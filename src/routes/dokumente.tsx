@@ -1,10 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useMemo } from "react";
 import { Upload, Receipt } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { useDokumente } from "@/hooks/useApi";
 import { formatEUR } from "@/lib/format";
 import { PageHeader, KpiCard } from "@/components/layout/PageHeader";
+import { PrimaryAction } from "@/components/layout/PrimaryAction";
 import { FilterBar } from "@/routes/angebote";
 
 export const Route = createFileRoute("/dokumente")({ component: Page });
