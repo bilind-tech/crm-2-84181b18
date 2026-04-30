@@ -441,7 +441,7 @@ export function seed() {
 
   return {
     unlocked: false,
-    masterPasswort: "admin",
+    masterPasswort: "040506",
     kunden: [k1, k2],
     ansprechpartner: [ap1],
     objekte: [o1, o2],

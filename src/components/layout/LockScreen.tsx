@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { useAuth } from "@/lib/auth";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,11 +24,21 @@ export function LockScreen() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background via-background to-accent/30 p-4">
-      <Card className="w-full max-w-md border-border/60 shadow-xl">
+      <Card className="w-full max-w-md border-border/60 p-2 shadow-2xl">
         <CardHeader className="text-center">
-          <img src={logo} alt="My Clean Center" className="mx-auto mb-3 h-16 w-16 object-contain" />
-          <CardTitle className="text-2xl">My Clean Center</CardTitle>
-          <CardDescription>Bitte gib dein Master-Passwort ein, um zu entsperren.</CardDescription>
+          <img
+            src={logo}
+            alt="My Clean Center"
+            className="mx-auto mb-4 h-28 w-28 object-contain drop-shadow-md"
+          />
+          <h1 className="text-2xl tracking-tight">
+            <span className="font-light">My </span>
+            <span className="font-extrabold">Clean</span>
+            <span className="font-light"> Center</span>
+          </h1>
+          <CardDescription className="mt-1">
+            Bitte gib dein Master-Passwort ein, um zu entsperren.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -49,14 +59,13 @@ export function LockScreen() {
               </div>
             </div>
             {fehler && (
-              <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{fehler}</p>
+              <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                {fehler}
+              </p>
             )}
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? "Entsperren …" : "Entsperren"}
             </Button>
-            <p className="text-center text-xs text-muted-foreground">
-              Mock-Modus · Standard-Passwort: <code className="rounded bg-muted px-1 py-0.5">admin</code>
-            </p>
           </form>
         </CardContent>
       </Card>
