@@ -95,10 +95,7 @@ function Page() {
         title="Rechnungen"
         subtitle="Rechnungen erstellen, Zahlungen erfassen, Mahnungen senden."
         actions={
-          <Button onClick={() => setOpen(true)} className="h-10 gap-1.5 rounded-full px-5 shadow-sm">
-            <Plus className="h-4 w-4" />
-            Neue Rechnung
-          </Button>
+          <PrimaryAction onClick={() => setOpen(true)} label="Neue Rechnung" />
         }
       />
 
