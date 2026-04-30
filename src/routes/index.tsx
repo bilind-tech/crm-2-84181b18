@@ -60,6 +60,7 @@ function Dashboard() {
           value={k?.aktiveKunden ?? 0}
           sublabel="aktiv"
           icon={Building2}
+          tone="primary"
         />
         <KpiCard
           label="Aufträge"
@@ -72,12 +73,14 @@ function Dashboard() {
           value={formatEUR(last6[last6.length - 1]?.brutto ?? 0)}
           sublabel="brutto"
           icon={Euro}
+          tone="success"
         />
         <KpiCard
           label="Offene Rechnungen"
           value={offene.length}
           sublabel={`${k?.offeneAngebote ?? 0} offene Angebote`}
           icon={FileText}
+          tone="danger"
         />
       </div>
 
