@@ -142,6 +142,7 @@ export interface Angebot {
   nummer: string; // "AN-2025-001"
   kundeId: ID;
   objektId?: ID;
+  ansprechpartnerId?: ID;
   titel: string;
   introText?: string;
   outroText?: string;
@@ -189,6 +190,7 @@ export interface Rechnung {
   nummer: string; // "RE-2025-001"
   kundeId: ID;
   objektId?: ID;
+  ansprechpartnerId?: ID;
   quellAngebotId?: ID;
   titel: string;
   introText?: string;
