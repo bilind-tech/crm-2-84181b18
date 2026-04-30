@@ -12,7 +12,7 @@ interface ThemeState {
 }
 
 const Ctx = createContext<ThemeState | null>(null);
-const STORAGE = "mcc_theme_v1";
+const STORAGE = "mcc_theme_v2";
 
 function applyAkzent(hex: string) {
   // Konvertiert Hex grob zu oklch — bei Tailwind v4 reicht --primary als CSS-Var-Setzung.
