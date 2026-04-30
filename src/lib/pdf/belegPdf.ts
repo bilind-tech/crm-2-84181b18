@@ -5,18 +5,20 @@
 import type { Angebot, Rechnung, Position, Kunde, Firmendaten } from "@/lib/api/types";
 import logoUrl from "@/assets/logo.png";
 
-let pdfMakeInstance: typeof import("pdfmake/build/pdfmake") | null = null;
+// pdfmake-Typen sind unvollständig — wir benutzen any-Cast, um Layout-Definitionen frei zu halten.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyPdfMake = any;
+let pdfMakeInstance: AnyPdfMake = null;
 
-async function getPdfMake() {
+async function getPdfMake(): Promise<AnyPdfMake> {
   if (pdfMakeInstance) return pdfMakeInstance;
   // Dynamische Imports — pdfmake darf nicht im SSR-Bundle landen.
-  const pm = (await import("pdfmake/build/pdfmake")).default;
-  const vfs = (await import("pdfmake/build/vfs_fonts")) as unknown as { default?: { vfs: Record<string, string> }; vfs?: Record<string, string> };
-  // Verschiedene Versionen exportieren das vfs unterschiedlich.
-  const vfsData = vfs.default?.vfs ?? vfs.vfs ?? (vfs as unknown as { pdfMake?: { vfs: Record<string, string> } }).pdfMake?.vfs;
-  if (vfsData) {
-    pm.vfs = vfsData;
-  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const pm: any = (await import("pdfmake/build/pdfmake")).default;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const vfs: any = await import("pdfmake/build/vfs_fonts");
+  const vfsData = vfs?.default?.vfs ?? vfs?.vfs ?? vfs?.pdfMake?.vfs ?? vfs?.default?.pdfMake?.vfs;
+  if (vfsData) pm.vfs = vfsData;
   pdfMakeInstance = pm;
   return pm;
 }
