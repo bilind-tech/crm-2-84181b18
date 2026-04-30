@@ -237,3 +237,21 @@ h1, h2, h3, h4, h5, h6 {
 .slide-over-overlay[data-state="closed"] {
   animation: slideOverFadeOut 180ms ease-out;
 }
+
+/* ---------- Page Transitions & Top Loader ---------- */
+@keyframes fadeInFast {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.animate-fade-in-fast {
+  animation: fadeInFast 140ms ease-out;
+}
+
+@keyframes topLoader {
+  0%   { transform: translateX(-120%); }
+  50%  { transform: translateX(40%); }
+  100% { transform: translateX(220%); }
+}
+.animate-top-loader {
+  animation: topLoader 1.1s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
