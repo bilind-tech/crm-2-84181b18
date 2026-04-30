@@ -437,6 +437,7 @@ export async function mockBackend<T>(method: string, path: string, body?: unknow
       notizen: a.notizen,
       status: a.status ?? "entwurf",
       archiviert: false,
+      optionen: a.optionen,
       erstelltAm: now(),
       geaendertAm: now(),
     };
