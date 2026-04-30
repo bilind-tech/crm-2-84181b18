@@ -27,13 +27,20 @@ import {
 import logo from "@/assets/logo.png";
 import { useAuth } from "@/lib/auth";
 
-const uebersicht = [
+type NavItem = {
+  title: string;
+  url: string;
+  icon: React.ComponentType<{ className?: string }>;
+  exact?: boolean;
+};
+
+const uebersicht: NavItem[] = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard, exact: true },
 ];
-const stammdaten = [
+const stammdaten: NavItem[] = [
   { title: "Kunden", url: "/kunden", icon: Users },
 ];
-const vertrieb = [
+const vertrieb: NavItem[] = [
   { title: "Angebote", url: "/angebote", icon: FileText },
   { title: "Aufträge", url: "/auftraege", icon: ClipboardList },
   { title: "Rechnungen", url: "/rechnungen", icon: Receipt },
@@ -41,7 +48,7 @@ const vertrieb = [
   { title: "Dokumente", url: "/dokumente", icon: FolderClosed },
   { title: "Steuer-Export", url: "/steuer-export", icon: Calculator },
 ];
-const system = [
+const system: NavItem[] = [
   { title: "Einstellungen", url: "/einstellungen", icon: Settings },
 ];
 
@@ -54,7 +61,7 @@ export function AppSidebar() {
   const isActive = (url: string, exact = false) =>
     exact ? path === url : path === url || path.startsWith(url + "/");
 
-  const renderGroup = (label: string, items: typeof uebersicht) => (
+  const renderGroup = (label: string, items: NavItem[]) => (
     <SidebarGroup>
       {!collapsed && (
         <SidebarGroupLabel className="px-3 text-[11px] font-medium uppercase tracking-wider text-muted-foreground/70">
