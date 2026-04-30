@@ -5,7 +5,7 @@ type Crumb = { label: string; to?: string };
 
 interface Props {
   title: string;
-  subtitle?: string;
+  subtitle?: React.ReactNode;
   /** Entweder ein einfacher String (eine Ebene) oder mehrere Krümel. */
   breadcrumb: string | Crumb[];
   /** @deprecated wird nicht mehr angezeigt */
