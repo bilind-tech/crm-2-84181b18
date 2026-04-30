@@ -49,10 +49,7 @@ function Page() {
         title="Kunden"
         subtitle="Stammdaten deiner Kunden zentral verwalten."
         actions={
-          <Button onClick={() => setOpen(true)} className="h-10 gap-1.5 rounded-full px-5 shadow-sm">
-            <Plus className="h-4 w-4" />
-            Neuer Kunde
-          </Button>
+          <PrimaryAction onClick={() => setOpen(true)} label="Neuer Kunde" />
         }
       />
 
