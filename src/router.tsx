@@ -1,4 +1,5 @@
 import { createRouter, useRouter } from "@tanstack/react-router";
+import { Loader2 } from "lucide-react";
 import { routeTree } from "./routeTree.gen";
 
 function DefaultErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
@@ -54,12 +55,24 @@ function DefaultErrorComponent({ error, reset }: { error: Error; reset: () => vo
   );
 }
 
+function DefaultPendingComponent() {
+  return (
+    <div className="flex min-h-[40vh] items-center justify-center text-muted-foreground">
+      <Loader2 className="h-6 w-6 animate-spin" />
+    </div>
+  );
+}
+
 export const getRouter = () => {
   const router = createRouter({
     routeTree,
     context: {},
     scrollRestoration: true,
+    defaultPreload: "intent",
     defaultPreloadStaleTime: 0,
+    defaultPendingMs: 80,
+    defaultPendingMinMs: 200,
+    defaultPendingComponent: DefaultPendingComponent,
     defaultErrorComponent: DefaultErrorComponent,
   });
 
