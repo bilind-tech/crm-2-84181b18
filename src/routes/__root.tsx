@@ -1,4 +1,4 @@
-import { Outlet, createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";
+import { Outlet, createRootRoute, HeadContent, Scripts, useRouterState } from "@tanstack/react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
 import appCss from "../styles.css?url";
@@ -39,7 +39,9 @@ function RootShell({ children }: { children: React.ReactNode }) {
 }
 
 function RootComponent() {
-  const [queryClient] = useState(() => new QueryClient({ defaultOptions: { queries: { staleTime: 5_000 } } }));
+  const [queryClient] = useState(
+    () => new QueryClient({ defaultOptions: { queries: { staleTime: 30_000 } } }),
+  );
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
@@ -52,16 +54,27 @@ function RootComponent() {
   );
 }
 
+function TopLoader() {
+  const isLoading = useRouterState({ select: (s) => s.isLoading });
+  if (!isLoading) return null;
+  return (
+    <div className="fixed inset-x-0 top-0 z-[60] h-[3px] overflow-hidden bg-primary/15">
+      <div className="h-full w-1/3 animate-top-loader bg-primary" />
+    </div>
+  );
+}
+
 function Shell() {
   const { unlocked } = useAuth();
   if (!unlocked) return <LockScreen />;
   return (
     <SidebarProvider>
+      <TopLoader />
       <div className="flex min-h-screen w-full">
         <AppSidebar />
         <div className="flex min-w-0 flex-1 flex-col">
           <AppHeader />
-          <main className="flex-1 p-4 sm:p-6">
+          <main key={typeof window !== "undefined" ? window.location.pathname : ""} className="flex-1 p-4 motion-safe:animate-fade-in-fast sm:p-6">
             <Outlet />
           </main>
         </div>
