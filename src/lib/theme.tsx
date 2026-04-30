@@ -33,8 +33,8 @@ function applyTheme(t: Theme) {
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>("system");
-  const [akzent, setAkzentState] = useState<string>("#0E9F8A");
+  const [theme, setThemeState] = useState<Theme>("hell");
+  const [akzent, setAkzentState] = useState<string>("#1E3A5F");
 
   useEffect(() => {
     try {
