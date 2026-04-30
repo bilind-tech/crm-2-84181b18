@@ -1,8 +1,9 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { Home, ChevronRight, Download, Send, FileCheck2 } from "lucide-react";
+import { createFileRoute } from "@tanstack/react-router";
+import { Download, Send, FileCheck2 } from "lucide-react";
 import { useAngebot, useSendeAngebot, useAngebotInRechnung } from "@/hooks/useApi";
 import { useAngebotPdf } from "@/hooks/useBelegPdf";
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/layout/PageHeader";
 import { formatEUR, formatDate } from "@/lib/format";
 import { summenRechnung } from "@/lib/mock/backend";
 import { toast } from "sonner";
