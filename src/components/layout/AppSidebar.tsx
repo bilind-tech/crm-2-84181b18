@@ -6,9 +6,6 @@ import {
   Receipt,
   FolderClosed,
   Settings,
-  ClipboardList,
-  AlertTriangle,
-  Calculator,
   Lock,
 } from "lucide-react";
 import {
@@ -42,11 +39,8 @@ const stammdaten: NavItem[] = [
 ];
 const vertrieb: NavItem[] = [
   { title: "Angebote", url: "/angebote", icon: FileText },
-  { title: "Aufträge", url: "/auftraege", icon: ClipboardList },
   { title: "Rechnungen", url: "/rechnungen", icon: Receipt },
-  { title: "Mahnwesen", url: "/mahnwesen", icon: AlertTriangle },
   { title: "Dokumente", url: "/dokumente", icon: FolderClosed },
-  { title: "Steuer-Export", url: "/steuer-export", icon: Calculator },
 ];
 const system: NavItem[] = [
   { title: "Einstellungen", url: "/einstellungen", icon: Settings },

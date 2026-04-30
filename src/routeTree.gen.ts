@@ -9,14 +9,11 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as SteuerExportRouteImport } from './routes/steuer-export'
 import { Route as RechnungenRouteImport } from './routes/rechnungen'
 import { Route as ObjekteRouteImport } from './routes/objekte'
-import { Route as MahnwesenRouteImport } from './routes/mahnwesen'
 import { Route as KundenRouteImport } from './routes/kunden'
 import { Route as EinstellungenRouteImport } from './routes/einstellungen'
 import { Route as DokumenteRouteImport } from './routes/dokumente'
-import { Route as AuftraegeRouteImport } from './routes/auftraege'
 import { Route as AngeboteRouteImport } from './routes/angebote'
 import { Route as AktivitaetRouteImport } from './routes/aktivitaet'
 import { Route as IndexRouteImport } from './routes/index'
@@ -29,11 +26,6 @@ import { Route as KundenIdRouteImport } from './routes/kunden.$id'
 import { Route as AngeboteNeuRouteImport } from './routes/angebote.neu'
 import { Route as AngeboteIdRouteImport } from './routes/angebote.$id'
 
-const SteuerExportRoute = SteuerExportRouteImport.update({
-  id: '/steuer-export',
-  path: '/steuer-export',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const RechnungenRoute = RechnungenRouteImport.update({
   id: '/rechnungen',
   path: '/rechnungen',
@@ -42,11 +34,6 @@ const RechnungenRoute = RechnungenRouteImport.update({
 const ObjekteRoute = ObjekteRouteImport.update({
   id: '/objekte',
   path: '/objekte',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const MahnwesenRoute = MahnwesenRouteImport.update({
-  id: '/mahnwesen',
-  path: '/mahnwesen',
   getParentRoute: () => rootRouteImport,
 } as any)
 const KundenRoute = KundenRouteImport.update({
@@ -62,11 +49,6 @@ const EinstellungenRoute = EinstellungenRouteImport.update({
 const DokumenteRoute = DokumenteRouteImport.update({
   id: '/dokumente',
   path: '/dokumente',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuftraegeRoute = AuftraegeRouteImport.update({
-  id: '/auftraege',
-  path: '/auftraege',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AngeboteRoute = AngeboteRouteImport.update({
@@ -129,14 +111,11 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/aktivitaet': typeof AktivitaetRoute
   '/angebote': typeof AngeboteRouteWithChildren
-  '/auftraege': typeof AuftraegeRoute
   '/dokumente': typeof DokumenteRoute
   '/einstellungen': typeof EinstellungenRoute
   '/kunden': typeof KundenRouteWithChildren
-  '/mahnwesen': typeof MahnwesenRoute
   '/objekte': typeof ObjekteRouteWithChildren
   '/rechnungen': typeof RechnungenRouteWithChildren
-  '/steuer-export': typeof SteuerExportRoute
   '/angebote/$id': typeof AngeboteIdRoute
   '/angebote/neu': typeof AngeboteNeuRoute
   '/kunden/$id': typeof KundenIdRoute
@@ -150,14 +129,11 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/aktivitaet': typeof AktivitaetRoute
   '/angebote': typeof AngeboteRouteWithChildren
-  '/auftraege': typeof AuftraegeRoute
   '/dokumente': typeof DokumenteRoute
   '/einstellungen': typeof EinstellungenRoute
   '/kunden': typeof KundenRouteWithChildren
-  '/mahnwesen': typeof MahnwesenRoute
   '/objekte': typeof ObjekteRouteWithChildren
   '/rechnungen': typeof RechnungenRouteWithChildren
-  '/steuer-export': typeof SteuerExportRoute
   '/angebote/$id': typeof AngeboteIdRoute
   '/angebote/neu': typeof AngeboteNeuRoute
   '/kunden/$id': typeof KundenIdRoute
@@ -172,14 +148,11 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/aktivitaet': typeof AktivitaetRoute
   '/angebote': typeof AngeboteRouteWithChildren
-  '/auftraege': typeof AuftraegeRoute
   '/dokumente': typeof DokumenteRoute
   '/einstellungen': typeof EinstellungenRoute
   '/kunden': typeof KundenRouteWithChildren
-  '/mahnwesen': typeof MahnwesenRoute
   '/objekte': typeof ObjekteRouteWithChildren
   '/rechnungen': typeof RechnungenRouteWithChildren
-  '/steuer-export': typeof SteuerExportRoute
   '/angebote/$id': typeof AngeboteIdRoute
   '/angebote/neu': typeof AngeboteNeuRoute
   '/kunden/$id': typeof KundenIdRoute
@@ -195,14 +168,11 @@ export interface FileRouteTypes {
     | '/'
     | '/aktivitaet'
     | '/angebote'
-    | '/auftraege'
     | '/dokumente'
     | '/einstellungen'
     | '/kunden'
-    | '/mahnwesen'
     | '/objekte'
     | '/rechnungen'
-    | '/steuer-export'
     | '/angebote/$id'
     | '/angebote/neu'
     | '/kunden/$id'
@@ -216,14 +186,11 @@ export interface FileRouteTypes {
     | '/'
     | '/aktivitaet'
     | '/angebote'
-    | '/auftraege'
     | '/dokumente'
     | '/einstellungen'
     | '/kunden'
-    | '/mahnwesen'
     | '/objekte'
     | '/rechnungen'
-    | '/steuer-export'
     | '/angebote/$id'
     | '/angebote/neu'
     | '/kunden/$id'
@@ -237,14 +204,11 @@ export interface FileRouteTypes {
     | '/'
     | '/aktivitaet'
     | '/angebote'
-    | '/auftraege'
     | '/dokumente'
     | '/einstellungen'
     | '/kunden'
-    | '/mahnwesen'
     | '/objekte'
     | '/rechnungen'
-    | '/steuer-export'
     | '/angebote/$id'
     | '/angebote/neu'
     | '/kunden/$id'
@@ -259,25 +223,15 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AktivitaetRoute: typeof AktivitaetRoute
   AngeboteRoute: typeof AngeboteRouteWithChildren
-  AuftraegeRoute: typeof AuftraegeRoute
   DokumenteRoute: typeof DokumenteRoute
   EinstellungenRoute: typeof EinstellungenRoute
   KundenRoute: typeof KundenRouteWithChildren
-  MahnwesenRoute: typeof MahnwesenRoute
   ObjekteRoute: typeof ObjekteRouteWithChildren
   RechnungenRoute: typeof RechnungenRouteWithChildren
-  SteuerExportRoute: typeof SteuerExportRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/steuer-export': {
-      id: '/steuer-export'
-      path: '/steuer-export'
-      fullPath: '/steuer-export'
-      preLoaderRoute: typeof SteuerExportRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/rechnungen': {
       id: '/rechnungen'
       path: '/rechnungen'
@@ -290,13 +244,6 @@ declare module '@tanstack/react-router' {
       path: '/objekte'
       fullPath: '/objekte'
       preLoaderRoute: typeof ObjekteRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/mahnwesen': {
-      id: '/mahnwesen'
-      path: '/mahnwesen'
-      fullPath: '/mahnwesen'
-      preLoaderRoute: typeof MahnwesenRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/kunden': {
@@ -318,13 +265,6 @@ declare module '@tanstack/react-router' {
       path: '/dokumente'
       fullPath: '/dokumente'
       preLoaderRoute: typeof DokumenteRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/auftraege': {
-      id: '/auftraege'
-      path: '/auftraege'
-      fullPath: '/auftraege'
-      preLoaderRoute: typeof AuftraegeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/angebote': {
@@ -465,14 +405,11 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AktivitaetRoute: AktivitaetRoute,
   AngeboteRoute: AngeboteRouteWithChildren,
-  AuftraegeRoute: AuftraegeRoute,
   DokumenteRoute: DokumenteRoute,
   EinstellungenRoute: EinstellungenRoute,
   KundenRoute: KundenRouteWithChildren,
-  MahnwesenRoute: MahnwesenRoute,
   ObjekteRoute: ObjekteRouteWithChildren,
   RechnungenRoute: RechnungenRouteWithChildren,
-  SteuerExportRoute: SteuerExportRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -3,9 +3,9 @@ import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import {
   Building2,
-  Sparkles,
+  Palette,
   Hash,
-  AlertTriangle,
+  Bell,
   FileText,
   Cloud,
   Save,
@@ -23,9 +23,9 @@ export const Route = createFileRoute("/einstellungen")({ component: Page });
 
 const tabs = [
   { id: "firmendaten", label: "Firmendaten", icon: Building2 },
-  { id: "erscheinungsbild", label: "Erscheinungsbild", icon: Sparkles },
+  { id: "erscheinungsbild", label: "Erscheinungsbild", icon: Palette },
   { id: "nummernkreise", label: "Nummernkreise", icon: Hash },
-  { id: "mahnwesen", label: "Mahnwesen", icon: AlertTriangle },
+  { id: "mahnwesen", label: "Mahnwesen", icon: Bell },
   { id: "vorlagen", label: "Textbausteine & Vorlagen", icon: FileText },
   { id: "drive", label: "Google Drive", icon: Cloud },
   { id: "backup", label: "Backup & Download", icon: Save },
