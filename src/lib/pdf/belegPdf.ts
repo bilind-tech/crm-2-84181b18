@@ -72,6 +72,7 @@ function kundeAdresse(k: Kunde) {
 interface PdfContext {
   firma: Firmendaten;
   kunde: Kunde;
+  ansprechpartner?: Ansprechpartner;
 }
 
 function header(absenderzeile: string, logo: string | null) {
