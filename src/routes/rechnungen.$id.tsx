@@ -13,6 +13,8 @@ import { ZahlungErfassenDialog } from "@/components/forms/ZahlungErfassenDialog"
 import { EmailVersandDialog } from "@/components/email/EmailVersandDialog";
 import { EmailVersandHistorie } from "@/components/email/EmailVersandHistorie";
 import { MahnSektion } from "@/components/mahnung/MahnSektion";
+import { PdfViewButton } from "@/components/pdf/PdfViewButton";
+import { PdfPreviewCard } from "@/components/pdf/PdfPreviewCard";
 import { formatEUR, formatDate } from "@/lib/format";
 import { summenRechnung } from "@/lib/mock/backend";
 import { toast } from "sonner";

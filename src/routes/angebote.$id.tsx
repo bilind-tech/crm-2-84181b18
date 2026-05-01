@@ -13,6 +13,8 @@ import { useAngebotPdf } from "@/hooks/useBelegPdf";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { FlowBar } from "@/components/flow/FlowBar";
+import { PdfViewButton } from "@/components/pdf/PdfViewButton";
+import { PdfPreviewCard } from "@/components/pdf/PdfPreviewCard";
 import { angebotFlow } from "@/lib/flow/flows";
 import { EmailVersandDialog } from "@/components/email/EmailVersandDialog";
 import { EmailVersandHistorie } from "@/components/email/EmailVersandHistorie";
