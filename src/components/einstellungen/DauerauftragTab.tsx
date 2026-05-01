@@ -67,23 +67,25 @@ export function DauerauftragTab() {
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <Label className="text-xs font-medium">Standard-Stichtag</Label>
-            <select
-              className="mt-1.5 h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+            <Select
               value={form.defaultStichtag.typ}
-              onChange={(e) =>
+              onValueChange={(v) =>
                 setForm({
                   ...form,
                   defaultStichtag: {
                     ...form.defaultStichtag,
-                    typ: e.target.value as DauerauftragStichtag["typ"],
+                    typ: v as DauerauftragStichtag["typ"],
                   },
                 })
               }
             >
-              <option value="monatstag">Tag im Monat</option>
-              <option value="monatsletzter">Letzter Monatstag</option>
-              <option value="quartalstag">Tag im Quartalsmonat</option>
-            </select>
+              <SelectTrigger className="mt-1.5 h-10"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="monatstag">Tag im Monat</SelectItem>
+                <SelectItem value="monatsletzter">Letzter Monatstag</SelectItem>
+                <SelectItem value="quartalstag">Tag im Quartalsmonat</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           <div>
             <Label className="text-xs font-medium">Tag (1–28)</Label>
