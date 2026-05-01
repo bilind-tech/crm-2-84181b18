@@ -266,12 +266,11 @@ h1, h2, h3, h4, h5, h6 {
   to   { opacity: 0; }
 }
 .quick-create-dialog {
-  /* Radix-Defaults (slide/zoom) komplett deaktivieren */
+  /* Radix-Slide/Zoom deaktivieren — Positionierung von Radix beibehalten */
   animation: none !important;
-  transform: translate(-50%, -50%) !important;
 }
 .quick-create-dialog[data-state="open"] {
-  animation: quickCreateFadeIn 110ms ease-out !important;
+  animation: quickCreateFadeIn 120ms ease-out !important;
 }
 .quick-create-dialog[data-state="closed"] {
   animation: quickCreateFadeOut 90ms ease-in !important;
