@@ -185,6 +185,15 @@ function Page() {
       </div>
 
       <ZahlungErfassenDialog open={zahlungOpen} onOpenChange={setZahlungOpen} rechnung={r} />
+      <EmailVersandDialog
+        open={emailOpen}
+        onOpenChange={setEmailOpen}
+        kontext={r.status === "ueberfaellig" ? "mahnung" : "rechnung"}
+        kunde={kunde}
+        rechnung={r}
+        pdfBlobUrl={pdf.url}
+        pdfDateiname={`${r.nummer}.pdf`}
+      />
     </div>
   );
 }
