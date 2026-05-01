@@ -156,13 +156,14 @@ function Page() {
                     >
                       <Eye className="h-4 w-4" />
                     </Link>
-                    <button
-                      onClick={() => send.mutate()}
+                    <Link
+                      to="/angebote/$id"
+                      params={{ id: a.id }}
                       className="rounded-md p-1.5 hover:bg-muted hover:text-primary"
                       title="Senden"
                     >
                       <Send className="h-4 w-4" />
-                    </button>
+                    </Link>
                     <button
                       onClick={() => {
                         if (confirm(`Angebot ${a.nummer} löschen?`)) del.mutate(a.id);
