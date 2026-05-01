@@ -1,8 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { LoadingPlaceholder } from "@/components/layout/LoadingPlaceholder";
 import { useState } from "react";
-import { Download, Send, CheckCircle2, Wallet, Banknote } from "lucide-react";
-import { useRechnung, useAngebot, useKunde } from "@/hooks/useApi";
+import { Download, Send, CheckCircle2, Wallet, Banknote, Trash2 } from "lucide-react";
+import { useRechnung, useAngebot, useKunde, useDeleteZahlung } from "@/hooks/useApi";
+import { useConfirm } from "@/hooks/useConfirm";
 import { useRechnungPdf } from "@/hooks/useBelegPdf";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/layout/PageHeader";
