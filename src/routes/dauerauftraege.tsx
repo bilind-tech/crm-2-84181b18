@@ -38,7 +38,7 @@ function Liste() {
     const aktive = alle.filter((d) => d.status === "aktiv");
     let mrr = 0;
     for (const da of aktive) {
-      const s = summenRechnung(da.positionen, da.rabattGesamt, da.steuersatz);
+      const s = summenRechnung(da.positionen, da.rabattGesamt);
       mrr += monatlicheBrutto(da, s.brutto);
     }
     return {
@@ -92,7 +92,7 @@ function Liste() {
           </thead>
           <tbody>
             {alle.map((da) => {
-              const s = summenRechnung(da.positionen, da.rabattGesamt, da.steuersatz);
+              const s = summenRechnung(da.positionen, da.rabattGesamt);
               const naechste = berechneNaechsteLauftermine(da, heute, 1)[0];
               return (
                 <tr key={da.id} className="border-b border-border last:border-0 transition-colors hover:bg-muted/40">

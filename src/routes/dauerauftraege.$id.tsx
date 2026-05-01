@@ -37,7 +37,7 @@ function Page() {
 
   if (!da) return <p className="text-sm text-muted-foreground">Lade …</p>;
 
-  const s = summenRechnung(da.positionen, da.rabattGesamt, da.steuersatz);
+  const s = summenRechnung(da.positionen, da.rabattGesamt);
   const heute = new Date();
   const naechste = berechneNaechsteLauftermine(da, heute, 5);
   const mrr = monatlicheBrutto(da, s.brutto);
