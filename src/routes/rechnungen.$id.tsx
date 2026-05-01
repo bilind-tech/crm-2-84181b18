@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { LoadingPlaceholder } from "@/components/layout/LoadingPlaceholder";
 import { useState } from "react";
-import { Download, Send, CheckCircle2, Wallet, Banknote, Trash2 } from "lucide-react";
+import { Download, Send, CheckCircle2, Wallet, Trash2 } from "lucide-react";
 import { useRechnung, useAngebot, useKunde, useDeleteZahlung } from "@/hooks/useApi";
 import { useConfirm } from "@/hooks/useConfirm";
 import { useRechnungPdf } from "@/hooks/useBelegPdf";
@@ -141,7 +141,6 @@ function Page() {
               <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Zahlungen</p>
               <ul className="space-y-2 text-sm">
                 {r.zahlungen.map((z) => {
-                  const ausBank = z.referenz?.startsWith("Bank-Eingang");
                   return (
                     <li key={z.id} className="flex items-baseline justify-between gap-3">
                       <div className="min-w-0">
@@ -149,15 +148,6 @@ function Page() {
                           <span className="text-muted-foreground">
                             {formatDate(z.datum)} · {z.methode}
                           </span>
-                          {ausBank && (
-                            <Link
-                              to="/zahlungseingaenge"
-                              className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary hover:bg-primary/20"
-                              title="Aus Bank-Eingang zugeordnet"
-                            >
-                              <Banknote className="h-2.5 w-2.5" /> Bank
-                            </Link>
-                          )}
                         </div>
                         {z.notiz && (
                           <p className="mt-0.5 line-clamp-1 text-[11px] text-muted-foreground/80">

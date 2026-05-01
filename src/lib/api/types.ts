@@ -633,39 +633,7 @@ export interface DauerauftragSonderposition {
   verbrauchtAm?: ISODateTime;
 }
 
-// ---------- Zahlungseingänge & Abgleich ----------
-
-export type ZahlungseingangStatus = "offen" | "zugeordnet" | "teilweise" | "ignoriert";
-
-export interface ZahlungseingangZuordnung {
-  rechnungId: ID;
-  /** FK auf erzeugte `Zahlung` (in der Rechnung gespeichert). */
-  zahlungId: ID;
-  /** Anteilig zugeordneter Betrag (für Sammelüberweisungen-Splits). */
-  betrag: number;
-  /** Optional: Score, mit dem zugeordnet wurde (für spätere Statistik). */
-  score?: number;
-}
-
-export interface Zahlungseingang {
-  id: ID;
-  buchungsdatum: ISODate;
-  /** Immer positiv. Lastschriften/Ausgänge werden beim Import herausgefiltert. */
-  betrag: number;
-  waehrung: "EUR";
-  verwendungszweck: string;
-  senderName?: string;
-  senderIban?: string;
-  status: ZahlungseingangStatus;
-  zuordnungen: ZahlungseingangZuordnung[];
-  importQuelle: "manuell" | "csv";
-  importiertAm: ISODateTime;
-}
-
-export interface ZahlungsabgleichEinstellungen {
-  /** Score-Schwelle, ab der ein Eingang ohne Klick zugeordnet wird (0 = aus). */
-  autoZuordnenAbScore: number;
-}
+// ---------- Dauerauftrag-Einstellungen (continued) ----------
 
 export interface DauerauftragEinstellungen {
   defaultModus: DauerauftragModus;

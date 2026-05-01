@@ -6,7 +6,6 @@ import {
 } from "@/hooks/useApi";
 import { useMahnZaehler } from "@/hooks/useMahnZaehler";
 import { useDauerauftraege, useDauerauftragLaeufe } from "@/hooks/useDauerauftraege";
-import { useZahlungseingaenge } from "@/hooks/useZahlungseingaenge";
 import { monatlicheBrutto } from "@/lib/dauerauftrag/termine";
 import { summenRechnung } from "@/lib/mock/backend";
 import { formatEUR, formatDate } from "@/lib/format";
@@ -20,7 +19,6 @@ import {
   ArrowRight,
   Repeat,
   Inbox,
-  Banknote,
 } from "lucide-react";
 import {
   Bar,
@@ -44,8 +42,6 @@ function Dashboard() {
   const mahn = useMahnZaehler();
   const { data: dauerauftraege = [] } = useDauerauftraege();
   const { data: laeufeErzeugt = [] } = useDauerauftragLaeufe("erzeugt");
-  const { data: offeneEingaenge = [] } = useZahlungseingaenge("offen");
-  const { data: teilweiseEingaenge = [] } = useZahlungseingaenge("teilweise");
 
   const aktiveDA = dauerauftraege.filter((d) => d.status === "aktiv");
   const mrr = aktiveDA.reduce((sum, da) => {
@@ -192,17 +188,9 @@ function Dashboard() {
         </div>
 
         <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-          <div className="mb-3 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Bell className="h-4 w-4 text-warning" />
-              <h2 className="text-base font-semibold">Mahnwesen</h2>
-            </div>
-            <Link
-              to="/mahnungen"
-              className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
-            >
-              Cockpit öffnen <ArrowRight className="h-3 w-3" />
-            </Link>
+          <div className="mb-3 flex items-center gap-2">
+            <Bell className="h-4 w-4 text-warning" />
+            <h2 className="text-base font-semibold">Mahnwesen</h2>
           </div>
           {mahn.aktionEmpfohlen === 0 && mahn.ueberfaellig === 0 ? (
             <div className="py-6 text-center">
@@ -286,61 +274,6 @@ function Dashboard() {
         )}
       </div>
 
-      <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-        <div className="mb-3 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Banknote className="h-4 w-4 text-primary" />
-            <h2 className="text-base font-semibold">Zahlungseingänge</h2>
-          </div>
-          <Link
-            to="/zahlungseingaenge"
-            className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
-          >
-            Übersicht öffnen <ArrowRight className="h-3 w-3" />
-          </Link>
-        </div>
-        {offeneEingaenge.length === 0 && teilweiseEingaenge.length === 0 ? (
-          <div className="py-6 text-center">
-            <CheckCircle2 className="mx-auto h-6 w-6 text-success" />
-            <p className="mt-2 text-sm text-muted-foreground">
-              Alle Bank-Eingänge sind zugeordnet.
-            </p>
-          </div>
-        ) : (
-          <div className="grid gap-3 sm:grid-cols-3">
-            <div className="rounded-xl border border-border bg-muted/30 p-3">
-              <p className="text-xs font-medium text-muted-foreground">Offen</p>
-              <p className="mt-1 text-2xl font-semibold text-primary">
-                {offeneEingaenge.length}
-              </p>
-              <p className="text-[11px] text-muted-foreground">
-                {formatEUR(offeneEingaenge.reduce((a, z) => a + z.betrag, 0))}
-              </p>
-            </div>
-            <div className="rounded-xl border border-border bg-muted/30 p-3">
-              <p className="text-xs font-medium text-muted-foreground">Teilweise</p>
-              <p className="mt-1 text-2xl font-semibold">
-                {teilweiseEingaenge.length}
-              </p>
-              <p className="text-[11px] text-muted-foreground">Rest noch zuordnen</p>
-            </div>
-            <Link
-              to="/zahlungseingaenge"
-              className="rounded-xl border border-primary/40 bg-primary/5 p-3 transition hover:bg-primary/10"
-            >
-              <p className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                <Inbox className="h-3 w-3" /> Posteingang
-              </p>
-              <p className="mt-1 text-sm font-semibold text-primary">
-                Jetzt zuordnen
-              </p>
-              <p className="text-[11px] text-muted-foreground">
-                Vorschläge mit Score 0–100
-              </p>
-            </Link>
-          </div>
-        )}
-      </div>
     </div>
   );
 }

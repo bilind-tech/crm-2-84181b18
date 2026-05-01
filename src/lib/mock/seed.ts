@@ -37,8 +37,6 @@ import type {
   SicherheitsEinstellungen,
   SmtpEinstellungen,
   Textvorlage,
-  Zahlungseingang,
-  ZahlungsabgleichEinstellungen,
 } from "@/lib/api/types";
 import { STANDARD_MAHN_EINSTELLUNGEN, standardMahnVorlagen } from "@/lib/mahnung/defaults";
 
@@ -243,15 +241,10 @@ export function seed() {
   const dauerauftraege: Dauerauftrag[] = [];
   const dauerauftragLaeufe: DauerauftragLauf[] = [];
   const dauerauftragSonderpositionen: DauerauftragSonderposition[] = [];
-  const zahlungseingaenge: Zahlungseingang[] = [];
 
   const dauerauftragEinstellungen: DauerauftragEinstellungen = {
     defaultModus: "entwurf",
     defaultStichtag: { typ: "monatstag", wert: 1 },
-  };
-
-  const zahlungsabgleich: ZahlungsabgleichEinstellungen = {
-    autoZuordnenAbScore: 0, // 0 = aus; User aktiviert in Einstellungen
   };
 
   return {
@@ -284,9 +277,7 @@ export function seed() {
     dauerauftraege,
     dauerauftragLaeufe,
     dauerauftragSonderpositionen,
-    zahlungseingaenge,
     dauerauftragEinstellungen,
-    zahlungsabgleich,
     zaehler: { kunde: 0, objekt: 0, angebot: 0, rechnung: 0, dauerauftrag: 0 },
   };
 }

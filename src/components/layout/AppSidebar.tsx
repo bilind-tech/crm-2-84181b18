@@ -7,9 +7,6 @@ import {
   FolderClosed,
   Settings,
   Lock,
-  Bell,
-  Repeat,
-  Banknote,
 } from "lucide-react";
 import {
   Sidebar,
@@ -26,10 +23,6 @@ import {
 } from "@/components/ui/sidebar";
 import logo from "@/assets/logo.png";
 import { useAuth } from "@/lib/auth";
-import { useMahnZaehler } from "@/hooks/useMahnZaehler";
-import { useDauerauftragLaeufe } from "@/hooks/useDauerauftraege";
-import { useRechnungen } from "@/hooks/useApi";
-import { useZahlungseingaenge } from "@/hooks/useZahlungseingaenge";
 import { cn } from "@/lib/utils";
 
 type NavItem = {
@@ -46,18 +39,6 @@ export function AppSidebar() {
   const collapsed = state === "collapsed";
   const path = useRouterState({ select: (r) => r.location.pathname });
   const { lock } = useAuth();
-  const mahn = useMahnZaehler();
-  const { data: laeufeErzeugt = [] } = useDauerauftragLaeufe("erzeugt");
-  const { data: alleRechnungen = [] } = useRechnungen();
-  const { data: offeneEingaenge = [] } = useZahlungseingaenge("offen");
-  const { data: teilweiseEingaenge = [] } = useZahlungseingaenge("teilweise");
-  const offeneEntwuerfe = laeufeErzeugt.filter((l) => {
-    if (!l.rechnungId) return false;
-    const r = alleRechnungen.find((rr) => rr.id === l.rechnungId);
-    return r?.status === "entwurf";
-  }).length;
-  const offeneZahlungen = offeneEingaenge.length + teilweiseEingaenge.length;
-  
 
   const uebersicht: NavItem[] = [
     { title: "Dashboard", url: "/", icon: LayoutDashboard, exact: true },
@@ -68,27 +49,6 @@ export function AppSidebar() {
   const vertrieb: NavItem[] = [
     { title: "Angebote", url: "/angebote", icon: FileText },
     { title: "Rechnungen", url: "/rechnungen", icon: Receipt },
-    {
-      title: "Daueraufträge",
-      url: "/dauerauftraege",
-      icon: Repeat,
-      badge: offeneEntwuerfe,
-      badgeTone: "primary",
-    },
-    {
-      title: "Mahnungen",
-      url: "/mahnungen",
-      icon: Bell,
-      badge: mahn.aktionEmpfohlen,
-      badgeTone: mahn.inkassoReif > 0 ? "danger" : "warning",
-    },
-    {
-      title: "Zahlungseingänge",
-      url: "/zahlungseingaenge",
-      icon: Banknote,
-      badge: offeneZahlungen,
-      badgeTone: "primary",
-    },
     { title: "Dokumente", url: "/dokumente", icon: FolderClosed },
   ];
   const system: NavItem[] = [
