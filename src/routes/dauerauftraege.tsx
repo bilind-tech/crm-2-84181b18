@@ -85,7 +85,7 @@ function Liste() {
           return (
             <MobileListCard
               key={da.id}
-              onClick={() => {}}
+              onClick={undefined}
               title={da.bezeichnung}
               subtitle={kundeName(da.kundeId)}
               meta={
