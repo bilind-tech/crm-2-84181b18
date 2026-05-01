@@ -395,7 +395,7 @@ export function BelegForm({ mode, onClose, defaultKundeId }: Props) {
         </div>
       )}
 
-      <div className="flex items-center justify-end gap-2 border-t border-border pt-4">
+      <div className="sticky bottom-0 -mx-4 -mb-6 mt-2 flex flex-col-reverse items-stretch gap-2 border-t border-border bg-background px-4 py-3 sm:-mx-8 sm:px-8 sm:flex-row sm:items-center sm:justify-end ">
         <Button variant="outline" onClick={onClose}>Abbrechen</Button>
         <Button disabled={pending} onClick={submit} className="rounded-md px-6">
           {pending ? "Speichere…" : mode === "angebot" ? "Angebot anlegen" : "Rechnung anlegen"}

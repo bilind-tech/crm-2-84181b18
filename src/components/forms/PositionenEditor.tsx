@@ -80,7 +80,89 @@ export function PositionenEditor({ positionen, onChange, defaultSteuersatz = 19 
 
   return (
     <div className="rounded-2xl border border-border bg-card/50">
-      <div className="overflow-x-auto">
+      {/* Mobil: Card-View pro Position */}
+      <div className="space-y-3 p-3 md:hidden">
+        {positionen.map((p, i) => (
+          <div key={p.id} className="rounded-xl border border-border bg-background p-3 shadow-sm">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-xs font-semibold text-muted-foreground">Position {i + 1}</span>
+              <button
+                onClick={() => remove(i)}
+                className="rounded-md p-1.5 text-destructive hover:bg-destructive/10"
+                aria-label="Position entfernen"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </div>
+            <Input
+              value={p.beschreibung}
+              onChange={(e) => update(i, { beschreibung: e.target.value })}
+              placeholder="Leistungsbeschreibung"
+              className="mb-2 h-10"
+            />
+            <div className="grid grid-cols-2 gap-2">
+              <label className="block">
+                <span className="mb-1 block text-[11px] font-medium text-muted-foreground">Menge</span>
+                <Input
+                  type="number"
+                  inputMode="decimal"
+                  value={p.menge}
+                  onChange={(e) => update(i, { menge: Number(e.target.value) || 0 })}
+                  className="h-10"
+                />
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-[11px] font-medium text-muted-foreground">Einheit</span>
+                <Select
+                  value={p.einheit}
+                  onValueChange={(v) => update(i, { einheit: v as Einheit })}
+                >
+                  <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {EINHEITEN.map((u) => (
+                      <SelectItem key={u.value} value={u.value}>{u.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-[11px] font-medium text-muted-foreground">Einzelpreis €</span>
+                <Input
+                  type="number"
+                  inputMode="decimal"
+                  step="0.01"
+                  value={p.einzelpreisNetto}
+                  onChange={(e) => update(i, { einzelpreisNetto: Number(e.target.value) || 0 })}
+                  className="h-10"
+                />
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-[11px] font-medium text-muted-foreground">MwSt %</span>
+                <Input
+                  type="number"
+                  inputMode="decimal"
+                  value={p.steuersatz}
+                  onChange={(e) => update(i, { steuersatz: Number(e.target.value) || 0 })}
+                  className="h-10"
+                />
+              </label>
+            </div>
+            <div className="mt-2 flex justify-end border-t border-border pt-2 text-sm">
+              <span className="text-muted-foreground">
+                Summe <span className="ml-1 font-semibold text-foreground">{formatEUR(summe(p))}</span>
+              </span>
+            </div>
+          </div>
+        ))}
+        {positionen.length === 0 && (
+          <div className="rounded-xl border border-dashed border-border p-6 text-center text-xs text-muted-foreground">
+            Noch keine Positionen.
+          </div>
+        )}
+      </div>
+
+      {/* Desktop: Tabelle */}
+      <div className="hidden overflow-x-auto md:block">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border bg-muted/40 text-left text-[11px] uppercase tracking-wider text-muted-foreground">
@@ -170,7 +252,7 @@ export function PositionenEditor({ positionen, onChange, defaultSteuersatz = 19 
         <Button variant="outline" size="sm" onClick={add} className="rounded-full">
           <Plus className="mr-1 h-3.5 w-3.5" /> Position hinzufügen
         </Button>
-        <div className="flex gap-6 text-sm">
+        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs sm:text-sm">
           <span className="text-muted-foreground">
             Netto <span className="ml-1 font-semibold text-foreground">{formatEUR(totals.netto)}</span>
           </span>

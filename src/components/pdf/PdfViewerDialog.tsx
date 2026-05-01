@@ -4,7 +4,7 @@ import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
 import "@/lib/pdf/pdfjsWorker";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+
 import { Download, Loader2, AlertCircle } from "lucide-react";
 import { DriveStatusBadge } from "./DriveStatusBadge";
 import type { DriveSyncInfo } from "@/lib/api/types";
@@ -76,12 +76,12 @@ export function PdfViewerDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="flex h-[90vh] max-h-[90vh] w-[95vw] max-w-5xl flex-col gap-0 overflow-hidden bg-background p-0"
+        className="flex h-[100dvh] max-h-[100dvh] w-screen max-w-none flex-col gap-0 overflow-hidden rounded-none border-0 bg-background p-0 sm:h-[90vh] sm:max-h-[90vh] sm:w-[95vw] sm:max-w-5xl sm:rounded-lg sm:border"
       >
-        <DialogHeader className="flex-row items-center justify-between gap-3 space-y-0 border-b border-border px-4 py-3 sm:px-6">
+        <DialogHeader className="flex-row items-center justify-between gap-2 space-y-0 border-b border-border px-3 py-2 sm:gap-3 sm:px-6 sm:py-3">
           <div className="min-w-0 flex-1">
-            <DialogTitle className="truncate text-base font-semibold">{title}</DialogTitle>
-            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            <DialogTitle className="truncate pr-8 text-sm font-semibold sm:pr-0 sm:text-base">{title}</DialogTitle>
+            <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground sm:mt-1">
               {numPages > 0 ? (
                 <span>
                   Seite <span className="font-medium text-foreground">{currentPage}</span> von{" "}
@@ -94,28 +94,25 @@ export function PdfViewerDialog({
               <DriveStatusBadge drive={drive} />
             </div>
           </div>
-          <Button
-            asChild
-            variant="outline"
-            size="sm"
-            disabled={!pdfUrl}
-            className="shrink-0"
-          >
-            {pdfUrl ? (
-              <a href={pdfUrl} download={fileName}>
-                <Download className="mr-1.5 h-4 w-4" />
-                Download
-              </a>
-            ) : (
-              <span>
-                <Download className="mr-1.5 h-4 w-4" />
-                Download
-              </span>
-            )}
-          </Button>
+          {pdfUrl ? (
+            <a
+              href={pdfUrl}
+              download={fileName}
+              className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-md border border-input bg-background px-2 text-sm font-medium hover:bg-accent sm:px-3"
+              aria-label="Download"
+            >
+              <Download className="h-4 w-4" />
+              <span className="hidden sm:inline">Download</span>
+            </a>
+          ) : (
+            <span className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-md border border-input bg-background px-2 text-sm font-medium opacity-50 sm:px-3">
+              <Download className="h-4 w-4" />
+              <span className="hidden sm:inline">Download</span>
+            </span>
+          )}
         </DialogHeader>
 
-        <div ref={containerRef} className="flex-1 overflow-y-auto bg-muted/30 px-2 py-4 sm:px-6">
+        <div ref={containerRef} className="flex-1 overflow-y-auto bg-muted/30 px-1 py-3 sm:px-6 sm:py-4">
           {isLoading && (
             <div className="flex h-full min-h-[60vh] flex-col items-center justify-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="h-6 w-6 animate-spin" />
@@ -154,7 +151,7 @@ export function PdfViewerDialog({
                 >
                   <Page
                     pageNumber={pageNum}
-                    width={Math.min(containerWidth - 16, 900)}
+                    width={Math.min(containerWidth - 4, 900)}
                     renderAnnotationLayer={false}
                     renderTextLayer={false}
                   />
