@@ -344,6 +344,57 @@ export interface SmtpEinstellungen {
   ssl: boolean;
 }
 
+// ---------- E-Mail (Vorlagen, Signaturen, Versand) ----------
+
+export type EmailKontext = "angebot" | "rechnung" | "mahnung" | "allgemein";
+
+export interface EmailVorlage {
+  id: ID;
+  name: string;
+  kontext: EmailKontext;
+  betreff: string; // mit {{platzhalter}}
+  koerperHtml: string; // HTML-Body mit Platzhaltern
+  istStandard: boolean;
+  erstelltAm: ISODateTime;
+  aktualisiertAm: ISODateTime;
+}
+
+export interface EmailSignatur {
+  id: ID;
+  name: string;
+  html: string;
+  istStandard: boolean;
+  erstelltAm: ISODateTime;
+}
+
+export type EmailVersandStatus = "queued" | "sending" | "sent" | "failed";
+
+export interface EmailAnhang {
+  name: string;
+  sizeBytes: number;
+  /** Im Mock: nur Metadaten. Backend bekommt das echte PDF zur Sendezeit. */
+  kind: "pdf-beleg" | "datei";
+}
+
+export interface EmailVersand {
+  id: ID;
+  belegTyp: "angebot" | "rechnung" | "allgemein";
+  belegId?: ID;
+  kundeId?: ID;
+  empfaenger: string[];
+  cc: string[];
+  bcc: string[];
+  betreff: string;
+  koerperHtml: string;
+  vorlageId?: ID;
+  signaturId?: ID;
+  anhaenge: EmailAnhang[];
+  status: EmailVersandStatus;
+  versendetAm?: ISODateTime;
+  fehlerGrund?: string;
+  messageId?: string;
+}
+
 export interface Nummernkreise {
   kundePraefix: string; // z.B. "K-{YYYY}-{####}"
   angebotPraefix: string; // "AN-{YYYY}-{####}"
