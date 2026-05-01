@@ -9,6 +9,7 @@ import { PrimaryAction } from "@/components/layout/PrimaryAction";
 import { FilterBar } from "@/routes/angebote";
 import { SlideOver } from "@/components/ui/slide-over";
 import { RechnungForm } from "@/components/forms/RechnungForm";
+import { ZahlungErfassenDialog } from "@/components/forms/ZahlungErfassenDialog";
 import type { Rechnung } from "@/lib/api/types";
 
 export const Route = createFileRoute("/rechnungen")({ component: Page });
@@ -57,6 +58,7 @@ function Page() {
   const [filter, setFilter] = useState("alle");
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
+  const [zahlungFuer, setZahlungFuer] = useState<Rechnung | null>(null);
 
   const heute = new Date().toISOString().slice(0, 10);
   const monat = heute.slice(0, 7);
@@ -186,9 +188,15 @@ function Page() {
                       >
                         <Eye className="h-4 w-4" />
                       </Link>
-                      <button className="rounded-md p-1.5 text-success hover:bg-success/10" title="Bezahlt markieren">
-                        <CheckCircle2 className="h-4 w-4" />
-                      </button>
+                      {r.status !== "bezahlt" && r.status !== "storniert" && (
+                        <button
+                          onClick={() => setZahlungFuer(r)}
+                          className="rounded-md p-1.5 text-success hover:bg-success/10"
+                          title="Zahlung erfassen"
+                        >
+                          <CheckCircle2 className="h-4 w-4" />
+                        </button>
+                      )}
                       <button
                         onClick={() => {
                           if (confirm(`Rechnung ${r.nummer} löschen?`)) del.mutate(r.id);
@@ -222,6 +230,14 @@ function Page() {
       >
         <RechnungForm onClose={() => setOpen(false)} />
       </SlideOver>
+
+      {zahlungFuer && (
+        <ZahlungErfassenDialog
+          open={!!zahlungFuer}
+          onOpenChange={(o) => !o && setZahlungFuer(null)}
+          rechnung={zahlungFuer}
+        />
+      )}
     </div>
   );
 }
