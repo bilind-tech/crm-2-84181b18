@@ -11,6 +11,8 @@ import { AngebotForm } from "@/components/forms/AngebotForm";
 import { RechnungForm } from "@/components/forms/RechnungForm";
 import { formatEUR, formatDate } from "@/lib/format";
 import { summenRechnung } from "@/lib/mock/backend";
+import { FlowBar } from "@/components/flow/FlowBar";
+import { angebotFlow, rechnungFlow } from "@/lib/flow/flows";
 
 export const Route = createFileRoute("/kunden/$id")({ component: Page });
 
@@ -236,12 +238,14 @@ function Page() {
                     <th className="px-4 py-3 font-medium">Titel</th>
                     <th className="px-4 py-3 font-medium">Gültig bis</th>
                     <th className="px-4 py-3 text-right font-medium">Brutto</th>
-                    <th className="px-4 py-3 font-medium">Status</th>
+                    <th className="px-4 py-3 font-medium">Fortschritt</th>
                   </tr>
                 </thead>
                 <tbody>
                   {k.angebote.map((a) => {
                     const s = summenRechnung(a.positionen, a.rabattGesamt);
+                    const hatRechnung = k.rechnungen.some((r) => r.quellAngebotId === a.id);
+                    const flow = angebotFlow(a, hatRechnung);
                     return (
                       <tr key={a.id} className="border-b border-border last:border-0 hover:bg-muted/30">
                         <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{a.nummer}</td>
@@ -250,7 +254,9 @@ function Page() {
                         </td>
                         <td className="px-4 py-3 text-muted-foreground">{formatDate(a.gueltigBis)}</td>
                         <td className="px-4 py-3 text-right font-semibold">{formatEUR(s.brutto)}</td>
-                        <td className="px-4 py-3 capitalize text-muted-foreground">{a.status}</td>
+                        <td className="px-4 py-3">
+                          <FlowBar steps={flow.steps} size="sm" />
+                        </td>
                       </tr>
                     );
                   })}
@@ -276,22 +282,32 @@ function Page() {
                     <th className="px-4 py-3 font-medium">Nummer</th>
                     <th className="px-4 py-3 font-medium">Datum</th>
                     <th className="px-4 py-3 font-medium">Fällig</th>
-                    <th className="px-4 py-3 text-right font-medium">Brutto</th>
-                    <th className="px-4 py-3 font-medium">Status</th>
+                    <th className="px-4 py-3 text-right font-medium">Brutto / Offen</th>
+                    <th className="px-4 py-3 font-medium">Fortschritt</th>
                   </tr>
                 </thead>
                 <tbody>
                   {k.rechnungen.map((r) => {
                     const s = summenRechnung(r.positionen, r.rabattGesamt);
+                    const bezahlt = r.zahlungen.reduce((a, z) => a + z.betrag, 0);
+                    const offen = Math.max(0, s.brutto - bezahlt);
+                    const flow = rechnungFlow(r);
                     return (
                       <tr key={r.id} className="border-b border-border last:border-0 hover:bg-muted/30">
                         <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{r.nummer}</td>
                         <td className="px-4 py-3 text-muted-foreground">{formatDate(r.rechnungsdatum)}</td>
                         <td className="px-4 py-3 text-muted-foreground">{formatDate(r.faelligkeitsdatum)}</td>
-                        <td className="px-4 py-3 text-right font-semibold">
-                          <Link to="/rechnungen/$id" params={{ id: r.id }} className="hover:text-primary">{formatEUR(s.brutto)}</Link>
+                        <td className="px-4 py-3 text-right">
+                          <Link to="/rechnungen/$id" params={{ id: r.id }} className="font-semibold hover:text-primary">
+                            {formatEUR(s.brutto)}
+                          </Link>
+                          {offen > 0 && offen < s.brutto && (
+                            <div className="text-xs text-warning">{formatEUR(offen)} offen</div>
+                          )}
                         </td>
-                        <td className="px-4 py-3 capitalize text-muted-foreground">{r.status}</td>
+                        <td className="px-4 py-3">
+                          <FlowBar steps={flow.steps} size="sm" />
+                        </td>
                       </tr>
                     );
                   })}

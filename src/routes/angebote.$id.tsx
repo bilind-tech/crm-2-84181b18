@@ -1,13 +1,21 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Download, Send, FileCheck2 } from "lucide-react";
-import { useAngebot, useSendeAngebot, useAngebotInRechnung } from "@/hooks/useApi";
+import { Download, Send, FileCheck2, ThumbsUp, ThumbsDown } from "lucide-react";
+import {
+  useAngebot,
+  useSendeAngebot,
+  useAngebotInRechnung,
+  useUpdateAngebot,
+  useRechnungen,
+} from "@/hooks/useApi";
 import { useAngebotPdf } from "@/hooks/useBelegPdf";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { FlowBar } from "@/components/flow/FlowBar";
+import { angebotFlow } from "@/lib/flow/flows";
 import { formatEUR, formatDate } from "@/lib/format";
 import { summenRechnung } from "@/lib/mock/backend";
 import { toast } from "sonner";
-import { useNavigate } from "@tanstack/react-router";
+import { useNavigate, Link } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/angebote/$id")({ component: Page });
 
@@ -17,10 +25,75 @@ function Page() {
   const { data: a } = useAngebot(id);
   const send = useSendeAngebot(id);
   const inRechnung = useAngebotInRechnung(id);
+  const updateAngebot = useUpdateAngebot(id);
   const pdf = useAngebotPdf(a);
+  const { data: alleRechnungen = [] } = useRechnungen();
 
   if (!a) return <p className="text-sm text-muted-foreground">Lade …</p>;
+
+  const folgeRechnung = alleRechnungen.find((r) => r.quellAngebotId === a.id);
+  const hatRechnung = !!folgeRechnung;
+  const flow = angebotFlow(a, hatRechnung);
   const s = summenRechnung(a.positionen, a.rabattGesamt);
+
+  const setStatus = (status: "angenommen" | "abgelehnt") => {
+    updateAngebot.mutate(
+      { status },
+      {
+        onSuccess: () =>
+          toast.success(status === "angenommen" ? "Als angenommen markiert" : "Als abgelehnt markiert"),
+      }
+    );
+  };
+
+  // Primary-Action je nach Status
+  const renderPrimaryAction = () => {
+    if (a.status === "entwurf") {
+      return (
+        <Button
+          className="rounded-lg"
+          onClick={() =>
+            send.mutate(undefined, { onSuccess: () => toast.success("Angebot versendet") })
+          }
+        >
+          <Send className="mr-1.5 h-4 w-4" /> Per E-Mail versenden
+        </Button>
+      );
+    }
+    if (a.status === "versendet") {
+      return (
+        <div className="flex flex-wrap gap-2">
+          <Button
+            className="rounded-lg bg-success text-success-foreground hover:bg-success/90"
+            onClick={() => setStatus("angenommen")}
+          >
+            <ThumbsUp className="mr-1.5 h-4 w-4" /> Angenommen
+          </Button>
+          <Button variant="outline" className="rounded-lg" onClick={() => setStatus("abgelehnt")}>
+            <ThumbsDown className="mr-1.5 h-4 w-4" /> Abgelehnt
+          </Button>
+        </div>
+      );
+    }
+    if (a.status === "angenommen" && !hatRechnung) {
+      return (
+        <Button
+          className="rounded-lg"
+          onClick={() =>
+            inRechnung.mutate(undefined, {
+              onSuccess: (r) => {
+                toast.success(`Rechnung ${r.nummer} erstellt`);
+                navigate({ to: "/rechnungen/$id", params: { id: r.id } });
+              },
+            })
+          }
+        >
+          <FileCheck2 className="mr-1.5 h-4 w-4" /> In Rechnung umwandeln
+        </Button>
+      );
+    }
+    return null;
+  };
 
   return (
     <div className="space-y-6">
@@ -46,33 +119,33 @@ function Page() {
                 </a>
               </Button>
             )}
-            <Button
-              variant="outline"
-              className="rounded-lg"
-              onClick={() => {
-                send.mutate(undefined, {
-                  onSuccess: () => toast.success("Angebot versendet"),
-                });
-              }}
-            >
-              <Send className="mr-1.5 h-4 w-4" /> Senden
-            </Button>
-            <Button
-              className="rounded-lg"
-              onClick={() => {
-                inRechnung.mutate(undefined, {
-                  onSuccess: (r) => {
-                    toast.success(`Rechnung ${r.nummer} erstellt`);
-                    navigate({ to: "/rechnungen/$id", params: { id: r.id } });
-                  },
-                });
-              }}
-            >
-              <FileCheck2 className="mr-1.5 h-4 w-4" /> In Rechnung umwandeln
-            </Button>
+            {renderPrimaryAction()}
           </>
         }
       />
+
+      {/* Lebenszyklus-Balken */}
+      <FlowBar steps={flow.steps} size="lg" />
+
+      {/* Folge-Rechnung Hinweis */}
+      {folgeRechnung && (
+        <div className="flex items-center justify-between rounded-2xl border border-success/30 bg-success/5 p-4">
+          <div>
+            <p className="text-xs uppercase tracking-wider text-success">In Rechnung umgewandelt</p>
+            <p className="mt-0.5 text-sm">
+              Rechnung <span className="font-mono font-semibold">{folgeRechnung.nummer}</span> wurde aus
+              diesem Angebot erstellt.
+            </p>
+          </div>
+          <Link
+            to="/rechnungen/$id"
+            params={{ id: folgeRechnung.id }}
+            className="text-sm font-medium text-primary hover:underline"
+          >
+            Zur Rechnung →
+          </Link>
+        </div>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-[380px_1fr]">
         <div className="space-y-4">

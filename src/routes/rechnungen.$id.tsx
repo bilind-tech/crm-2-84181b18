@@ -1,10 +1,14 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { Download, Send, CheckCircle2 } from "lucide-react";
-import { useRechnung, useSendeRechnung, useAddZahlung } from "@/hooks/useApi";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useState } from "react";
+import { Download, Send, CheckCircle2, Wallet } from "lucide-react";
+import { useRechnung, useSendeRechnung, useAngebot } from "@/hooks/useApi";
 import { useRechnungPdf } from "@/hooks/useBelegPdf";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { formatEUR, formatDate, todayISO } from "@/lib/format";
+import { FlowBar } from "@/components/flow/FlowBar";
+import { rechnungFlow } from "@/lib/flow/flows";
+import { ZahlungErfassenDialog } from "@/components/forms/ZahlungErfassenDialog";
+import { formatEUR, formatDate } from "@/lib/format";
 import { summenRechnung } from "@/lib/mock/backend";
 import { toast } from "sonner";
 
@@ -14,13 +18,45 @@ function Page() {
   const { id } = Route.useParams();
   const { data: r } = useRechnung(id);
   const send = useSendeRechnung(id);
-  const addZahlung = useAddZahlung(id);
   const pdf = useRechnungPdf(r);
+  const [zahlungOpen, setZahlungOpen] = useState(false);
+  const { data: quellAngebot } = useAngebot(r?.quellAngebotId ?? "");
 
   if (!r) return <p className="text-sm text-muted-foreground">Lade …</p>;
   const s = summenRechnung(r.positionen, r.rabattGesamt);
   const bezahlt = r.zahlungen.reduce((a, z) => a + z.betrag, 0);
   const offen = Math.max(0, s.brutto - bezahlt);
+  const flow = rechnungFlow(r);
+
+  const renderPrimaryAction = () => {
+    if (r.status === "entwurf") {
+      return (
+        <Button
+          className="rounded-lg"
+          onClick={() =>
+            send.mutate(undefined, { onSuccess: () => toast.success("Rechnung versendet") })
+          }
+        >
+          <Send className="mr-1.5 h-4 w-4" /> Per E-Mail versenden
+        </Button>
+      );
+    }
+    if (r.status === "bezahlt") {
+      return (
+        <span className="inline-flex items-center gap-1.5 rounded-lg border border-success/30 bg-success/10 px-3 py-2 text-sm font-medium text-success">
+          <CheckCircle2 className="h-4 w-4" /> Vollständig bezahlt
+        </span>
+      );
+    }
+    if (offen > 0) {
+      return (
+        <Button className="rounded-lg" onClick={() => setZahlungOpen(true)}>
+          <Wallet className="mr-1.5 h-4 w-4" /> Zahlung erfassen
+        </Button>
+      );
+    }
+    return null;
+  };
 
   return (
     <div className="space-y-6">
@@ -47,36 +83,32 @@ function Page() {
                 </a>
               </Button>
             )}
-            <Button
-              variant="outline"
-              className="rounded-lg"
-              onClick={() =>
-                send.mutate(undefined, {
-                  onSuccess: () => toast.success("Rechnung versendet"),
-                })
-              }
-            >
-              <Send className="mr-1.5 h-4 w-4" /> Senden
-            </Button>
-            {offen > 0 && (
-              <Button
-                className="rounded-lg"
-                onClick={() => {
-                  addZahlung.mutate(
-                    { datum: todayISO(), betrag: offen, methode: "ueberweisung" },
-                    {
-                      onSuccess: () =>
-                        toast.success(`${formatEUR(offen)} als bezahlt erfasst`),
-                    }
-                  );
-                }}
-              >
-                <CheckCircle2 className="mr-1.5 h-4 w-4" /> Bezahlt markieren
-              </Button>
-            )}
+            {renderPrimaryAction()}
           </>
         }
       />
+
+      {/* Lebenszyklus-Balken */}
+      <FlowBar steps={flow.steps} size="lg" />
+
+      {/* Quell-Angebot-Hinweis */}
+      {quellAngebot && (
+        <div className="flex items-center justify-between rounded-2xl border border-border bg-muted/30 p-4">
+          <div>
+            <p className="text-xs uppercase tracking-wider text-muted-foreground">Erstellt aus Angebot</p>
+            <p className="mt-0.5 text-sm">
+              <span className="font-mono font-semibold">{quellAngebot.nummer}</span> · {quellAngebot.titel}
+            </p>
+          </div>
+          <Link
+            to="/angebote/$id"
+            params={{ id: quellAngebot.id }}
+            className="text-sm font-medium text-primary hover:underline"
+          >
+            Zum Angebot →
+          </Link>
+        </div>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-[380px_1fr]">
         <div className="space-y-4">
@@ -88,6 +120,15 @@ function Page() {
             <Row label="Brutto" value={formatEUR(s.brutto)} />
             <Row label="Bezahlt" value={formatEUR(bezahlt)} />
             <Row label="Offen" value={formatEUR(offen)} bold />
+            {offen > 0 && (
+              <Button
+                size="sm"
+                className="mt-3 w-full rounded-lg"
+                onClick={() => setZahlungOpen(true)}
+              >
+                <Wallet className="mr-1.5 h-4 w-4" /> Zahlung erfassen
+              </Button>
+            )}
           </div>
 
           {r.zahlungen.length > 0 && (
@@ -128,6 +169,8 @@ function Page() {
           {pdf.url && <iframe title="Rechnung PDF" src={pdf.url} className="block h-[900px] w-full border-0" />}
         </div>
       </div>
+
+      <ZahlungErfassenDialog open={zahlungOpen} onOpenChange={setZahlungOpen} rechnung={r} />
     </div>
   );
 }
