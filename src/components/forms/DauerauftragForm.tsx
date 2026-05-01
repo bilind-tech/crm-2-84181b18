@@ -94,34 +94,37 @@ export function DauerauftragForm({ onClose }: Props) {
     <div className="space-y-6">
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Kunde *">
-          <select
-            className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-            value={kundeId}
-            onChange={(e) => {
-              setKundeId(e.target.value);
+          <Select
+            value={kundeId || undefined}
+            onValueChange={(v) => {
+              setKundeId(v);
               setObjektId("");
             }}
           >
-            <option value="">Kunde wählen…</option>
-            {kunden.map((k) => (
-              <option key={k.id} value={k.id}>
-                {k.firmenname || `${k.vorname ?? ""} ${k.nachname ?? ""}`.trim()} · {k.nummer}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger><SelectValue placeholder="Kunde wählen…" /></SelectTrigger>
+            <SelectContent>
+              {kunden.map((k) => (
+                <SelectItem key={k.id} value={k.id}>
+                  {k.firmenname || `${k.vorname ?? ""} ${k.nachname ?? ""}`.trim()} · {k.nummer}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </Field>
         <Field label="Objekt (optional)">
-          <select
-            className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm disabled:opacity-50"
-            value={objektId}
+          <Select
+            value={objektId || "__none__"}
+            onValueChange={(v) => setObjektId(v === "__none__" ? "" : v)}
             disabled={!kundeId}
-            onChange={(e) => setObjektId(e.target.value)}
           >
-            <option value="">— kein Objekt —</option>
-            {objekteVonKunde.map((o) => (
-              <option key={o.id} value={o.id}>{o.name}</option>
-            ))}
-          </select>
+            <SelectTrigger><SelectValue placeholder={kundeId ? "— kein Objekt —" : "Erst Kunde wählen"} /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__none__">— kein Objekt —</SelectItem>
+              {objekteVonKunde.map((o) => (
+                <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </Field>
       </div>
 
@@ -135,29 +138,28 @@ export function DauerauftragForm({ onClose }: Props) {
 
       <div className="grid gap-4 sm:grid-cols-3">
         <Field label="Frequenz">
-          <select
-            className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-            value={frequenz}
-            onChange={(e) => setFrequenz(e.target.value as DauerauftragFrequenz)}
-          >
-            <option value="monatlich">Monatlich</option>
-            <option value="quartalsweise">Quartalsweise</option>
-            <option value="halbjaehrlich">Halbjährlich</option>
-            <option value="jaehrlich">Jährlich</option>
-          </select>
+          <Select value={frequenz} onValueChange={(v) => setFrequenz(v as DauerauftragFrequenz)}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="monatlich">Monatlich</SelectItem>
+              <SelectItem value="quartalsweise">Quartalsweise</SelectItem>
+              <SelectItem value="halbjaehrlich">Halbjährlich</SelectItem>
+              <SelectItem value="jaehrlich">Jährlich</SelectItem>
+            </SelectContent>
+          </Select>
         </Field>
         <Field label="Stichtag">
-          <select
-            className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+          <Select
             value={stichtagTyp}
-            onChange={(e) =>
-              setStichtagTyp(e.target.value as DauerauftragStichtag["typ"])
-            }
+            onValueChange={(v) => setStichtagTyp(v as DauerauftragStichtag["typ"])}
           >
-            <option value="monatstag">Tag im Monat</option>
-            <option value="monatsletzter">Letzter Monatstag</option>
-            <option value="quartalstag">Tag im Quartalsmonat</option>
-          </select>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="monatstag">Tag im Monat</SelectItem>
+              <SelectItem value="monatsletzter">Letzter Monatstag</SelectItem>
+              <SelectItem value="quartalstag">Tag im Quartalsmonat</SelectItem>
+            </SelectContent>
+          </Select>
         </Field>
         <Field label="Tag (1–28)">
           <Input
