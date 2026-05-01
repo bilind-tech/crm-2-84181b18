@@ -1,11 +1,13 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useState, useMemo } from "react";
 import { Search, Send, Trash2, ChevronRight, SlidersHorizontal, Check } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { PdfViewButton } from "@/components/pdf/PdfViewButton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useAngebote, useDeleteAngebot } from "@/hooks/useApi";
+import { useAngebote, useDeleteAngebot, useKunde } from "@/hooks/useApi";
+import { useAngebotPdf } from "@/hooks/useBelegPdf";
+import { EmailVersandDialog } from "@/components/email/EmailVersandDialog";
 import { formatEUR, formatDate } from "@/lib/format";
 import { PageHeader, KpiCard } from "@/components/layout/PageHeader";
 import { PrimaryAction } from "@/components/layout/PrimaryAction";
@@ -15,7 +17,13 @@ import { AngebotForm } from "@/components/forms/AngebotForm";
 import type { Angebot } from "@/lib/api/types";
 import { useConfirm } from "@/hooks/useConfirm";
 
-export const Route = createFileRoute("/angebote")({ component: Page });
+export const Route = createFileRoute("/angebote")({ component: Layout });
+
+function Layout() {
+  const path = useRouterState({ select: (r) => r.location.pathname });
+  if (path !== "/angebote") return <Outlet />;
+  return <Page />;
+}
 
 const statusLabel: Record<string, string> = {
   entwurf: "Entwurf",
