@@ -291,6 +291,7 @@ function AngebotEmailLauncher({ angebot, onClose }: { angebot: Angebot; onClose:
       angebot={angebot}
       pdfBlobUrl={pdf.url}
       pdfDateiname={`${angebot.nummer}.pdf`}
+      pdfStatus={pdf.status}
     />
   );
 }
