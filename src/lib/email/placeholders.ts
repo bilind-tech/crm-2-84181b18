@@ -1,16 +1,29 @@
 // Platzhalter-System für E-Mail-Vorlagen.
-// Syntax: {{kunde.firmenname}}, {{rechnung.offen}}, …
+// Syntax: {{kunde.firmenname}}, {{rechnung.offen}}, {{mahnung.gebuehr}} …
 // Wird auf Betreff UND HTML-Body angewendet.
 
-import type { Angebot, Firmendaten, Kunde, Rechnung } from "@/lib/api/types";
+import type {
+  Angebot,
+  Firmendaten,
+  Kunde,
+  MahnEinstellungen,
+  MahnStufe,
+  Rechnung,
+} from "@/lib/api/types";
 import { formatDate, formatEUR } from "@/lib/format";
 import { summenRechnung } from "@/lib/mock/backend";
+import { berechneNeueFrist, bestimmeMahnZustand, stufenLabel } from "@/lib/mahnung/regeln";
 
 export interface PlaceholderContext {
   kunde?: Kunde | null;
   angebot?: Angebot | null;
   rechnung?: Rechnung | null;
   firma?: Firmendaten | null;
+  /** Optional — wenn gesetzt, werden {{mahnung.*}} Platzhalter aufgelöst. */
+  mahnung?: {
+    stufe: MahnStufe;
+    einstellungen?: MahnEinstellungen | null;
+  } | null;
 }
 
 const ANREDE_LABELS: Record<string, string> = {
