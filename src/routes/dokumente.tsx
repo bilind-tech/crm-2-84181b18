@@ -89,14 +89,11 @@ function Page() {
         subtitle="Quittungen, Rechnungen und Belege zentral ablegen — mit Frist und Erinnerung."
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
+            <PrimaryAction
+              icon={Smartphone}
+              label="Vom Handy scannen"
               onClick={() => setScanOpen(true)}
-              className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-card px-4 text-sm font-medium hover:bg-muted"
-            >
-              <Smartphone className="h-4 w-4" />
-              Vom Handy scannen
-            </button>
+            />
             <DokumentUploader compact />
           </div>
         }
