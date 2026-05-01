@@ -52,6 +52,7 @@ function bezahlt(r: Rechnung) {
 
 function Page() {
   const { data: alle = [] } = useRechnungen();
+  const navigate = useNavigate();
   const del = useDeleteRechnung();
   const [filter, setFilter] = useState("alle");
   const [q, setQ] = useState("");
