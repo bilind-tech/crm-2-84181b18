@@ -4,7 +4,7 @@ import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
 import "@/lib/pdf/pdfjsWorker";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+
 import { Download, Loader2, AlertCircle } from "lucide-react";
 import { DriveStatusBadge } from "./DriveStatusBadge";
 import type { DriveSyncInfo } from "@/lib/api/types";
@@ -151,7 +151,7 @@ export function PdfViewerDialog({
                 >
                   <Page
                     pageNumber={pageNum}
-                    width={Math.min(containerWidth - 16, 900)}
+                    width={Math.min(containerWidth - 4, 900)}
                     renderAnnotationLayer={false}
                     renderTextLayer={false}
                   />
