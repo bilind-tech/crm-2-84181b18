@@ -184,18 +184,14 @@ export function ZahlungErfassenDialog({ open, onOpenChange, rechnung }: Props) {
             <Label htmlFor="methode" className="text-xs font-medium text-muted-foreground">
               Methode
             </Label>
-            <select
-              id="methode"
-              value={methode}
-              onChange={(e) => setMethode(e.target.value as Zahlungsmethode)}
-              className="mt-1.5 h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-            >
-              {METHODEN.map((m) => (
-                <option key={m.value} value={m.value}>
-                  {m.label}
-                </option>
-              ))}
-            </select>
+            <Select value={methode} onValueChange={(v) => setMethode(v as Zahlungsmethode)}>
+              <SelectTrigger id="methode" className="mt-1.5 h-10"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {METHODEN.map((m) => (
+                  <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
