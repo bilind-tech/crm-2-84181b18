@@ -89,12 +89,22 @@ function Page() {
           </thead>
           <tbody>
             {filtered.map((k) => (
-              <tr key={k.id} className="border-b border-border last:border-0 hover:bg-muted/30">
+              <tr
+                key={k.id}
+                role="link"
+                tabIndex={0}
+                onClick={() => navigate({ to: "/kunden/$id", params: { id: k.id } })}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    navigate({ to: "/kunden/$id", params: { id: k.id } });
+                  }
+                }}
+                className="cursor-pointer border-b border-border last:border-0 transition-colors hover:bg-muted/40 focus:bg-muted/40 focus:outline-none"
+              >
                 <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{k.nummer}</td>
                 <td className="px-4 py-3 font-medium">
-                  <Link to="/kunden/$id" params={{ id: k.id }} className="hover:text-primary">
-                    {k.firmenname || `${k.vorname ?? ""} ${k.nachname ?? ""}`.trim()}
-                  </Link>
+                  {k.firmenname || `${k.vorname ?? ""} ${k.nachname ?? ""}`.trim()}
                 </td>
                 <td className="px-4 py-3 text-muted-foreground">{k.ort ?? "—"}</td>
                 <td className="px-4 py-3 text-muted-foreground">{k.email ?? "—"}</td>
@@ -104,13 +114,7 @@ function Page() {
                   </span>
                 </td>
                 <td className="px-4 py-3 text-right">
-                  <Link
-                    to="/kunden/$id"
-                    params={{ id: k.id }}
-                    className="inline-flex items-center justify-center rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </Link>
+                  <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground" />
                 </td>
               </tr>
             ))}
