@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { Download, Send, CheckCircle2, Wallet } from "lucide-react";
+import { Download, Send, CheckCircle2, Wallet, Banknote } from "lucide-react";
 import { useRechnung, useAngebot, useKunde } from "@/hooks/useApi";
 import { useRechnungPdf } from "@/hooks/useBelegPdf";
 import { Button } from "@/components/ui/button";
@@ -138,12 +138,35 @@ function Page() {
             <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
               <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Zahlungen</p>
               <ul className="space-y-2 text-sm">
-                {r.zahlungen.map((z) => (
-                  <li key={z.id} className="flex items-baseline justify-between gap-3">
-                    <span className="text-muted-foreground">{formatDate(z.datum)} · {z.methode}</span>
-                    <span className="font-medium">{formatEUR(z.betrag)}</span>
-                  </li>
-                ))}
+                {r.zahlungen.map((z) => {
+                  const ausBank = z.referenz?.startsWith("Bank-Eingang");
+                  return (
+                    <li key={z.id} className="flex items-baseline justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-muted-foreground">
+                            {formatDate(z.datum)} · {z.methode}
+                          </span>
+                          {ausBank && (
+                            <Link
+                              to="/zahlungseingaenge"
+                              className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary hover:bg-primary/20"
+                              title="Aus Bank-Eingang zugeordnet"
+                            >
+                              <Banknote className="h-2.5 w-2.5" /> Bank
+                            </Link>
+                          )}
+                        </div>
+                        {z.notiz && (
+                          <p className="mt-0.5 line-clamp-1 text-[11px] text-muted-foreground/80">
+                            {z.notiz}
+                          </p>
+                        )}
+                      </div>
+                      <span className="shrink-0 font-medium">{formatEUR(z.betrag)}</span>
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           )}
