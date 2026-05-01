@@ -22,6 +22,9 @@ import type {
   Benachrichtigung,
   DashboardKennzahlen,
   Dokument,
+  EmailSignatur,
+  EmailVersand,
+  EmailVorlage,
   Firmendaten,
   ID,
   Kunde,
@@ -43,7 +46,7 @@ import type {
 import { ApiError } from "@/lib/api/client";
 import { seed } from "@/lib/mock/seed";
 
-const STORAGE_KEY = "mcc_mock_db_v4";
+const STORAGE_KEY = "mcc_mock_db_v5";
 
 interface DB {
   unlocked: boolean;
