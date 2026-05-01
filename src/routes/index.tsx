@@ -6,6 +6,7 @@ import {
 } from "@/hooks/useApi";
 import { useMahnZaehler } from "@/hooks/useMahnZaehler";
 import { useDauerauftraege, useDauerauftragLaeufe } from "@/hooks/useDauerauftraege";
+import { useZahlungseingaenge } from "@/hooks/useZahlungseingaenge";
 import { monatlicheBrutto } from "@/lib/dauerauftrag/termine";
 import { summenRechnung } from "@/lib/mock/backend";
 import { formatEUR, formatDate } from "@/lib/format";
@@ -19,6 +20,7 @@ import {
   ArrowRight,
   Repeat,
   Inbox,
+  Banknote,
 } from "lucide-react";
 import {
   Bar,
@@ -42,6 +44,8 @@ function Dashboard() {
   const mahn = useMahnZaehler();
   const { data: dauerauftraege = [] } = useDauerauftraege();
   const { data: laeufeErzeugt = [] } = useDauerauftragLaeufe("erzeugt");
+  const { data: offeneEingaenge = [] } = useZahlungseingaenge("offen");
+  const { data: teilweiseEingaenge = [] } = useZahlungseingaenge("teilweise");
 
   const aktiveDA = dauerauftraege.filter((d) => d.status === "aktiv");
   const mrr = aktiveDA.reduce((sum, da) => {
