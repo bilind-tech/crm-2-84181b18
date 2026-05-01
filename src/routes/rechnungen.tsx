@@ -70,6 +70,7 @@ function Page() {
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
   const [zahlungFuer, setZahlungFuer] = useState<Rechnung | null>(null);
+  const [emailFuer, setEmailFuer] = useState<Rechnung | null>(null);
   const { confirm, dialog: confirmDialog } = useConfirm();
 
   const heute = new Date().toISOString().slice(0, 10);
@@ -182,9 +183,16 @@ function Page() {
               actions={
                 <>
                   <PdfViewButton kind="rechnung" beleg={r} />
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setEmailFuer(r); }}
+                    className="rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-primary"
+                    title="Per E-Mail versenden"
+                  >
+                    <Send className="h-4 w-4" />
+                  </button>
                   {r.status !== "bezahlt" && r.status !== "storniert" && (
                     <button
-                      onClick={() => setZahlungFuer(r)}
+                      onClick={(e) => { e.stopPropagation(); setZahlungFuer(r); }}
                       className="rounded-md p-2 text-success hover:bg-success/10"
                       title="Zahlung erfassen"
                     >
@@ -263,9 +271,16 @@ function Page() {
                   <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                     <div className="flex items-center justify-end gap-1 text-muted-foreground">
                       <PdfViewButton kind="rechnung" beleg={r} />
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setEmailFuer(r); }}
+                        className="rounded-md p-1.5 hover:bg-muted hover:text-primary"
+                        title="Per E-Mail versenden"
+                      >
+                        <Send className="h-4 w-4" />
+                      </button>
                       {r.status !== "bezahlt" && r.status !== "storniert" && (
                         <button
-                          onClick={() => setZahlungFuer(r)}
+                          onClick={(e) => { e.stopPropagation(); setZahlungFuer(r); }}
                           className="rounded-md p-1.5 text-success hover:bg-success/10"
                           title="Zahlung erfassen"
                         >
@@ -323,7 +338,30 @@ function Page() {
         />
       )}
 
+      {emailFuer && (
+        <RechnungEmailLauncher
+          rechnung={emailFuer}
+          onClose={() => setEmailFuer(null)}
+        />
+      )}
+
       {confirmDialog}
     </div>
+  );
+}
+
+function RechnungEmailLauncher({ rechnung, onClose }: { rechnung: Rechnung; onClose: () => void }) {
+  const { data: kunde } = useKunde(rechnung.kundeId);
+  const pdf = useRechnungPdf(rechnung);
+  return (
+    <EmailVersandDialog
+      open
+      onOpenChange={(o) => { if (!o) onClose(); }}
+      kontext="rechnung"
+      kunde={kunde}
+      rechnung={rechnung}
+      pdfBlobUrl={pdf.url}
+      pdfDateiname={`${rechnung.nummer}.pdf`}
+    />
   );
 }
