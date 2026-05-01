@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState, useMemo } from "react";
 import { Search, Eye, Send, Trash2, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
