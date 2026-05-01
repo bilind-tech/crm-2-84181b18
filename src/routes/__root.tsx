@@ -1,6 +1,7 @@
 import { Outlet, createRootRoute, HeadContent, Scripts, useRouterState } from "@tanstack/react-router";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useState } from "react";
+import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import appCss from "../styles.css?url";
 import { ThemeProvider } from "@/lib/theme";
 import { AuthProvider, useAuth } from "@/lib/auth";
@@ -9,6 +10,7 @@ import { AppSidebar } from "@/components/layout/AppSidebar";
 import { AppHeader } from "@/components/layout/AppHeader";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { Toaster } from "@/components/ui/sonner";
+import { startScheduler } from "@/lib/mock/scheduler";
 
 export const Route = createRootRoute({
   head: () => ({
@@ -67,6 +69,22 @@ function TopLoader() {
 function Shell() {
   const { unlocked } = useAuth();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const qc = useQueryClient();
+  useEffect(() => {
+    if (!unlocked) return;
+    startScheduler({
+      onResult: (r) => {
+        if (r.erzeugteLaeufe > 0) {
+          toast.success(`${r.erzeugteLaeufe} neue Rechnung(en) aus Daueraufträgen erzeugt`);
+          qc.invalidateQueries({ queryKey: ["dauerauftraege"] });
+          qc.invalidateQueries({ queryKey: ["dauerauftrag-laeufe"] });
+          qc.invalidateQueries({ queryKey: ["rechnungen"] });
+          qc.invalidateQueries({ queryKey: ["benachrichtigungen"] });
+          qc.invalidateQueries({ queryKey: ["aktivitaeten"] });
+        }
+      },
+    });
+  }, [unlocked, qc]);
   if (!unlocked) return <LockScreen />;
   return (
     <SidebarProvider>

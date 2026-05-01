@@ -139,4 +139,8 @@ export const ALLE_PLATZHALTER = [
   "firma.name",
   "firma.telefon",
   "firma.email",
+  "lauf.zeitraum",
+  "lauf.monat",
+  "lauf.von",
+  "lauf.bis",
 ];

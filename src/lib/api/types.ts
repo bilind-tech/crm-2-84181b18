@@ -303,6 +303,10 @@ export type AktivitaetTyp =
   | "dokument_hochgeladen"
   | "einstellung_geaendert"
   | "backup_erstellt"
+  | "dauerauftrag_angelegt"
+  | "dauerauftrag_lauf_erzeugt"
+  | "zahlungseingang_zugeordnet"
+  | "zahlungseingang_importiert"
   | "system";
 
 export interface Aktivitaet {
@@ -487,4 +491,111 @@ export interface SuchTreffer {
   titel: string;
   untertitel?: string;
   link: { route: string; params?: Record<string, string> };
+}
+
+// ---------- Daueraufträge (wiederkehrende Rechnungen) ----------
+
+export type DauerauftragFrequenz = "monatlich" | "quartalsweise" | "halbjaehrlich" | "jaehrlich";
+export type DauerauftragModus = "entwurf" | "vollautomatisch";
+export type DauerauftragStatus = "aktiv" | "pausiert" | "beendet";
+
+export interface DauerauftragStichtag {
+  typ: "monatstag" | "monatsletzter" | "quartalstag";
+  /** Tag im Monat (1–28). Bei „monatsletzter" ignoriert. */
+  wert?: number;
+}
+
+export interface Dauerauftrag {
+  id: ID;
+  nummer: string; // "DA-2026-001"
+  kundeId: ID;
+  objektId?: ID;
+  ansprechpartnerId?: ID;
+  bezeichnung: string;
+  frequenz: DauerauftragFrequenz;
+  stichtag: DauerauftragStichtag;
+  laufzeitVon: ISODate;
+  /** Optional, leer = unbefristet. */
+  laufzeitBis?: ISODate;
+  positionen: Position[];
+  rabattGesamt: number;
+  steuersatz: number;
+  /** Betreff-Vorlage mit Platzhaltern wie {{lauf.zeitraum}}. */
+  betreffVorlage: string;
+  /** Intro-/Anschreiben-Vorlage mit Platzhaltern. */
+  textVorlage: string;
+  modus: DauerauftragModus;
+  /** Empfänger für Vollautomatik (sonst Standard-E-Mail des Kunden). */
+  emailEmpfaenger?: string[];
+  status: DauerauftragStatus;
+  /** Pausiert bis (inklusive) — Läufe in der Pause werden übersprungen. */
+  pausiertBis?: ISODate;
+  letzteAusfuehrung?: ISODate;
+  notizen?: string;
+  erstelltAm: ISODateTime;
+  geaendertAm: ISODateTime;
+}
+
+export type DauerauftragLaufStatus = "geplant" | "erzeugt" | "uebersprungen" | "fehler";
+
+export interface DauerauftragLauf {
+  id: ID;
+  dauerauftragId: ID;
+  /** Eindeutiger Schlüssel pro DA: "2026-04" / "2026-Q2" / "2026-H1" / "2026". */
+  periode: string;
+  geplantFuer: ISODate;
+  ausgefuehrtAm?: ISODateTime;
+  rechnungId?: ID;
+  status: DauerauftragLaufStatus;
+  fehlerGrund?: string;
+}
+
+export interface DauerauftragSonderposition {
+  id: ID;
+  dauerauftragId: ID;
+  /** Periode-Schlüssel, dem die Sonderposition zugeordnet ist. */
+  fuerPeriode: string;
+  position: Position;
+  /** Sobald ein Lauf erzeugt wurde, wird sie verbraucht. */
+  verbrauchtAm?: ISODateTime;
+}
+
+// ---------- Zahlungseingänge & Abgleich ----------
+
+export type ZahlungseingangStatus = "offen" | "zugeordnet" | "teilweise" | "ignoriert";
+
+export interface ZahlungseingangZuordnung {
+  rechnungId: ID;
+  /** FK auf erzeugte `Zahlung` (in der Rechnung gespeichert). */
+  zahlungId: ID;
+  /** Anteilig zugeordneter Betrag (für Sammelüberweisungen-Splits). */
+  betrag: number;
+  /** Optional: Score, mit dem zugeordnet wurde (für spätere Statistik). */
+  score?: number;
+}
+
+export interface Zahlungseingang {
+  id: ID;
+  buchungsdatum: ISODate;
+  /** Immer positiv. Lastschriften/Ausgänge werden beim Import herausgefiltert. */
+  betrag: number;
+  waehrung: "EUR";
+  verwendungszweck: string;
+  senderName?: string;
+  senderIban?: string;
+  status: ZahlungseingangStatus;
+  zuordnungen: ZahlungseingangZuordnung[];
+  importQuelle: "manuell" | "csv";
+  importiertAm: ISODateTime;
+}
+
+export interface ZahlungsabgleichEinstellungen {
+  /** Score-Schwelle, ab der ein Eingang ohne Klick zugeordnet wird (0 = aus). */
+  autoZuordnenAbScore: number;
+}
+
+export interface DauerauftragEinstellungen {
+  defaultModus: DauerauftragModus;
+  /** Standard-Stichtag für neue DAs. */
+  defaultStichtag: DauerauftragStichtag;
 }

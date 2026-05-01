@@ -15,6 +15,10 @@ import type {
   AppearanceEinstellungen,
   BackupEinstellungen,
   Benachrichtigung,
+  Dauerauftrag,
+  DauerauftragEinstellungen,
+  DauerauftragLauf,
+  DauerauftragSonderposition,
   Dokument,
   EmailSignatur,
   EmailVersand,
@@ -30,6 +34,8 @@ import type {
   SicherheitsEinstellungen,
   SmtpEinstellungen,
   Textvorlage,
+  Zahlungseingang,
+  ZahlungsabgleichEinstellungen,
 } from "@/lib/api/types";
 import { STANDARD_MAHN_EINSTELLUNGEN, standardMahnVorlagen } from "@/lib/mahnung/defaults";
 
@@ -206,6 +212,20 @@ export function seed() {
 
   const mahnung: MahnEinstellungen = STANDARD_MAHN_EINSTELLUNGEN;
 
+  const dauerauftraege: Dauerauftrag[] = [];
+  const dauerauftragLaeufe: DauerauftragLauf[] = [];
+  const dauerauftragSonderpositionen: DauerauftragSonderposition[] = [];
+  const zahlungseingaenge: Zahlungseingang[] = [];
+
+  const dauerauftragEinstellungen: DauerauftragEinstellungen = {
+    defaultModus: "entwurf",
+    defaultStichtag: { typ: "monatstag", wert: 1 },
+  };
+
+  const zahlungsabgleich: ZahlungsabgleichEinstellungen = {
+    autoZuordnenAbScore: 0, // 0 = aus; User aktiviert in Einstellungen
+  };
+
   return {
     unlocked: false,
     masterPasswort: "040506",
@@ -230,7 +250,13 @@ export function seed() {
     appearance,
     backup,
     mahnung,
-    zaehler: { kunde: 0, objekt: 0, angebot: 0, rechnung: 0 },
+    dauerauftraege,
+    dauerauftragLaeufe,
+    dauerauftragSonderpositionen,
+    zahlungseingaenge,
+    dauerauftragEinstellungen,
+    zahlungsabgleich,
+    zaehler: { kunde: 0, objekt: 0, angebot: 0, rechnung: 0, dauerauftrag: 0 },
   };
 }
 

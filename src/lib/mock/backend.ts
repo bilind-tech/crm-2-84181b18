@@ -21,6 +21,10 @@ import type {
   BackupEinstellungen,
   Benachrichtigung,
   DashboardKennzahlen,
+  Dauerauftrag,
+  DauerauftragEinstellungen,
+  DauerauftragLauf,
+  DauerauftragSonderposition,
   Dokument,
   EmailSignatur,
   EmailVersand,
@@ -45,12 +49,22 @@ import type {
   UmsatzPunkt,
   Warnung,
   Zahlung,
+  Zahlungseingang,
+  ZahlungsabgleichEinstellungen,
 } from "@/lib/api/types";
 import { ApiError } from "@/lib/api/client";
 import { seed } from "@/lib/mock/seed";
 import { berechneNeueFrist } from "@/lib/mahnung/regeln";
+import {
+  berechneNaechsteLauftermine,
+  isoDate,
+  istPausiert,
+  periodeFuer,
+} from "@/lib/dauerauftrag/termine";
+import { erzeugeRechnungAusLauf } from "@/lib/dauerauftrag/generator";
 
-const STORAGE_KEY = "mcc_mock_db_v6";
+const STORAGE_KEY = "mcc_mock_db_v7";
+const LEGACY_KEYS = ["mcc_mock_db_v6"];
 
 interface DB {
   unlocked: boolean;
@@ -77,7 +91,13 @@ interface DB {
   appearance: AppearanceEinstellungen;
   backup: BackupEinstellungen;
   mahnung: MahnEinstellungen;
-  zaehler: { kunde: number; objekt: number; angebot: number; rechnung: number };
+  dauerauftraege: Dauerauftrag[];
+  dauerauftragLaeufe: DauerauftragLauf[];
+  dauerauftragSonderpositionen: DauerauftragSonderposition[];
+  zahlungseingaenge: Zahlungseingang[];
+  dauerauftragEinstellungen: DauerauftragEinstellungen;
+  zahlungsabgleich: ZahlungsabgleichEinstellungen;
+  zaehler: { kunde: number; objekt: number; angebot: number; rechnung: number; dauerauftrag: number };
 }
 
 let db: DB | null = null;
@@ -96,6 +116,10 @@ function load(): DB {
       db.unlocked = false;
       db.unlockedAt = undefined;
       return db;
+    }
+    // Legacy-Keys aufräumen, frisch seeden (Settings & Daten gehen verloren — bewusst)
+    for (const k of LEGACY_KEYS) {
+      try { window.localStorage.removeItem(k); } catch { /* ignore */ }
     }
   } catch {
     /* ignore */
@@ -1170,7 +1194,270 @@ export async function mockBackend<T>(method: string, path: string, body?: unknow
     result = r;
   }
 
-  // ---- Backup ----
+  // ---- Daueraufträge ----
+  else if (m === "GET" && match(path, "/dauerauftraege")) {
+    result = [...d.dauerauftraege];
+  } else if (m === "POST" && match(path, "/dauerauftraege")) {
+    const da = body as Partial<Dauerauftrag>;
+    d.zaehler.dauerauftrag += 1;
+    const heute = now().slice(0, 10);
+    const nummer = `DA-${new Date().getFullYear()}-${String(d.zaehler.dauerauftrag).padStart(4, "0")}`;
+    const neu: Dauerauftrag = {
+      id: uuid(),
+      nummer,
+      kundeId: da.kundeId!,
+      objektId: da.objektId,
+      ansprechpartnerId: da.ansprechpartnerId,
+      bezeichnung: da.bezeichnung ?? "Neuer Dauerauftrag",
+      frequenz: da.frequenz ?? "monatlich",
+      stichtag: da.stichtag ?? d.dauerauftragEinstellungen.defaultStichtag,
+      laufzeitVon: da.laufzeitVon ?? heute,
+      laufzeitBis: da.laufzeitBis,
+      positionen: (da.positionen ?? []).map((p) => ({ ...p, id: uuid() })),
+      rabattGesamt: da.rabattGesamt ?? 0,
+      steuersatz: da.steuersatz ?? d.firmendaten.standardSteuersatz,
+      betreffVorlage: da.betreffVorlage ?? "Reinigung {{lauf.zeitraum}}",
+      textVorlage: da.textVorlage ?? "",
+      modus: da.modus ?? d.dauerauftragEinstellungen.defaultModus,
+      emailEmpfaenger: da.emailEmpfaenger,
+      status: da.status ?? "aktiv",
+      pausiertBis: da.pausiertBis,
+      letzteAusfuehrung: undefined,
+      notizen: da.notizen,
+      erstelltAm: now(),
+      geaendertAm: now(),
+    };
+    d.dauerauftraege.push(neu);
+    logAktivitaet("dauerauftrag_angelegt", `Dauerauftrag ${neu.nummer} angelegt`, {
+      typ: "dauerauftrag", id: neu.id,
+    });
+    persist();
+    result = neu;
+  } else if (matchRoute(m, path, "GET", "/dauerauftraege/:id")) {
+    const id = match(path, "/dauerauftraege/:id")!.id;
+    const da = d.dauerauftraege.find((x) => x.id === id);
+    if (!da) throw new ApiError("Dauerauftrag nicht gefunden", 404);
+    result = {
+      ...da,
+      laeufe: d.dauerauftragLaeufe.filter((l) => l.dauerauftragId === id)
+        .sort((a, b) => b.geplantFuer.localeCompare(a.geplantFuer)),
+      sonderpositionen: d.dauerauftragSonderpositionen.filter((sp) => sp.dauerauftragId === id),
+    };
+  } else if (matchRoute(m, path, "PATCH", "/dauerauftraege/:id")) {
+    const id = match(path, "/dauerauftraege/:id")!.id;
+    const da = d.dauerauftraege.find((x) => x.id === id);
+    if (!da) throw new ApiError("Dauerauftrag nicht gefunden", 404);
+    Object.assign(da, body, { geaendertAm: now() });
+    persist();
+    result = da;
+  } else if (matchRoute(m, path, "DELETE", "/dauerauftraege/:id")) {
+    const id = match(path, "/dauerauftraege/:id")!.id;
+    d.dauerauftraege = d.dauerauftraege.filter((x) => x.id !== id);
+    d.dauerauftragLaeufe = d.dauerauftragLaeufe.filter((l) => l.dauerauftragId !== id);
+    d.dauerauftragSonderpositionen = d.dauerauftragSonderpositionen.filter((sp) => sp.dauerauftragId !== id);
+    persist();
+    return undefined as T;
+  } else if (matchRoute(m, path, "POST", "/dauerauftraege/:id/sofort-lauf")) {
+    const id = match(path, "/dauerauftraege/:id/sofort-lauf")!.id;
+    const da = d.dauerauftraege.find((x) => x.id === id);
+    if (!da) throw new ApiError("Dauerauftrag nicht gefunden", 404);
+    const stichtag = new Date();
+    const lauf = erzeugeLaufIntern(d, da, stichtag, true);
+    persist();
+    result = lauf;
+  } else if (matchRoute(m, path, "POST", "/dauerauftraege/:id/pausieren")) {
+    const id = match(path, "/dauerauftraege/:id/pausieren")!.id;
+    const da = d.dauerauftraege.find((x) => x.id === id);
+    if (!da) throw new ApiError("Dauerauftrag nicht gefunden", 404);
+    const { bis } = (body as { bis?: string }) ?? {};
+    da.pausiertBis = bis;
+    da.status = bis ? "pausiert" : "aktiv";
+    da.geaendertAm = now();
+    persist();
+    result = da;
+  } else if (matchRoute(m, path, "POST", "/dauerauftraege/:id/beenden")) {
+    const id = match(path, "/dauerauftraege/:id/beenden")!.id;
+    const da = d.dauerauftraege.find((x) => x.id === id);
+    if (!da) throw new ApiError("Dauerauftrag nicht gefunden", 404);
+    const { zum } = (body as { zum?: string }) ?? {};
+    da.laufzeitBis = zum ?? now().slice(0, 10);
+    da.status = "beendet";
+    da.geaendertAm = now();
+    persist();
+    result = da;
+  }
+
+  // ---- Sonderpositionen ----
+  else if (m === "POST" && match(path, "/dauerauftrag-sonderpositionen")) {
+    const sp = body as Partial<DauerauftragSonderposition>;
+    const neu: DauerauftragSonderposition = {
+      id: uuid(),
+      dauerauftragId: sp.dauerauftragId!,
+      fuerPeriode: sp.fuerPeriode!,
+      position: { ...(sp.position as Position), id: uuid() },
+    };
+    d.dauerauftragSonderpositionen.push(neu);
+    persist();
+    result = neu;
+  } else if (matchRoute(m, path, "DELETE", "/dauerauftrag-sonderpositionen/:id")) {
+    const id = match(path, "/dauerauftrag-sonderpositionen/:id")!.id;
+    d.dauerauftragSonderpositionen = d.dauerauftragSonderpositionen.filter((sp) => sp.id !== id);
+    persist();
+    return undefined as T;
+  }
+
+  // ---- Dauerauftrag-Läufe (Posteingang) ----
+  else if (m === "GET" && match(path.split("?")[0], "/dauerauftrag-laeufe")) {
+    const q = query(path);
+    const status = q.get("status");
+    let liste = [...d.dauerauftragLaeufe];
+    if (status) liste = liste.filter((l) => l.status === status);
+    result = liste.sort((a, b) => b.geplantFuer.localeCompare(a.geplantFuer));
+  } else if (m === "POST" && match(path, "/dauerauftrag-laeufe/check")) {
+    // Scheduler-Tick: prüft alle aktiven DAs auf fällige Läufe
+    const erzeugte = pruefeFaelligeLaeufeIntern(d);
+    persist();
+    result = { erzeugteLaeufe: erzeugte.length, laeufe: erzeugte };
+  }
+
+  // ---- Einstellungen Dauerauftrag / Zahlungsabgleich ----
+  else if (m === "GET" && match(path, "/einstellungen/dauerauftrag")) {
+    result = d.dauerauftragEinstellungen;
+  } else if (m === "PATCH" && match(path, "/einstellungen/dauerauftrag")) {
+    Object.assign(d.dauerauftragEinstellungen, body);
+    persist();
+    result = d.dauerauftragEinstellungen;
+  } else if (m === "GET" && match(path, "/einstellungen/zahlungsabgleich")) {
+    result = d.zahlungsabgleich;
+  } else if (m === "PATCH" && match(path, "/einstellungen/zahlungsabgleich")) {
+    Object.assign(d.zahlungsabgleich, body);
+    persist();
+    result = d.zahlungsabgleich;
+  }
+
+  // ---- Zahlungseingänge ----
+  else if (m === "GET" && match(path.split("?")[0], "/zahlungseingaenge")) {
+    const q = query(path);
+    const status = q.get("status");
+    let liste = [...d.zahlungseingaenge];
+    if (status) liste = liste.filter((z) => z.status === status);
+    result = liste.sort((a, b) => b.buchungsdatum.localeCompare(a.buchungsdatum));
+  } else if (m === "POST" && match(path, "/zahlungseingaenge")) {
+    const z = body as Partial<Zahlungseingang>;
+    const neu: Zahlungseingang = {
+      id: uuid(),
+      buchungsdatum: z.buchungsdatum ?? now().slice(0, 10),
+      betrag: Math.abs(z.betrag ?? 0),
+      waehrung: "EUR",
+      verwendungszweck: z.verwendungszweck ?? "",
+      senderName: z.senderName,
+      senderIban: z.senderIban,
+      status: "offen",
+      zuordnungen: [],
+      importQuelle: z.importQuelle ?? "manuell",
+      importiertAm: now(),
+    };
+    d.zahlungseingaenge.unshift(neu);
+    logAktivitaet("zahlungseingang_importiert", `Zahlungseingang ${neu.betrag.toFixed(2)} € erfasst`);
+    persist();
+    result = neu;
+  } else if (m === "POST" && match(path, "/zahlungseingaenge/import")) {
+    const { eintraege } = (body as { eintraege: Partial<Zahlungseingang>[] }) ?? { eintraege: [] };
+    const importiert: Zahlungseingang[] = [];
+    for (const e of eintraege) {
+      const neu: Zahlungseingang = {
+        id: uuid(),
+        buchungsdatum: e.buchungsdatum ?? now().slice(0, 10),
+        betrag: Math.abs(e.betrag ?? 0),
+        waehrung: "EUR",
+        verwendungszweck: e.verwendungszweck ?? "",
+        senderName: e.senderName,
+        senderIban: e.senderIban,
+        status: "offen",
+        zuordnungen: [],
+        importQuelle: "csv",
+        importiertAm: now(),
+      };
+      d.zahlungseingaenge.unshift(neu);
+      importiert.push(neu);
+    }
+    logAktivitaet("zahlungseingang_importiert", `${importiert.length} Zahlungseingänge importiert (CSV)`);
+    persist();
+    result = { anzahl: importiert.length, eintraege: importiert };
+  } else if (matchRoute(m, path, "DELETE", "/zahlungseingaenge/:id")) {
+    const id = match(path, "/zahlungseingaenge/:id")!.id;
+    // Vorher Zuordnungen lösen
+    const z = d.zahlungseingaenge.find((x) => x.id === id);
+    if (z) {
+      for (const zu of z.zuordnungen) {
+        const r = d.rechnungen.find((rr) => rr.id === zu.rechnungId);
+        if (r) {
+          r.zahlungen = r.zahlungen.filter((zz) => zz.id !== zu.zahlungId);
+          r.status = rechnungStatusAuto(r);
+        }
+      }
+    }
+    d.zahlungseingaenge = d.zahlungseingaenge.filter((x) => x.id !== id);
+    persist();
+    return undefined as T;
+  } else if (matchRoute(m, path, "POST", "/zahlungseingaenge/:id/ignorieren")) {
+    const id = match(path, "/zahlungseingaenge/:id/ignorieren")!.id;
+    const z = d.zahlungseingaenge.find((x) => x.id === id);
+    if (!z) throw new ApiError("Zahlungseingang nicht gefunden", 404);
+    z.status = "ignoriert";
+    persist();
+    result = z;
+  } else if (matchRoute(m, path, "POST", "/zahlungseingaenge/:id/zuordnen")) {
+    const id = match(path, "/zahlungseingaenge/:id/zuordnen")!.id;
+    const z = d.zahlungseingaenge.find((x) => x.id === id);
+    if (!z) throw new ApiError("Zahlungseingang nicht gefunden", 404);
+    const { zuordnungen } = (body as {
+      zuordnungen: Array<{ rechnungId: ID; betrag: number; score?: number }>;
+    }) ?? { zuordnungen: [] };
+    if (!zuordnungen.length) throw new ApiError("Mindestens eine Zuordnung erforderlich", 400);
+    const summe = zuordnungen.reduce((s, x) => s + x.betrag, 0);
+    if (summe > z.betrag + 0.005) throw new ApiError("Summe der Zuordnungen übersteigt den Eingang", 400);
+
+    for (const zu of zuordnungen) {
+      const r = d.rechnungen.find((rr) => rr.id === zu.rechnungId);
+      if (!r) continue;
+      const zahlung: Zahlung = {
+        id: uuid(),
+        rechnungId: r.id,
+        datum: z.buchungsdatum,
+        betrag: zu.betrag,
+        methode: "ueberweisung",
+        referenz: `Bank-Eingang ${z.id.slice(0, 8)}`,
+        notiz: z.verwendungszweck,
+      };
+      r.zahlungen.push(zahlung);
+      r.status = rechnungStatusAuto(r);
+      z.zuordnungen.push({ rechnungId: r.id, zahlungId: zahlung.id, betrag: zu.betrag, score: zu.score });
+    }
+    z.status = Math.abs(summe - z.betrag) < 0.005 ? "zugeordnet" : "teilweise";
+    logAktivitaet(
+      "zahlungseingang_zugeordnet",
+      `Eingang ${z.betrag.toFixed(2)} € auf ${zuordnungen.length} Rechnung(en) zugeordnet`,
+    );
+    persist();
+    result = z;
+  } else if (matchRoute(m, path, "POST", "/zahlungseingaenge/:id/zuordnung-loesen")) {
+    const id = match(path, "/zahlungseingaenge/:id/zuordnung-loesen")!.id;
+    const z = d.zahlungseingaenge.find((x) => x.id === id);
+    if (!z) throw new ApiError("Zahlungseingang nicht gefunden", 404);
+    for (const zu of z.zuordnungen) {
+      const r = d.rechnungen.find((rr) => rr.id === zu.rechnungId);
+      if (r) {
+        r.zahlungen = r.zahlungen.filter((zz) => zz.id !== zu.zahlungId);
+        r.status = rechnungStatusAuto(r);
+      }
+    }
+    z.zuordnungen = [];
+    z.status = "offen";
+    persist();
+    result = z;
+  }
+
   else if (m === "POST" && match(path, "/backup/erstellen")) {
     logAktivitaet("backup_erstellt", "Backup erstellt (Mock)");
     result = {
@@ -1188,4 +1475,152 @@ export async function mockBackend<T>(method: string, path: string, body?: unknow
 
 function matchRoute(method: string, path: string, expectedMethod: string, pattern: string): boolean {
   return method === expectedMethod && match(path, pattern) !== null;
+}
+
+// =============================================================================
+// Dauerauftrag-Scheduler-Helpers (intern)
+// =============================================================================
+
+/**
+ * Erzeugt einen einzelnen Lauf für einen Dauerauftrag und die zugehörige Rechnung.
+ * Idempotent: prüft (dauerauftragId, periode) — existiert der Lauf schon, liefert er ihn zurück.
+ */
+function erzeugeLaufIntern(
+  d: DB,
+  da: Dauerauftrag,
+  stichtag: Date,
+  forceEvenIfPaused = false,
+): DauerauftragLauf {
+  const periode = periodeFuer(da, stichtag);
+  const existing = d.dauerauftragLaeufe.find(
+    (l) => l.dauerauftragId === da.id && l.periode === periode,
+  );
+  if (existing) return existing;
+
+  // Pausierung respektieren — Lauf wird als "uebersprungen" markiert
+  if (!forceEvenIfPaused && istPausiert(da, stichtag)) {
+    const lauf: DauerauftragLauf = {
+      id: uuid(),
+      dauerauftragId: da.id,
+      periode,
+      geplantFuer: isoDate(stichtag),
+      status: "uebersprungen",
+      ausgefuehrtAm: now(),
+    };
+    d.dauerauftragLaeufe.push(lauf);
+    return lauf;
+  }
+
+  // Sonderpositionen für diese Periode konsumieren
+  const sonderpositionen = d.dauerauftragSonderpositionen.filter(
+    (sp) => sp.dauerauftragId === da.id && sp.fuerPeriode === periode && !sp.verbrauchtAm,
+  );
+
+  d.zaehler.rechnung += 1;
+  const rechnungId = uuid();
+  const rechnungNummer = nextNumber(d.nummernkreise.rechnungPraefix, d.zaehler.rechnung);
+  const kunde = d.kunden.find((k) => k.id === da.kundeId);
+
+  try {
+    const rechnung = erzeugeRechnungAusLauf({
+      da,
+      kunde,
+      stichtag,
+      sonderpositionen,
+      rechnungId,
+      rechnungNummer,
+      jetztIso: now(),
+    });
+    d.rechnungen.push(rechnung);
+
+    for (const sp of sonderpositionen) sp.verbrauchtAm = now();
+    da.letzteAusfuehrung = isoDate(stichtag);
+
+    const lauf: DauerauftragLauf = {
+      id: uuid(),
+      dauerauftragId: da.id,
+      periode,
+      geplantFuer: isoDate(stichtag),
+      ausgefuehrtAm: now(),
+      rechnungId: rechnung.id,
+      status: "erzeugt",
+    };
+    d.dauerauftragLaeufe.push(lauf);
+
+    logAktivitaet(
+      "dauerauftrag_lauf_erzeugt",
+      `Dauerauftrag ${da.nummer} → Rechnung ${rechnung.nummer} (${periode})`,
+      { typ: "rechnung", id: rechnung.id },
+    );
+
+    if (da.modus === "vollautomatisch") {
+      d.benachrichtigungen.unshift({
+        id: uuid(),
+        zeitpunkt: now(),
+        typ: "info",
+        titel: "Rechnung automatisch versendet",
+        text: `${da.nummer}: Rechnung ${rechnung.nummer} (${periode}) wurde automatisch erstellt und versendet.`,
+        gelesen: false,
+        link: { route: "/rechnungen/$id", params: { id: rechnung.id } },
+      });
+    } else {
+      d.benachrichtigungen.unshift({
+        id: uuid(),
+        zeitpunkt: now(),
+        typ: "info",
+        titel: "Neuer Rechnungs-Entwurf",
+        text: `${da.nummer}: Rechnung ${rechnung.nummer} (${periode}) wartet im Posteingang.`,
+        gelesen: false,
+        link: { route: "/dauerauftraege/posteingang", params: {} },
+      });
+    }
+
+    return lauf;
+  } catch (err) {
+    const lauf: DauerauftragLauf = {
+      id: uuid(),
+      dauerauftragId: da.id,
+      periode,
+      geplantFuer: isoDate(stichtag),
+      status: "fehler",
+      fehlerGrund: err instanceof Error ? err.message : String(err),
+    };
+    d.dauerauftragLaeufe.push(lauf);
+    return lauf;
+  }
+}
+
+/**
+ * Prüft alle aktiven Daueraufträge auf fällige Läufe.
+ * Wird vom Frontend-Scheduler im Mock und vom Pi-Cron im Live-Modus aufgerufen.
+ */
+function pruefeFaelligeLaeufeIntern(d: DB): DauerauftragLauf[] {
+  const heute = new Date();
+  const erzeugte: DauerauftragLauf[] = [];
+
+  for (const da of d.dauerauftraege) {
+    if (da.status === "beendet") continue;
+
+    const ab = da.letzteAusfuehrung
+      ? (() => {
+          const next = new Date(da.letzteAusfuehrung);
+          next.setDate(next.getDate() + 1);
+          return next;
+        })()
+      : new Date(da.laufzeitVon);
+
+    // Sicherheitsbegrenzung: max. 24 nachzuholende Läufe pro Tick
+    const stichtage = berechneNaechsteLauftermine(da, ab, 24).filter((t) => t <= heute);
+
+    for (const stichtag of stichtage) {
+      const periode = periodeFuer(da, stichtag);
+      const exists = d.dauerauftragLaeufe.some(
+        (l) => l.dauerauftragId === da.id && l.periode === periode,
+      );
+      if (exists) continue;
+      const lauf = erzeugeLaufIntern(d, da, stichtag);
+      if (lauf.status === "erzeugt") erzeugte.push(lauf);
+    }
+  }
+  return erzeugte;
 }
