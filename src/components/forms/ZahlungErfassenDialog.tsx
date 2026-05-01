@@ -90,7 +90,7 @@ export function ZahlungErfassenDialog({ open, onOpenChange, rechnung }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md bg-background">
         <DialogHeader>
           <DialogTitle>Zahlung erfassen</DialogTitle>
           <DialogDescription>
