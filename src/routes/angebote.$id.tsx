@@ -54,12 +54,7 @@ function Page() {
   const renderPrimaryAction = () => {
     if (a.status === "entwurf") {
       return (
-        <Button
-          className="rounded-lg"
-          onClick={() =>
-            send.mutate(undefined, { onSuccess: () => toast.success("Angebot versendet") })
-          }
-        >
+        <Button className="rounded-lg" onClick={() => setEmailOpen(true)}>
           <Send className="mr-1.5 h-4 w-4" /> Per E-Mail versenden
         </Button>
       );
