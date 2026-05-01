@@ -15,6 +15,10 @@ import type {
   AppearanceEinstellungen,
   BackupEinstellungen,
   Benachrichtigung,
+  Dauerauftrag,
+  DauerauftragEinstellungen,
+  DauerauftragLauf,
+  DauerauftragSonderposition,
   Dokument,
   EmailSignatur,
   EmailVersand,
@@ -30,6 +34,8 @@ import type {
   SicherheitsEinstellungen,
   SmtpEinstellungen,
   Textvorlage,
+  Zahlungseingang,
+  ZahlungsabgleichEinstellungen,
 } from "@/lib/api/types";
 import { STANDARD_MAHN_EINSTELLUNGEN, standardMahnVorlagen } from "@/lib/mahnung/defaults";
 
