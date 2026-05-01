@@ -1053,6 +1053,36 @@ export async function mockBackend<T>(method: string, path: string, body?: unknow
     d.benachrichtigungen.forEach((b) => (b.gelesen = true));
     persist();
     return undefined as T;
+  } else if (m === "POST" && match(path, "/dokumente/check-fristen")) {
+    // Prüft alle Dokumente auf überfällige Fristen und legt fehlende Benachrichtigungen an.
+    const heute = new Date();
+    heute.setHours(0, 0, 0, 0);
+    let neue = 0;
+    for (const dok of d.dokumente) {
+      if (dok.erledigtAm) continue;
+      if (!dok.faelligAm) continue;
+      const fr = new Date(dok.faelligAm);
+      fr.setHours(0, 0, 0, 0);
+      if (fr.getTime() >= heute.getTime()) continue;
+      // Schon eine offene Benachrichtigung für dieses Dokument?
+      const existiert = d.benachrichtigungen.some(
+        (b) => b.link?.params?.dokumentId === dok.id && !b.gelesen,
+      );
+      if (existiert) continue;
+      const tageUeber = Math.round((heute.getTime() - fr.getTime()) / (24 * 60 * 60 * 1000));
+      d.benachrichtigungen.unshift({
+        id: uuid(),
+        zeitpunkt: now(),
+        typ: "warnung",
+        titel: "Dokument überfällig",
+        text: `"${dok.titel}" ist seit ${tageUeber} Tag(en) überfällig.`,
+        gelesen: false,
+        link: { route: "/dokumente", params: { dokumentId: dok.id } },
+      });
+      neue++;
+    }
+    if (neue > 0) persist();
+    result = { neue };
   }
 
   // ---- Einstellungen ----
