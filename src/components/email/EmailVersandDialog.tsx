@@ -112,8 +112,16 @@ export function EmailVersandDialog({
   const visuellRef = useRef<HTMLDivElement>(null);
 
   const ctx: PlaceholderContext = useMemo(
-    () => ({ kunde, angebot, rechnung, firma }),
-    [kunde, angebot, rechnung, firma],
+    () => ({
+      kunde,
+      angebot,
+      rechnung,
+      firma,
+      mahnung: mahnStufe
+        ? { stufe: mahnStufe, einstellungen: mahnEinstellungen ?? null }
+        : null,
+    }),
+    [kunde, angebot, rechnung, firma, mahnStufe, mahnEinstellungen],
   );
 
   // Vorbelegen beim Öffnen
@@ -126,10 +134,22 @@ export function EmailVersandDialog({
     setPdfAnhangAktiv(true);
     setMode("visuell");
 
-    const standardVorlage =
-      passendeVorlagen.find((v) => v.istStandard && v.kontext === kontext) ??
-      passendeVorlagen.find((v) => v.kontext === kontext) ??
-      passendeVorlagen[0];
+    let standardVorlage: EmailVorlage | undefined;
+    if (mahnStufe && mahnEinstellungen) {
+      const config = mahnEinstellungen.stufen.find((s) => s.stufe === mahnStufe);
+      if (config?.emailVorlageId) {
+        standardVorlage = vorlagen.find((v) => v.id === config.emailVorlageId);
+      }
+    }
+    if (!standardVorlage && vorbelegteVorlageId) {
+      standardVorlage = vorlagen.find((v) => v.id === vorbelegteVorlageId);
+    }
+    if (!standardVorlage) {
+      standardVorlage =
+        passendeVorlagen.find((v) => v.istStandard && v.kontext === kontext) ??
+        passendeVorlagen.find((v) => v.kontext === kontext) ??
+        passendeVorlagen[0];
+    }
     const standardSig =
       signaturen.find((s) => s.istStandard) ?? signaturen[0];
 
@@ -206,6 +226,7 @@ export function EmailVersandDialog({
           pdfAnhangAktiv && pdfDateiname
             ? [{ name: pdfDateiname, sizeBytes: 0, kind: "pdf-beleg" }]
             : [],
+        mahnStufe,
       },
       {
         onSuccess: (res) => {
