@@ -129,25 +129,23 @@ export function KundeForm({ onClose, onCreated }: Props) {
         <TabsContent value="basis" className="mt-6 space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Typ">
-              <select
-                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                value={f.typ}
-                onChange={(e) => set("typ", e.target.value as FormState["typ"])}
-              >
-                <option value="firma">Firma</option>
-                <option value="privat">Privat</option>
-              </select>
+              <Select value={f.typ} onValueChange={(v) => set("typ", v as FormState["typ"])}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="firma">Firma</SelectItem>
+                  <SelectItem value="privat">Privat</SelectItem>
+                </SelectContent>
+              </Select>
             </Field>
             <Field label="Status">
-              <select
-                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                value={f.status}
-                onChange={(e) => set("status", e.target.value as FormState["status"])}
-              >
-                <option value="aktiv">Aktiv</option>
-                <option value="interessent">Interessent</option>
-                <option value="inaktiv">Inaktiv</option>
-              </select>
+              <Select value={f.status} onValueChange={(v) => set("status", v as FormState["status"])}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="aktiv">Aktiv</SelectItem>
+                  <SelectItem value="interessent">Interessent</SelectItem>
+                  <SelectItem value="inaktiv">Inaktiv</SelectItem>
+                </SelectContent>
+              </Select>
             </Field>
           </div>
           {f.typ === "firma" && (
@@ -157,17 +155,19 @@ export function KundeForm({ onClose, onCreated }: Props) {
           )}
           <div className="grid gap-4 sm:grid-cols-3">
             <Field label="Anrede">
-              <select
-                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                value={f.anrede}
-                onChange={(e) => set("anrede", e.target.value as FormState["anrede"])}
+              <Select
+                value={f.anrede || "__none__"}
+                onValueChange={(v) => set("anrede", (v === "__none__" ? "" : v) as FormState["anrede"])}
               >
-                <option value="">—</option>
-                <option value="herr">Herr</option>
-                <option value="frau">Frau</option>
-                <option value="divers">Divers</option>
-                <option value="keine">Keine</option>
-              </select>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">—</SelectItem>
+                  <SelectItem value="herr">Herr</SelectItem>
+                  <SelectItem value="frau">Frau</SelectItem>
+                  <SelectItem value="divers">Divers</SelectItem>
+                  <SelectItem value="keine">Keine</SelectItem>
+                </SelectContent>
+              </Select>
             </Field>
             <Field label="Vorname"><Input value={f.vorname} onChange={(e) => set("vorname", e.target.value)} /></Field>
             <Field label="Nachname"><Input value={f.nachname} onChange={(e) => set("nachname", e.target.value)} /></Field>
