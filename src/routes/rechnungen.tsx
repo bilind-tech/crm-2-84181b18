@@ -362,6 +362,7 @@ function RechnungEmailLauncher({ rechnung, onClose }: { rechnung: Rechnung; onCl
       rechnung={rechnung}
       pdfBlobUrl={pdf.url}
       pdfDateiname={`${rechnung.nummer}.pdf`}
+      pdfStatus={pdf.status}
     />
   );
 }
