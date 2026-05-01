@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { LoadingPlaceholder } from "@/components/layout/LoadingPlaceholder";
+import { DetailSkeleton } from "@/components/layout/DetailSkeleton";
+import { NotFoundState } from "@/components/layout/NotFoundState";
 import { useState } from "react";
 import { Download, Send, FileCheck2, ThumbsUp, ThumbsDown } from "lucide-react";
 import {
@@ -30,7 +31,7 @@ export const Route = createFileRoute("/angebote/$id")({ component: Page });
 function Page() {
   const navigate = useNavigate();
   const { id } = Route.useParams();
-  const { data: a } = useAngebot(id);
+  const { data: a, isLoading } = useAngebot(id);
   const { data: kunde } = useKunde(a?.kundeId ?? "");
   const inRechnung = useAngebotInRechnung(id);
   const updateAngebot = useUpdateAngebot(id);
@@ -38,7 +39,17 @@ function Page() {
   const { data: alleRechnungen = [] } = useRechnungen();
   const [emailOpen, setEmailOpen] = useState(false);
 
-  if (!a) return <LoadingPlaceholder />;
+  if (isLoading) return <DetailSkeleton variant="beleg" />;
+  if (!a) {
+    return (
+      <NotFoundState
+        title="Angebot nicht gefunden"
+        description="Dieses Angebot wurde gelöscht oder die Adresse ist ungültig."
+        backTo="/angebote"
+        backLabel="Zurück zu den Angeboten"
+      />
+    );
+  }
 
   const folgeRechnung = alleRechnungen.find((r) => r.quellAngebotId === a.id);
   const hatRechnung = !!folgeRechnung;

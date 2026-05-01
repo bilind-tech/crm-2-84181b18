@@ -112,7 +112,7 @@ function Shell() {
         <AppSidebar />
         <div className="flex min-w-0 flex-1 flex-col">
           <AppHeader />
-          <main key={pathname} className="min-w-0 flex-1 overflow-x-hidden p-4 motion-safe:animate-fade-in-fast sm:p-6">
+          <main className="min-w-0 flex-1 overflow-x-hidden p-4 sm:p-6">
             <Outlet />
           </main>
         </div>

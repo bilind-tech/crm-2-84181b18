@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { LoadingPlaceholder } from "@/components/layout/LoadingPlaceholder";
+import { DetailSkeleton } from "@/components/layout/DetailSkeleton";
+import { NotFoundState } from "@/components/layout/NotFoundState";
 import { useState } from "react";
 import { Pencil, Archive, Building2, Plus } from "lucide-react";
 import { useKunde } from "@/hooks/useApi";
@@ -24,13 +25,15 @@ function Page() {
   const [openAngebot, setOpenAngebot] = useState(false);
   const [openRechnung, setOpenRechnung] = useState(false);
 
-  if (isLoading) return <LoadingPlaceholder />;
+  if (isLoading) return <DetailSkeleton variant="kunde" />;
   if (!k) {
     return (
-      <p className="text-sm">
-        Kunde nicht gefunden.{" "}
-        <Link to="/kunden" className="underline">Zurück</Link>
-      </p>
+      <NotFoundState
+        title="Kunde nicht gefunden"
+        description="Dieser Kunde wurde gelöscht oder die Adresse ist ungültig."
+        backTo="/kunden"
+        backLabel="Zurück zur Kundenliste"
+      />
     );
   }
 

@@ -107,7 +107,18 @@ export const useCreateKunde = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (data: Partial<Kunde>) => api.post<Kunde>("/kunden", data),
-    onSuccess: () => {
+    onSuccess: (neu) => {
+      // Detail-Daten für die frisch angelegte Kunden-ID vorab in den Cache
+      // schreiben, damit /kunden/:id ohne Lade-Lücke direkt rendert.
+      qc.setQueryData(qk.kunde(neu.id), {
+        ...neu,
+        ansprechpartner: [],
+        objekte: [],
+        angebote: [],
+        rechnungen: [],
+        dokumente: [],
+        notizen: [],
+      });
       qc.invalidateQueries({ queryKey: qk.kunden });
       qc.invalidateQueries({ queryKey: qk.dashboard.kennzahlen });
     },

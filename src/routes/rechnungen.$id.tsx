@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { LoadingPlaceholder } from "@/components/layout/LoadingPlaceholder";
+import { DetailSkeleton } from "@/components/layout/DetailSkeleton";
+import { NotFoundState } from "@/components/layout/NotFoundState";
 import { useState } from "react";
 import { Download, Send, CheckCircle2, Wallet, Trash2 } from "lucide-react";
 import { useRechnung, useAngebot, useKunde, useDeleteZahlung } from "@/hooks/useApi";
@@ -25,7 +26,7 @@ export const Route = createFileRoute("/rechnungen/$id")({ component: Page });
 
 function Page() {
   const { id } = Route.useParams();
-  const { data: r } = useRechnung(id);
+  const { data: r, isLoading } = useRechnung(id);
   const pdf = useRechnungPdf(r);
   const [zahlungOpen, setZahlungOpen] = useState(false);
   const [emailOpen, setEmailOpen] = useState(false);
@@ -34,7 +35,17 @@ function Page() {
   const delZahlung = useDeleteZahlung(id);
   const { confirm, dialog: confirmDialog } = useConfirm();
 
-  if (!r) return <LoadingPlaceholder />;
+  if (isLoading) return <DetailSkeleton variant="beleg" />;
+  if (!r) {
+    return (
+      <NotFoundState
+        title="Rechnung nicht gefunden"
+        description="Diese Rechnung wurde gelöscht oder die Adresse ist ungültig."
+        backTo="/rechnungen"
+        backLabel="Zurück zu den Rechnungen"
+      />
+    );
+  }
   const s = summenRechnung(r.positionen, r.rabattGesamt);
   const bezahlt = r.zahlungen.reduce((a, z) => a + z.betrag, 0);
   const offen = Math.max(0, s.brutto - bezahlt);

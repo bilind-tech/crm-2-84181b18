@@ -1,13 +1,24 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { LoadingPlaceholder } from "@/components/layout/LoadingPlaceholder";
+import { DetailSkeleton } from "@/components/layout/DetailSkeleton";
+import { NotFoundState } from "@/components/layout/NotFoundState";
 import { useObjekt } from "@/hooks/useApi";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export const Route = createFileRoute("/objekte/$id")({ component: Page });
 function Page() {
   const { id } = Route.useParams();
-  const { data: o } = useObjekt(id);
-  if (!o) return <LoadingPlaceholder />;
+  const { data: o, isLoading } = useObjekt(id);
+  if (isLoading) return <DetailSkeleton variant="objekt" />;
+  if (!o) {
+    return (
+      <NotFoundState
+        title="Objekt nicht gefunden"
+        description="Dieses Objekt wurde gelöscht oder die Adresse ist ungültig."
+        backTo="/objekte"
+        backLabel="Zurück zu den Objekten"
+      />
+    );
+  }
   return (
     <div className="space-y-4">
       <div><Link to="/objekte" className="text-xs text-muted-foreground hover:underline">← Objekte</Link>
