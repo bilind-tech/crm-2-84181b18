@@ -100,6 +100,7 @@ interface DB {
   zaehler: { kunde: number; objekt: number; angebot: number; rechnung: number; dauerauftrag: number };
   /** Pro Kunde + "YYYY-MM" laufende Nummer für Rechnungen/Angebote mit eigenem Kürzel. */
   zaehlerProKunde?: Record<string, Record<string, number>>;
+}
 
 let db: DB | null = null;
 
