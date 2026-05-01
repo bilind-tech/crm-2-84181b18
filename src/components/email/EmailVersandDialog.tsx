@@ -64,6 +64,12 @@ interface Props {
   pdfBlobUrl?: string | null;
   pdfDateiname?: string;
   onSent?: () => void;
+  /** Wenn gesetzt: Versand wird im Backend als Mahnung dieser Stufe protokolliert. */
+  mahnStufe?: 1 | 2 | 3;
+  /** Optional: Vorlagen-ID, die per Default ausgewählt wird (z.B. aus Mahn-Konfig). */
+  vorbelegteVorlageId?: string;
+  /** Optional: zusätzliche Platzhalter-Variablen (z.B. mahnung.gebuehr). */
+  zusatzPlaceholder?: Record<string, string>;
 }
 
 type EditorMode = "visuell" | "html" | "vorschau";
