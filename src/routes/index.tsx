@@ -216,3 +216,29 @@ function Dashboard() {
     </div>
   );
 }
+
+function MahnStat({
+  value,
+  label,
+  sub,
+  tone,
+}: {
+  value: number;
+  label: string;
+  sub?: string;
+  tone: "primary" | "warning" | "danger" | "muted";
+}) {
+  const colorMap = {
+    primary: "text-primary",
+    warning: "text-warning",
+    danger: "text-destructive",
+    muted: "text-muted-foreground",
+  } as const;
+  return (
+    <div className="rounded-xl border border-border bg-muted/30 p-3 text-center">
+      <p className={`text-2xl font-semibold ${colorMap[tone]}`}>{value}</p>
+      <p className="mt-0.5 text-[11px] font-medium text-muted-foreground">{label}</p>
+      {sub && <p className="text-[11px] text-muted-foreground">{sub}</p>}
+    </div>
+  );
+}
