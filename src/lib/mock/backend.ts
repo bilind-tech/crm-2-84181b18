@@ -76,6 +76,7 @@ interface DB {
   sicherheit: SicherheitsEinstellungen;
   appearance: AppearanceEinstellungen;
   backup: BackupEinstellungen;
+  mahnung: MahnEinstellungen;
   zaehler: { kunde: number; objekt: number; angebot: number; rechnung: number };
 }
 
