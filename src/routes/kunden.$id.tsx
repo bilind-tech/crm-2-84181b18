@@ -115,6 +115,7 @@ function Page() {
         <TabsContent value="uebersicht" className="mt-6 grid gap-4 lg:grid-cols-2">
           <SectionCard title="Stammdaten">
             <Row label="Kundennummer" value={k.nummer} mono />
+            {k.kuerzel && <Row label="Kürzel" value={k.kuerzel} mono />}
             <Row label="Typ" value={k.typ === "firma" ? "Firma" : "Privat"} />
             {k.firmenname && <Row label="Firma" value={k.firmenname} />}
             {(k.vorname || k.nachname) && <Row label="Person" value={`${k.vorname ?? ""} ${k.nachname ?? ""}`.trim()} />}
