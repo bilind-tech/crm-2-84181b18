@@ -297,6 +297,21 @@ export interface Dokument {
   betrag?: number;
   steuerrelevant: boolean;
   hochgeladenAm: ISODateTime;
+  /** Wenn aus einer Handy-Scan-Session stammend */
+  quelle?: "upload" | "drag-drop" | "handy-scan";
+}
+
+// ---------- Upload-Session (Handy-Scan-Brücke) ----------
+
+export interface UploadSession {
+  id: ID;
+  /** Zufälliger Token, in URL und Header genutzt. */
+  token: string;
+  erstelltAm: ISODateTime;
+  ablaufAm: ISODateTime;
+  beendet: boolean;
+  /** Dokumente, die in dieser Session hochgeladen wurden (Referenz auf dokumente). */
+  dokumentIds: ID[];
 }
 
 // ---------- Notizen / Aktivitäten / Benachrichtigungen ----------
