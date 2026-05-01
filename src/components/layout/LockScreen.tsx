@@ -37,13 +37,13 @@ export function LockScreen() {
             <span className="font-light"> Center</span>
           </h1>
           <CardDescription className="mt-1">
-            Bitte gib dein Master-Passwort ein, um zu entsperren.
+            Bitte gib dein Passwort ein, um zu entsperren.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="pw">Master-Passwort</Label>
+              <Label htmlFor="pw">Passwort</Label>
               <div className="relative">
                 <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input

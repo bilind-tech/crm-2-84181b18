@@ -1,42 +1,18 @@
-import { Link } from "@tanstack/react-router";
-import { Home, ChevronRight } from "lucide-react";
-
 type Crumb = { label: string; to?: string };
 
 interface Props {
   title: string;
   subtitle?: React.ReactNode;
-  /** Entweder ein einfacher String (eine Ebene) oder mehrere Krümel. */
-  breadcrumb: string | Crumb[];
+  /** @deprecated wird nicht mehr angezeigt — Prop bleibt für Rückwärtskompatibilität */
+  breadcrumb?: string | Crumb[];
   /** @deprecated wird nicht mehr angezeigt */
   hint?: string;
   actions?: React.ReactNode;
 }
 
-export function PageHeader({ title, subtitle, breadcrumb, actions }: Props) {
-  const crumbs: Crumb[] =
-    typeof breadcrumb === "string" ? [{ label: breadcrumb }] : breadcrumb;
+export function PageHeader({ title, subtitle, actions }: Props) {
   return (
     <div className="space-y-2">
-      <nav className="flex items-center gap-1.5 text-sm text-muted-foreground">
-        <Link to="/" className="flex items-center hover:text-foreground">
-          <Home className="h-3.5 w-3.5" />
-        </Link>
-        {crumbs.map((c, i) => (
-          <span key={i} className="flex items-center gap-1.5">
-            <ChevronRight className="h-3.5 w-3.5" />
-            {c.to ? (
-              <Link to={c.to} className="hover:text-foreground">
-                {c.label}
-              </Link>
-            ) : (
-              <span className={i === crumbs.length - 1 ? "text-foreground" : ""}>
-                {c.label}
-              </span>
-            )}
-          </span>
-        ))}
-      </nav>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">{title}</h1>
