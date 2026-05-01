@@ -30,12 +30,20 @@ export function AppHeader() {
   const [createOpen, setCreateOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-border/60 bg-background px-4">
-      <SidebarTrigger className="h-9 w-9" />
+    <header className="sticky top-0 z-30 flex h-16 items-center gap-2 border-b border-border/60 bg-background px-3 sm:gap-3 sm:px-4">
+      <SidebarTrigger className="h-9 w-9 shrink-0" />
 
+      {/* Suche: Mobil als Icon-Button, ab sm als breites Feld */}
       <button
         onClick={() => setSearchOpen(true)}
-        className="flex h-10 max-w-2xl flex-1 items-center gap-2 rounded-full border border-border bg-card px-4 text-sm text-muted-foreground transition hover:border-primary/30"
+        aria-label="Suchen"
+        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border bg-card text-muted-foreground transition hover:border-primary/30 sm:hidden"
+      >
+        <Search className="h-4 w-4" />
+      </button>
+      <button
+        onClick={() => setSearchOpen(true)}
+        className="hidden h-10 max-w-2xl flex-1 items-center gap-2 rounded-full border border-border bg-card px-4 text-sm text-muted-foreground transition hover:border-primary/30 sm:flex"
       >
         <Search className="h-4 w-4" />
         <span>Suchen…</span>
@@ -44,8 +52,18 @@ export function AppHeader() {
         </kbd>
       </button>
 
-      <div className="ml-auto flex items-center gap-2">
-        <PrimaryAction onClick={() => setCreateOpen(true)} label="Neu" />
+      <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
+        {/* Mobil: Icon-only Plus-Button */}
+        <button
+          onClick={() => setCreateOpen(true)}
+          aria-label="Neu erstellen"
+          className="grid h-10 w-10 shrink-0 place-content-center rounded-lg bg-[linear-gradient(180deg,#3B82F6_0%,#2563EB_55%,#1D4ED8_100%)] text-white shadow-[0_8px_22px_-8px_rgba(37,99,235,0.55)] ring-1 ring-inset ring-white/15 transition active:brightness-95 sm:hidden"
+        >
+          <Plus className="h-5 w-5" />
+        </button>
+        <div className="hidden sm:block">
+          <PrimaryAction onClick={() => setCreateOpen(true)} label="Neu" />
+        </div>
 
         <Popover>
           <PopoverTrigger asChild>
@@ -58,7 +76,7 @@ export function AppHeader() {
               )}
             </Button>
           </PopoverTrigger>
-          <PopoverContent align="end" className="w-80 p-0">
+          <PopoverContent align="end" className="w-[calc(100vw-1.5rem)] max-w-80 p-0 sm:w-80">
             <div className="flex items-center justify-between border-b p-3">
               <p className="text-sm font-semibold">Benachrichtigungen</p>
               {ungelesen > 0 && (
