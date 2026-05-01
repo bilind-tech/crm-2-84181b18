@@ -305,6 +305,7 @@ export function EmailSignaturenTab() {
   const del = useDeleteEmailSignatur();
   const [editing, setEditing] = useState<EmailSignatur | null>(null);
   const [creating, setCreating] = useState(false);
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   return (
     <div className="space-y-4">
@@ -358,10 +359,20 @@ export function EmailSignaturenTab() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => {
-                      if (confirm(`Signatur „${s.name}" löschen?`))
-                        del.mutate(s.id, { onSuccess: () => toast.success("Signatur gelöscht") });
-                    }}
+                    onClick={() =>
+                      confirm(
+                        {
+                          title: "Signatur löschen?",
+                          description: `„${s.name}" dauerhaft entfernen.`,
+                          variant: "destructive",
+                          confirmLabel: "Löschen",
+                        },
+                        () =>
+                          del.mutate(s.id, {
+                            onSuccess: () => toast.success("Signatur gelöscht"),
+                          }),
+                      )
+                    }
                   >
                     <Trash2 className="h-4 w-4 text-destructive" />
                   </Button>
@@ -394,6 +405,7 @@ export function EmailSignaturenTab() {
           }}
         />
       )}
+      {confirmDialog}
     </div>
   );
 }
