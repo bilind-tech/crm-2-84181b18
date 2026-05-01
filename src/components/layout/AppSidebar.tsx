@@ -8,6 +8,8 @@ import {
   Settings,
   Lock,
   Bell,
+  Repeat,
+  Wallet,
 } from "lucide-react";
 import {
   Sidebar,
@@ -25,6 +27,9 @@ import {
 import logo from "@/assets/logo.png";
 import { useAuth } from "@/lib/auth";
 import { useMahnZaehler } from "@/hooks/useMahnZaehler";
+import { useDauerauftragLaeufe } from "@/hooks/useDauerauftraege";
+import { useZahlungseingaenge } from "@/hooks/useZahlungseingaenge";
+import { useRechnungen } from "@/hooks/useApi";
 import { cn } from "@/lib/utils";
 
 type NavItem = {
@@ -42,6 +47,8 @@ export function AppSidebar() {
   const path = useRouterState({ select: (r) => r.location.pathname });
   const { lock } = useAuth();
   const mahn = useMahnZaehler();
+  const { data: laeufeErzeugt = [] } = useDauerauftragLaeugeOffen();
+  const { data: zeOffen = [] } = useZahlungseingaenge("offen");
 
   const uebersicht: NavItem[] = [
     { title: "Dashboard", url: "/", icon: LayoutDashboard, exact: true },
@@ -52,6 +59,20 @@ export function AppSidebar() {
   const vertrieb: NavItem[] = [
     { title: "Angebote", url: "/angebote", icon: FileText },
     { title: "Rechnungen", url: "/rechnungen", icon: Receipt },
+    {
+      title: "Daueraufträge",
+      url: "/dauerauftraege",
+      icon: Repeat,
+      badge: laeufeErzeugt.length,
+      badgeTone: "primary",
+    },
+    {
+      title: "Zahlungseingänge",
+      url: "/zahlungseingaenge",
+      icon: Wallet,
+      badge: zeOffen.length,
+      badgeTone: "primary",
+    },
     {
       title: "Mahnungen",
       url: "/mahnungen",
