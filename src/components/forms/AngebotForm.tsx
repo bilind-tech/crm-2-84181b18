@@ -84,36 +84,37 @@ export function AngebotForm({ onClose, defaultKundeId, defaultObjektId }: Props)
     <div className="space-y-6">
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Kunde *">
-          <select
-            className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-            value={kundeId}
-            onChange={(e) => {
-              setKundeId(e.target.value);
+          <Select
+            value={kundeId || undefined}
+            onValueChange={(v) => {
+              setKundeId(v);
               setObjektId("");
             }}
           >
-            <option value="">Kunde wählen…</option>
-            {kunden.map((k) => (
-              <option key={k.id} value={k.id}>
-                {k.firmenname || `${k.vorname ?? ""} ${k.nachname ?? ""}`.trim()} · {k.nummer}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger><SelectValue placeholder="Kunde wählen…" /></SelectTrigger>
+            <SelectContent>
+              {kunden.map((k) => (
+                <SelectItem key={k.id} value={k.id}>
+                  {k.firmenname || `${k.vorname ?? ""} ${k.nachname ?? ""}`.trim()} · {k.nummer}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </Field>
         <Field label="Objekt (optional)">
-          <select
-            className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm disabled:opacity-50"
-            value={objektId}
+          <Select
+            value={objektId || "__none__"}
+            onValueChange={(v) => setObjektId(v === "__none__" ? "" : v)}
             disabled={!kundeId}
-            onChange={(e) => setObjektId(e.target.value)}
           >
-            <option value="">— kein Objekt —</option>
-            {objekteVonKunde.map((o) => (
-              <option key={o.id} value={o.id}>
-                {o.name}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger><SelectValue placeholder={kundeId ? "— kein Objekt —" : "Erst Kunde wählen"} /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__none__">— kein Objekt —</SelectItem>
+              {objekteVonKunde.map((o) => (
+                <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </Field>
       </div>
 
