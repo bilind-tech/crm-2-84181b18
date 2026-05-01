@@ -34,15 +34,14 @@ function Page() {
   const renderPrimaryAction = () => {
     if (r.status === "entwurf") {
       return (
-        <Button
-          className="rounded-lg"
-          onClick={() =>
-            send.mutate(undefined, { onSuccess: () => toast.success("Rechnung versendet") })
-          }
-        >
+        <Button className="rounded-lg" onClick={() => setEmailOpen(true)}>
           <Send className="mr-1.5 h-4 w-4" /> Per E-Mail versenden
         </Button>
       );
+    }
+    if (r.status === "versendet" || r.status === "ueberfaellig" || r.status === "teilbezahlt") {
+      // weiter unten regulärer Zahlung-Button — zusätzlich Mahnung anbieten bei überfällig
+      // (rendern wir später in einem zweiten Block, hier primär)
     }
     if (r.status === "bezahlt") {
       return (
