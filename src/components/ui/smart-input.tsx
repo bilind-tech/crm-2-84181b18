@@ -37,12 +37,20 @@ export const SmartInput = React.forwardRef<HTMLInputElement, SmartInputProps>(
       onFocus?.(e);
     }
 
+    // Auto-inputMode: passende Mobil-Tastatur ableiten
+    const autoInputMode: React.HTMLAttributes<HTMLInputElement>["inputMode"] =
+      rest.inputMode ??
+      (prefix.startsWith("+") ? "tel" : prefix.startsWith("http") ? "url" : undefined);
+    const autoType = rest.type ?? (prefix.startsWith("+") ? "tel" : prefix.startsWith("http") ? "url" : undefined);
+
     return (
       <Input
         ref={ref}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         onFocus={handleFocus}
+        inputMode={autoInputMode}
+        type={autoType}
         {...rest}
       />
     );
