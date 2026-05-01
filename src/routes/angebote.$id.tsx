@@ -182,6 +182,8 @@ function Page() {
               </ul>
             </div>
           )}
+
+          <EmailVersandHistorie belegId={a.id} belegTyp="angebot" />
         </div>
 
         <div className="overflow-hidden rounded-2xl border border-border bg-muted/40 shadow-sm">
