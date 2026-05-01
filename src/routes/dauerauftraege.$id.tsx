@@ -254,6 +254,7 @@ function Page() {
           </div>
         </div>
       </div>
+      {confirmDialog}
     </div>
   );
 }
