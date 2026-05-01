@@ -142,6 +142,7 @@ function Page() {
             badge={statusBadge(a.status)}
             actions={
               <>
+                <AngebotAnnahmeButtons angebot={a} />
                 <PdfViewButton kind="angebot" beleg={a} />
                 <button
                   type="button"
@@ -216,6 +217,7 @@ function Page() {
                 <td className="px-4 py-3">{statusBadge(a.status)}</td>
                 <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                   <div className="flex items-center justify-end gap-1 text-muted-foreground">
+                    <AngebotAnnahmeButtons angebot={a} size="sm" />
                     <PdfViewButton kind="angebot" beleg={a} />
                     <button
                       type="button"
