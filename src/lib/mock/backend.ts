@@ -18,6 +18,7 @@ import type {
   Angebot,
   Ansprechpartner,
   AppearanceEinstellungen,
+  BackupEintrag,
   BackupEinstellungen,
   Benachrichtigung,
   DashboardKennzahlen,
@@ -30,6 +31,7 @@ import type {
   EmailVersand,
   EmailVorlage,
   Firmendaten,
+  GoogleDriveEinstellungen,
   ID,
   Kunde,
   MahnEinstellungen,
@@ -43,6 +45,7 @@ import type {
   Rechnung,
   RechnungStatus,
   SicherheitsEinstellungen,
+  SitzungEintrag,
   SmtpEinstellungen,
   SuchTreffer,
   Textvorlage,
@@ -90,6 +93,9 @@ interface DB {
   sicherheit: SicherheitsEinstellungen;
   appearance: AppearanceEinstellungen;
   backup: BackupEinstellungen;
+  backupHistorie: BackupEintrag[];
+  googleDrive: GoogleDriveEinstellungen;
+  sitzungen: SitzungEintrag[];
   mahnung: MahnEinstellungen;
   dauerauftraege: Dauerauftrag[];
   dauerauftragLaeufe: DauerauftragLauf[];
@@ -936,16 +942,29 @@ export async function mockBackend<T>(method: string, path: string, body?: unknow
     persist();
     result = d.firmendaten;
   } else if (m === "GET" && match(path, "/einstellungen/smtp")) {
-    result = d.smtp;
+    // Passwort NIEMALS im Response — Frontend bekommt nur passwortGesetzt-Flag.
+    const { passwort: _ignored, ...safe } = d.smtp as SmtpEinstellungen & { passwort?: string };
+    void _ignored;
+    result = safe;
   } else if (m === "PATCH" && match(path, "/einstellungen/smtp")) {
     const incoming = body as Partial<SmtpEinstellungen> & { passwort?: string };
-    Object.assign(d.smtp, incoming);
-    if (incoming.passwort) d.smtp.passwortGesetzt = true;
+    const { passwort, ...rest } = incoming;
+    Object.assign(d.smtp, rest);
+    if (passwort && passwort.trim().length > 0) {
+      d.smtp.passwortGesetzt = true;
+      // Mock: das Klartext-Passwort wird NICHT persistiert. Auf dem Pi wird hier AES-GCM verschlüsselt.
+    }
+    logAktivitaet("einstellung_geaendert", "SMTP-Einstellungen aktualisiert");
     persist();
-    result = d.smtp;
+    const { passwort: _strip, ...safe } = d.smtp as SmtpEinstellungen & { passwort?: string };
+    void _strip;
+    result = safe;
   } else if (m === "POST" && match(path, "/einstellungen/smtp/test")) {
-    // Mock: simulieren
-    result = { erfolg: true, nachricht: "Testmail (simuliert) erfolgreich versendet." };
+    if (!d.smtp.passwortGesetzt || !d.smtp.server || !d.smtp.benutzer) {
+      result = { erfolg: false, nachricht: "Bitte zuerst alle Felder inkl. Passwort speichern." };
+    } else {
+      result = { erfolg: true, nachricht: `Testmail (simuliert) an ${d.smtp.absenderEmail || d.smtp.benutzer} versendet.` };
+    }
   } else if (m === "GET" && match(path, "/einstellungen/nummernkreise")) {
     result = d.nummernkreise;
   } else if (m === "PATCH" && match(path, "/einstellungen/nummernkreise")) {
@@ -968,8 +987,57 @@ export async function mockBackend<T>(method: string, path: string, body?: unknow
     result = d.backup;
   } else if (m === "PATCH" && match(path, "/einstellungen/backup")) {
     Object.assign(d.backup, body);
+    logAktivitaet("einstellung_geaendert", "Backup-Einstellungen aktualisiert");
     persist();
     result = d.backup;
+  } else if (m === "GET" && match(path, "/einstellungen/backup/historie")) {
+    result = d.backupHistorie ?? [];
+  } else if (m === "GET" && match(path, "/einstellungen/google-drive")) {
+    result = d.googleDrive;
+  } else if (m === "PATCH" && match(path, "/einstellungen/google-drive")) {
+    Object.assign(d.googleDrive, body);
+    logAktivitaet("einstellung_geaendert", "Google-Drive-Einstellungen aktualisiert");
+    persist();
+    result = d.googleDrive;
+  } else if (m === "POST" && match(path, "/einstellungen/google-drive/connect")) {
+    const incoming = body as { kontoEmail?: string };
+    d.googleDrive.verbunden = true;
+    d.googleDrive.kontoEmail = incoming.kontoEmail ?? "konto@beispiel.de";
+    d.googleDrive.verbundenAm = now();
+    d.googleDrive.rootOrdnerId = d.googleDrive.rootOrdnerId ?? "mock-root-" + uuid().slice(0, 8);
+    d.googleDrive.letzterFehler = undefined;
+    logAktivitaet("einstellung_geaendert", `Google Drive verbunden (${d.googleDrive.kontoEmail})`);
+    persist();
+    result = d.googleDrive;
+  } else if (m === "POST" && match(path, "/einstellungen/google-drive/disconnect")) {
+    d.googleDrive.verbunden = false;
+    d.googleDrive.kontoEmail = undefined;
+    d.googleDrive.verbundenAm = undefined;
+    d.googleDrive.rootOrdnerId = undefined;
+    d.googleDrive.letzteSynchronisation = undefined;
+    d.googleDrive.letzterFehler = undefined;
+    logAktivitaet("einstellung_geaendert", "Google Drive getrennt");
+    persist();
+    result = d.googleDrive;
+  } else if (m === "POST" && match(path, "/einstellungen/google-drive/test")) {
+    if (!d.googleDrive.verbunden) {
+      result = { erfolg: false, nachricht: "Bitte zuerst Google Drive verbinden." };
+    } else {
+      d.googleDrive.letzteSynchronisation = now();
+      d.googleDrive.letzterFehler = undefined;
+      persist();
+      result = {
+        erfolg: true,
+        nachricht: "Test-PDF erfolgreich nach Drive hochgeladen.",
+        webViewLink: "https://drive.google.com/file/d/mock-test/view",
+      };
+    }
+  } else if (m === "GET" && match(path, "/einstellungen/sitzungen")) {
+    result = d.sitzungen ?? [];
+  } else if (m === "POST" && match(path, "/einstellungen/sitzungen/alle-beenden")) {
+    if (d.sitzungen) d.sitzungen = d.sitzungen.filter((s) => s.istAktuellesGeraet);
+    persist();
+    return undefined as T;
   } else if (m === "GET" && match(path, "/einstellungen/positionsvorlagen")) {
     result = d.positionsvorlagen;
   } else if (m === "POST" && match(path, "/einstellungen/positionsvorlagen")) {

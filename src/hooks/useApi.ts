@@ -7,6 +7,7 @@ import type {
   Angebot,
   Ansprechpartner,
   AppearanceEinstellungen,
+  BackupEintrag,
   BackupEinstellungen,
   Benachrichtigung,
   DashboardKennzahlen,
@@ -15,6 +16,7 @@ import type {
   EmailVersand,
   EmailVorlage,
   Firmendaten,
+  GoogleDriveEinstellungen,
   Kunde,
   Notiz,
   Nummernkreise,
@@ -22,6 +24,7 @@ import type {
   Positionsvorlage,
   Rechnung,
   SicherheitsEinstellungen,
+  SitzungEintrag,
   SmtpEinstellungen,
   SuchTreffer,
   Textvorlage,
@@ -55,6 +58,9 @@ export const qk = {
     sicherheit: ["einstellungen", "sicherheit"] as const,
     erscheinung: ["einstellungen", "erscheinung"] as const,
     backup: ["einstellungen", "backup"] as const,
+    backupHistorie: ["einstellungen", "backup", "historie"] as const,
+    googleDrive: ["einstellungen", "googleDrive"] as const,
+    sitzungen: ["einstellungen", "sitzungen"] as const,
     positionsvorlagen: ["einstellungen", "positionsvorlagen"] as const,
     textvorlagen: ["einstellungen", "textvorlagen"] as const,
   },
@@ -686,6 +692,68 @@ export const useInkassoMarkieren = (rechnungId: string) => {
       qc.invalidateQueries({ queryKey: qk.rechnung(rechnungId) });
       qc.invalidateQueries({ queryKey: ["rechnungen"] });
     },
+  });
+};
+
+// ---------- Google Drive ----------
+export const useGoogleDrive = () =>
+  useQuery({
+    queryKey: qk.einstellungen.googleDrive,
+    queryFn: () => api.get<GoogleDriveEinstellungen>("/einstellungen/google-drive"),
+  });
+
+export const useUpdateGoogleDrive = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: Partial<GoogleDriveEinstellungen>) =>
+      api.patch<GoogleDriveEinstellungen>("/einstellungen/google-drive", data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.einstellungen.googleDrive }),
+  });
+};
+
+export const useConnectGoogleDrive = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { kontoEmail: string }) =>
+      api.post<GoogleDriveEinstellungen>("/einstellungen/google-drive/connect", data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.einstellungen.googleDrive }),
+  });
+};
+
+export const useDisconnectGoogleDrive = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.post<GoogleDriveEinstellungen>("/einstellungen/google-drive/disconnect"),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.einstellungen.googleDrive }),
+  });
+};
+
+export const useTestGoogleDrive = () =>
+  useMutation({
+    mutationFn: () =>
+      api.post<{ erfolg: boolean; nachricht: string; webViewLink?: string }>(
+        "/einstellungen/google-drive/test",
+      ),
+  });
+
+// ---------- Backup-Historie & Sitzungen ----------
+export const useBackupHistorie = () =>
+  useQuery({
+    queryKey: qk.einstellungen.backupHistorie,
+    queryFn: () => api.get<BackupEintrag[]>("/einstellungen/backup/historie"),
+  });
+
+export const useSitzungen = () =>
+  useQuery({
+    queryKey: qk.einstellungen.sitzungen,
+    queryFn: () => api.get<SitzungEintrag[]>("/einstellungen/sitzungen"),
+  });
+
+export const useAlleSitzungenBeenden = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.post<void>("/einstellungen/sitzungen/alle-beenden"),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.einstellungen.sitzungen }),
   });
 };
 

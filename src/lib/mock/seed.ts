@@ -13,6 +13,7 @@ import type {
   Angebot,
   Ansprechpartner,
   AppearanceEinstellungen,
+  BackupEintrag,
   BackupEinstellungen,
   Benachrichtigung,
   Dauerauftrag,
@@ -24,10 +25,12 @@ import type {
   EmailVersand,
   EmailVorlage,
   Firmendaten,
+  GoogleDriveEinstellungen,
   Kunde,
   MahnEinstellungen,
   Notiz,
   Nummernkreise,
+  SitzungEintrag,
   Objekt,
   Positionsvorlage,
   Rechnung,
@@ -168,6 +171,31 @@ export function seed() {
     behaltenAnzahl: 14,
     zielordner: "/var/lib/mcc/backups",
   };
+  const backupHistorie: BackupEintrag[] = [];
+
+  const googleDrive: GoogleDriveEinstellungen = {
+    verbunden: false,
+    rootOrdnerName: "mycleancenter.cm",
+    unterordnerSchema: {
+      rechnungen: "Rechnungen/{YYYY}/{MM}",
+      angebote: "Angebote/{YYYY}/{MM}",
+    },
+    dateinameSchema: {
+      rechnung: "{nummer} {kunde} {leistung} {MM}-{YYYY}",
+      angebot: "{nummer} {kunde} {leistung} {MM}-{YYYY}",
+    },
+    autoUpload: true,
+  };
+
+  const sitzungen: SitzungEintrag[] = [
+    {
+      id: uuid(),
+      hostname: "MacBook-Buero",
+      ip: "192.168.1.42",
+      letzteAktivitaet: new Date().toISOString(),
+      istAktuellesGeraet: true,
+    },
+  ];
 
   const jetzt = new Date().toISOString();
 
@@ -249,6 +277,9 @@ export function seed() {
     sicherheit,
     appearance,
     backup,
+    backupHistorie,
+    googleDrive,
+    sitzungen,
     mahnung,
     dauerauftraege,
     dauerauftragLaeufe,

@@ -1,3 +1,4 @@
+// Einstellungen-Seite. Sub-Sidebar (Desktop) + Select (Mobile).
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
@@ -15,11 +16,18 @@ import {
   PenLine,
   Server,
   Repeat,
-  Banknote,
+  Shield,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useFirmendaten, useUpdateFirmendaten } from "@/hooks/useApi";
 import { PageHeader } from "@/components/layout/PageHeader";
 import {
@@ -29,89 +37,164 @@ import {
 } from "@/components/email/EmailEinstellungen";
 import { MahnwesenTab } from "@/components/mahnung/MahnwesenTab";
 import { DauerauftragTab } from "@/components/einstellungen/DauerauftragTab";
-import { ZahlungsabgleichTab } from "@/components/einstellungen/ZahlungsabgleichTab";
+import { ErscheinungsbildTab } from "@/components/einstellungen/ErscheinungsbildTab";
+import { NummernkreiseTab } from "@/components/einstellungen/NummernkreiseTab";
+import { VorlagenTab } from "@/components/einstellungen/VorlagenTab";
+import { GoogleDriveTab } from "@/components/einstellungen/GoogleDriveTab";
+import { BackupTab } from "@/components/einstellungen/BackupTab";
+import { SicherheitTab } from "@/components/einstellungen/SicherheitTab";
+import { VerlaufTab } from "@/components/einstellungen/VerlaufTab";
 import type { Firmendaten } from "@/lib/api/types";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/einstellungen")({ component: Page });
 
-const tabs = [
-  { id: "firmendaten", label: "Firmendaten", icon: Building2 },
-  { id: "email-vorlagen", label: "E-Mail-Vorlagen", icon: Mail },
-  { id: "email-signaturen", label: "E-Mail-Signaturen", icon: PenLine },
-  { id: "smtp", label: "SMTP-Server", icon: Server },
-  { id: "erscheinungsbild", label: "Erscheinungsbild", icon: Palette },
-  { id: "nummernkreise", label: "Nummernkreise", icon: Hash },
-  { id: "mahnwesen", label: "Mahnwesen", icon: Bell },
-  { id: "dauerauftrag", label: "Daueraufträge", icon: Repeat },
-  { id: "zahlungsabgleich", label: "Zahlungsabgleich", icon: Banknote },
-  { id: "vorlagen", label: "Textbausteine & Vorlagen", icon: FileText },
-  { id: "drive", label: "Google Drive", icon: Cloud },
-  { id: "backup", label: "Backup & Download", icon: Save },
-  { id: "verlauf", label: "Verlauf", icon: History },
+type TabId =
+  | "firmendaten"
+  | "email-vorlagen"
+  | "email-signaturen"
+  | "smtp"
+  | "erscheinungsbild"
+  | "nummernkreise"
+  | "mahnwesen"
+  | "dauerauftrag"
+  | "vorlagen"
+  | "drive"
+  | "backup"
+  | "sicherheit"
+  | "verlauf";
+
+const tabs: { id: TabId; label: string; icon: typeof Building2; gruppe: string }[] = [
+  { id: "firmendaten", label: "Firmendaten", icon: Building2, gruppe: "Stammdaten" },
+  { id: "nummernkreise", label: "Nummernkreise", icon: Hash, gruppe: "Stammdaten" },
+  { id: "vorlagen", label: "Vorlagen", icon: FileText, gruppe: "Stammdaten" },
+
+  { id: "email-vorlagen", label: "E-Mail-Vorlagen", icon: Mail, gruppe: "E-Mail" },
+  { id: "email-signaturen", label: "E-Mail-Signaturen", icon: PenLine, gruppe: "E-Mail" },
+  { id: "smtp", label: "SMTP-Server", icon: Server, gruppe: "E-Mail" },
+
+  { id: "mahnwesen", label: "Mahnwesen", icon: Bell, gruppe: "Belege" },
+  { id: "dauerauftrag", label: "Daueraufträge", icon: Repeat, gruppe: "Belege" },
+
+  { id: "drive", label: "Google Drive", icon: Cloud, gruppe: "System" },
+  { id: "backup", label: "Backup & Export", icon: Save, gruppe: "System" },
+  { id: "sicherheit", label: "Sicherheit", icon: Shield, gruppe: "System" },
+  { id: "erscheinungsbild", label: "Erscheinungsbild", icon: Palette, gruppe: "System" },
+  { id: "verlauf", label: "Verlauf", icon: History, gruppe: "System" },
 ];
 
+const gruppen = Array.from(new Set(tabs.map((t) => t.gruppe)));
+
 function Page() {
-  const [tab, setTab] = useState("firmendaten");
+  const [tab, setTab] = useState<TabId>("firmendaten");
   const { data: firma } = useFirmendaten();
   const update = useUpdateFirmendaten();
+
+  const aktiverTab = tabs.find((t) => t.id === tab)!;
 
   return (
     <div className="space-y-6 pb-24">
       <PageHeader
         title="Einstellungen"
-        subtitle="Verwalte Stammdaten, Erscheinungsbild und Vorlagen deines CRM."
+        subtitle="Stammdaten, E-Mail, Belege, System."
       />
 
-      <div className="rounded-2xl border border-border bg-card p-2 shadow-sm">
-        <div className="flex flex-wrap gap-1">
-          {tabs.map((t) => {
-            const active = tab === t.id;
-            return (
-              <button
-                key={t.id}
-                onClick={() => setTab(t.id)}
-                className={`inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-medium transition ${
-                  active
-                    ? "bg-card text-foreground shadow-sm ring-1 ring-border"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                }`}
-              >
-                <t.icon className="h-4 w-4" />
-                {t.label}
-              </button>
-            );
-          })}
-        </div>
+      {/* Mobile: Select */}
+      <div className="md:hidden">
+        <Select value={tab} onValueChange={(v) => setTab(v as TabId)}>
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {gruppen.map((g) => (
+              <div key={g}>
+                <div className="px-2 py-1 text-[10px] font-semibold uppercase text-muted-foreground">
+                  {g}
+                </div>
+                {tabs
+                  .filter((t) => t.gruppe === g)
+                  .map((t) => (
+                    <SelectItem key={t.id} value={t.id}>
+                      <span className="inline-flex items-center gap-2">
+                        <t.icon className="h-4 w-4" />
+                        {t.label}
+                      </span>
+                    </SelectItem>
+                  ))}
+              </div>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
-      {tab === "firmendaten" && firma && (
-        <FirmendatenTab
-          initial={firma}
-          onSave={(data) =>
-            update.mutate(data, {
-              onSuccess: () => toast.success("Firmendaten gespeichert"),
-            })
-          }
-        />
-      )}
+      <div className="md:grid md:grid-cols-[14rem_1fr] md:gap-6">
+        {/* Desktop: Sub-Sidebar */}
+        <nav className="hidden md:block">
+          <div className="sticky top-4 space-y-4 rounded-2xl border border-border bg-card p-3 shadow-sm">
+            {gruppen.map((g) => (
+              <div key={g}>
+                <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  {g}
+                </p>
+                <ul className="space-y-0.5">
+                  {tabs
+                    .filter((t) => t.gruppe === g)
+                    .map((t) => {
+                      const active = t.id === tab;
+                      return (
+                        <li key={t.id}>
+                          <button
+                            onClick={() => setTab(t.id)}
+                            className={cn(
+                              "inline-flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-sm transition",
+                              active
+                                ? "bg-primary/10 font-medium text-foreground ring-1 ring-primary/20"
+                                : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                            )}
+                          >
+                            <t.icon className="h-4 w-4 shrink-0" />
+                            <span className="truncate">{t.label}</span>
+                          </button>
+                        </li>
+                      );
+                    })}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </nav>
 
-      {tab === "email-vorlagen" && <EmailVorlagenTab />}
-      {tab === "email-signaturen" && <EmailSignaturenTab />}
-      {tab === "smtp" && <SmtpTab />}
-      {tab === "mahnwesen" && <MahnwesenTab />}
-      {tab === "dauerauftrag" && <DauerauftragTab />}
-      {tab === "zahlungsabgleich" && <ZahlungsabgleichTab />}
+        {/* Inhalt */}
+        <div>
+          <div className="mb-4 flex items-center gap-2 md:hidden">
+            <aktiverTab.icon className="h-5 w-5 text-muted-foreground" />
+            <h2 className="text-base font-semibold">{aktiverTab.label}</h2>
+          </div>
 
-      {!["firmendaten", "email-vorlagen", "email-signaturen", "smtp", "mahnwesen", "dauerauftrag", "zahlungsabgleich"].includes(tab) && (
-        <div className="rounded-2xl border border-border bg-card p-12 text-center shadow-sm">
-          <p className="text-base font-medium">
-            {tabs.find((t) => t.id === tab)?.label} folgt
-          </p>
-          <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
-            Dieser Bereich wird mit dem Pi-Backend ausgebaut.
-          </p>
+          {tab === "firmendaten" && firma && (
+            <FirmendatenTab
+              initial={firma}
+              onSave={(data) =>
+                update.mutate(data, {
+                  onSuccess: () => toast.success("Firmendaten gespeichert"),
+                })
+              }
+            />
+          )}
+          {tab === "email-vorlagen" && <EmailVorlagenTab />}
+          {tab === "email-signaturen" && <EmailSignaturenTab />}
+          {tab === "smtp" && <SmtpTab />}
+          {tab === "erscheinungsbild" && <ErscheinungsbildTab />}
+          {tab === "nummernkreise" && <NummernkreiseTab />}
+          {tab === "mahnwesen" && <MahnwesenTab />}
+          {tab === "dauerauftrag" && <DauerauftragTab />}
+          {tab === "vorlagen" && <VorlagenTab />}
+          {tab === "drive" && <GoogleDriveTab />}
+          {tab === "backup" && <BackupTab />}
+          {tab === "sicherheit" && <SicherheitTab />}
+          {tab === "verlauf" && <VerlaufTab />}
         </div>
-      )}
+      </div>
     </div>
   );
 }
@@ -169,14 +252,53 @@ function FirmendatenTab({
   const set = <K extends keyof Firmendaten>(k: K, v: Firmendaten[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
 
+  const handleLogo = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 500_000) {
+      toast.error("Bitte Logo unter 500 KB hochladen.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => set("logoUrl", String(reader.result));
+    reader.readAsDataURL(file);
+  };
+
   return (
-    <div className="space-y-5">
-      <Section title="Unternehmen" description="Name, Rechtsform und Slogan eures Betriebs.">
+    <div className="space-y-5 pb-24">
+      <Section title="Logo" description="Erscheint auf Belegen und im Header.">
+        <div className="flex items-center gap-4">
+          <div className="grid h-20 w-20 place-content-center overflow-hidden rounded-lg border border-border bg-muted">
+            {form.logoUrl ? (
+              <img src={form.logoUrl} alt="Logo" className="h-full w-full object-contain" />
+            ) : (
+              <span className="text-xs text-muted-foreground">kein Logo</span>
+            )}
+          </div>
+          <div className="flex flex-col gap-2">
+            <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-border bg-background px-3 py-1.5 text-sm hover:bg-muted">
+              <input type="file" accept="image/*" className="hidden" onChange={handleLogo} />
+              Logo hochladen
+            </label>
+            {form.logoUrl && (
+              <button
+                type="button"
+                onClick={() => set("logoUrl", undefined)}
+                className="text-xs text-destructive hover:underline"
+              >
+                Logo entfernen
+              </button>
+            )}
+          </div>
+        </div>
+      </Section>
+
+      <Section title="Unternehmen" description="Name, Rechtsform und Slogan.">
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Firmenname" required>
             <Input value={form.firmenname} onChange={(e) => set("firmenname", e.target.value)} />
           </Field>
-          <Field label="Rechtsform" required>
+          <Field label="Rechtsform">
             <Input value={form.rechtsform ?? ""} onChange={(e) => set("rechtsform", e.target.value)} />
           </Field>
           <div className="sm:col-span-2">
@@ -187,7 +309,7 @@ function FirmendatenTab({
         </div>
       </Section>
 
-      <Section title="Anschrift" description="Wird auf Rechnungen, Angeboten und im Impressum verwendet.">
+      <Section title="Anschrift">
         <div className="grid gap-4 sm:grid-cols-6">
           <div className="sm:col-span-3">
             <Field label="Straße & Hausnummer">
@@ -205,7 +327,7 @@ function FirmendatenTab({
             </Field>
           </div>
           <div className="sm:col-span-6">
-            <Field label="Land" required>
+            <Field label="Land">
               <Input value={form.land ?? ""} onChange={(e) => set("land", e.target.value)} />
             </Field>
           </div>
@@ -218,7 +340,11 @@ function FirmendatenTab({
             <Input value={form.telefon ?? ""} onChange={(e) => set("telefon", e.target.value)} />
           </Field>
           <Field label="E-Mail">
-            <Input value={form.email ?? ""} onChange={(e) => set("email", e.target.value)} />
+            <Input
+              type="email"
+              value={form.email ?? ""}
+              onChange={(e) => set("email", e.target.value)}
+            />
           </Field>
           <Field label="Website">
             <Input value={form.webseite ?? ""} onChange={(e) => set("webseite", e.target.value)} />
@@ -232,7 +358,10 @@ function FirmendatenTab({
             <Input value={form.ustId ?? ""} onChange={(e) => set("ustId", e.target.value)} />
           </Field>
           <Field label="Steuernummer">
-            <Input value={form.steuernummer ?? ""} onChange={(e) => set("steuernummer", e.target.value)} />
+            <Input
+              value={form.steuernummer ?? ""}
+              onChange={(e) => set("steuernummer", e.target.value)}
+            />
           </Field>
           <Field label="Handelsregister">
             <Input
@@ -263,11 +392,12 @@ function FirmendatenTab({
         </div>
       </Section>
 
-      <Section title="Standardwerte" description="Werden bei neuen Angeboten und Rechnungen vorausgewählt.">
+      <Section title="Standardwerte" description="Werden bei neuen Belegen vorausgewählt.">
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Standard-Steuersatz (%)">
             <Input
               type="number"
+              inputMode="decimal"
               value={form.standardSteuersatz}
               onChange={(e) => set("standardSteuersatz", Number(e.target.value))}
             />
@@ -275,6 +405,7 @@ function FirmendatenTab({
           <Field label="Zahlungsziel (Tage)">
             <Input
               type="number"
+              inputMode="numeric"
               value={form.standardZahlungszielTage}
               onChange={(e) => set("standardZahlungszielTage", Number(e.target.value))}
             />
@@ -283,28 +414,23 @@ function FirmendatenTab({
       </Section>
 
       <div className="fixed bottom-0 left-0 right-0 z-20 border-t border-border bg-card/95 px-4 py-3 backdrop-blur sm:left-[var(--sidebar-width,16rem)]">
-        <div className="mx-auto flex max-w-5xl items-center justify-between gap-3">
-          <p className="text-xs text-muted-foreground">
-            Änderungen werden im Aktivitätsprotokoll festgehalten.
-          </p>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              className="rounded-full px-5"
-              onClick={() => setForm(initial)}
-              disabled={!dirty}
-            >
-              Zurücksetzen
-            </Button>
-            <Button
-              className="gap-1.5 rounded-full px-5 shadow-sm"
-              onClick={() => onSave(form)}
-              disabled={!dirty}
-            >
-              <SaveIcon className="h-4 w-4" />
-              Speichern
-            </Button>
-          </div>
+        <div className="mx-auto flex max-w-5xl items-center justify-end gap-3">
+          <Button
+            variant="outline"
+            className="rounded-full px-5"
+            onClick={() => setForm(initial)}
+            disabled={!dirty}
+          >
+            Zurücksetzen
+          </Button>
+          <Button
+            className="gap-1.5 rounded-full px-5 shadow-sm"
+            onClick={() => onSave(form)}
+            disabled={!dirty}
+          >
+            <SaveIcon className="h-4 w-4" />
+            Speichern
+          </Button>
         </div>
       </div>
     </div>

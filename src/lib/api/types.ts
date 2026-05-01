@@ -482,6 +482,59 @@ export interface BackupEinstellungen {
   zielordner: string; // Pi-Pfad
 }
 
+// ---------- Google Drive ----------
+
+/** Konfiguration der Google-Drive-Anbindung. OAuth-Token wird nur im Pi-Backend
+ *  AES-GCM verschlüsselt gespeichert und nie an das Frontend zurückgegeben. */
+export interface GoogleDriveEinstellungen {
+  /** True sobald OAuth erfolgreich. */
+  verbunden: boolean;
+  /** Konto-Mail des verbundenen Google-Accounts. */
+  kontoEmail?: string;
+  /** Zeitpunkt der erfolgreichen Verbindung. */
+  verbundenAm?: ISODateTime;
+  /** Name des Drive-Root-Ordners (default "mycleancenter.cm"). */
+  rootOrdnerName: string;
+  /** Drive-Folder-ID des Root-Ordners. Wird vom Backend nach Erstellung gesetzt. */
+  rootOrdnerId?: string;
+  /** Pfad-Templates relativ zum Root für die Unterordner. */
+  unterordnerSchema: {
+    rechnungen: string; // z. B. "Rechnungen/{YYYY}/{MM}"
+    angebote: string;   // z. B. "Angebote/{YYYY}/{MM}"
+  };
+  /** Templates für die Dateinamen ohne Endung. */
+  dateinameSchema: {
+    rechnung: string; // "{nummer} {kunde} {leistung} {MM}-{YYYY}"
+    angebot: string;
+  };
+  /** Wenn true, läuft der Upload automatisch ohne User-Klick. */
+  autoUpload: boolean;
+  /** Zeitpunkt der letzten erfolgreichen Synchronisation. */
+  letzteSynchronisation?: ISODateTime;
+  /** Letzte Fehlermeldung — leer wenn alles ok. */
+  letzterFehler?: string;
+}
+
+/** Eintrag in der Backup-Historie. Mock liefert simulierte Daten. */
+export interface BackupEintrag {
+  id: ID;
+  zeitpunkt: ISODateTime;
+  groesseBytes: number;
+  status: "erfolg" | "fehler";
+  fehler?: string;
+  /** Pfad/Dateiname auf dem Pi. */
+  dateiname: string;
+}
+
+/** Aktive Sitzung / Gerät im LAN. Pi-Backend liefert echte Daten. */
+export interface SitzungEintrag {
+  id: ID;
+  hostname: string;
+  ip: string;
+  letzteAktivitaet: ISODateTime;
+  istAktuellesGeraet: boolean;
+}
+
 // ---------- Dashboard ----------
 
 export interface DashboardKennzahlen {
