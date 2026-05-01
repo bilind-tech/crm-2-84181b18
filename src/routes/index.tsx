@@ -4,14 +4,16 @@ import {
   useUmsatz,
   useRechnungen,
 } from "@/hooks/useApi";
+import { useMahnZaehler } from "@/hooks/useMahnZaehler";
 import { formatEUR, formatDate } from "@/lib/format";
 import {
   Building2,
   ClipboardList,
   Euro,
   FileText,
-  Receipt,
+  Bell,
   CheckCircle2,
+  ArrowRight,
 } from "lucide-react";
 import {
   Bar,
@@ -32,6 +34,7 @@ function Dashboard() {
   const { data: k } = useDashboardKennzahlen();
   const { data: umsatz = [] } = useUmsatz();
   const { data: rechnungen = [] } = useRechnungen();
+  const mahn = useMahnZaehler();
 
   const offene = rechnungen.filter(
     (r) => r.status === "versendet" || r.status === "ueberfaellig" || r.status === "teilbezahlt"
@@ -169,13 +172,45 @@ function Dashboard() {
         </div>
 
         <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-          <div className="mb-3 flex items-center gap-2">
-            <Receipt className="h-4 w-4 text-primary" />
-            <h2 className="text-base font-semibold">Aktive Aufträge</h2>
+          <div className="mb-3 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Bell className="h-4 w-4 text-warning" />
+              <h2 className="text-base font-semibold">Mahnwesen</h2>
+            </div>
+            <Link
+              to="/mahnungen"
+              className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+            >
+              Cockpit öffnen <ArrowRight className="h-3 w-3" />
+            </Link>
           </div>
-          <p className="py-6 text-center text-sm text-muted-foreground">
-            Keine aktiven Aufträge.
-          </p>
+          {mahn.aktionEmpfohlen === 0 && mahn.ueberfaellig === 0 ? (
+            <div className="py-6 text-center">
+              <CheckCircle2 className="mx-auto h-6 w-6 text-success" />
+              <p className="mt-2 text-sm text-muted-foreground">
+                Keine offenen Mahnvorgänge.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-3 gap-3">
+              <MahnStat
+                value={mahn.aktionEmpfohlen}
+                label="Aktion empfohlen"
+                tone="primary"
+              />
+              <MahnStat
+                value={mahn.ueberfaellig}
+                label="Überfällig"
+                tone="warning"
+                sub={mahn.offenSumme > 0 ? formatEUR(mahn.offenSumme) : undefined}
+              />
+              <MahnStat
+                value={mahn.inkassoReif}
+                label="Inkasso-reif"
+                tone={mahn.inkassoReif > 0 ? "danger" : "muted"}
+              />
+            </div>
+          )}
         </div>
       </div>
     </div>
