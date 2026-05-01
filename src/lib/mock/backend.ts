@@ -301,6 +301,7 @@ export async function mockBackend<T>(method: string, path: string, body?: unknow
     const neu: Kunde = {
       id: uuid(),
       nummer: nextNumber(d.nummernkreise.kundePraefix, d.zaehler.kunde),
+      kuerzel: k.kuerzel?.trim().toUpperCase().slice(0, 4) || undefined,
       typ: k.typ ?? "firma",
       anrede: k.anrede,
       firmenname: k.firmenname,
