@@ -48,6 +48,9 @@ function dt(iso?: string) {
 }
 
 function summe(p: Position) {
+  if (p.modus === "pauschal") {
+    return (p.pauschalpreisNetto ?? 0) * (1 - p.rabatt / 100);
+  }
   return p.menge * p.einzelpreisNetto * (1 - p.rabatt / 100);
 }
 function totals(positionen: Position[], rabattGesamt: number, steuersatz: number) {
@@ -55,6 +58,34 @@ function totals(positionen: Position[], rabattGesamt: number, steuersatz: number
   const netto = nettoRoh * (1 - rabattGesamt / 100);
   const steuer = netto * (steuersatz / 100);
   return { netto, steuer, brutto: netto + steuer };
+}
+
+/** Wandelt einen Beschreibungstext in pdfmake-Stack: Erste Nicht-Bullet-Zeile fett, Bullets als Liste. */
+function beschreibungBlock(text: string): unknown {
+  const zeilen = text.split("\n");
+  const items: unknown[] = [];
+  const bullets: string[] = [];
+  let titel: string | null = null;
+  for (const z of zeilen) {
+    const t = z.trim();
+    if (!t) continue;
+    const bm = t.match(/^[•\-*]\s+(.*)$/);
+    if (bm) {
+      bullets.push(bm[1]);
+    } else if (!titel && bullets.length === 0) {
+      titel = t;
+    } else {
+      // Zwischenzeile ohne Bullet → als eigene Bullet-freie Zeile
+      bullets.push(t);
+    }
+  }
+  if (titel) items.push({ text: titel, fontSize: 9, bold: true, margin: [0, 0, 0, 2] });
+  if (bullets.length > 0) {
+    items.push({ ul: bullets.map((b) => ({ text: b, fontSize: 9 })), margin: [0, 0, 0, 0] });
+  } else if (!titel) {
+    items.push({ text, fontSize: 9 });
+  }
+  return { stack: items };
 }
 
 function kundeAdresse(k: Kunde) {
@@ -137,6 +168,42 @@ function footer(firma: Firmendaten) {
 }
 
 function leistungstabelle(positionen: Position[]) {
+  const hatPauschal = positionen.some((p) => p.modus === "pauschal");
+
+  if (hatPauschal) {
+    // Layout im Stil des Beispiels: Ausführung | Leistung | Preis
+    const body: unknown[][] = [
+      [
+        { text: "Ausführung", bold: true, fillColor: "#1e3a8a", color: "#fff", fontSize: 9 },
+        { text: "Leistung", bold: true, fillColor: "#1e3a8a", color: "#fff", fontSize: 9 },
+        { text: "Preis", bold: true, fillColor: "#1e3a8a", color: "#fff", fontSize: 9, alignment: "right" },
+      ],
+    ];
+    positionen.forEach((p) => {
+      const ausf =
+        p.ausfuehrung ??
+        (p.modus === "pauschal"
+          ? "Pauschal"
+          : `${p.menge.toLocaleString("de-DE")} ${p.einheit}`);
+      body.push([
+        { text: ausf, fontSize: 9, bold: true },
+        beschreibungBlock(p.beschreibung || ""),
+        { text: eur(summe(p)), fontSize: 9, alignment: "right", bold: true },
+      ]);
+    });
+    return {
+      table: { headerRows: 1, widths: [90, "*", 70], body },
+      layout: {
+        hLineWidth: () => 0.5,
+        vLineWidth: () => 0,
+        hLineColor: () => "#e2e8f0",
+        paddingTop: () => 8,
+        paddingBottom: () => 8,
+      },
+    };
+  }
+
+  // Klassisches Layout (alle Positionen sind Einzelpositionen)
   const body: unknown[][] = [
     [
       { text: "Pos.", bold: true, fillColor: "#1e3a8a", color: "#fff", fontSize: 9 },
@@ -150,7 +217,7 @@ function leistungstabelle(positionen: Position[]) {
   positionen.forEach((p, i) => {
     body.push([
       { text: String(i + 1), fontSize: 9 },
-      { text: p.beschreibung, fontSize: 9 },
+      beschreibungBlock(p.beschreibung || ""),
       { text: p.menge.toLocaleString("de-DE"), fontSize: 9, alignment: "right" },
       { text: p.einheit, fontSize: 9 },
       { text: eur(p.einzelpreisNetto), fontSize: 9, alignment: "right" },
@@ -158,11 +225,7 @@ function leistungstabelle(positionen: Position[]) {
     ]);
   });
   return {
-    table: {
-      headerRows: 1,
-      widths: [22, "*", 40, 40, 60, 60],
-      body,
-    },
+    table: { headerRows: 1, widths: [22, "*", 40, 40, 60, 60], body },
     layout: {
       hLineWidth: () => 0.5,
       vLineWidth: () => 0,

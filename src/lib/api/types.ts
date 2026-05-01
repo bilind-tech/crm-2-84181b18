@@ -109,6 +109,8 @@ export interface Objekt {
 
 export type Einheit = "stk" | "h" | "m2" | "pauschal" | "tag" | "monat";
 
+export type PositionModus = "einzel" | "pauschal";
+
 export interface Position {
   id: ID;
   beschreibung: string;
@@ -117,6 +119,12 @@ export interface Position {
   einzelpreisNetto: number;
   steuersatz: number; // %
   rabatt: number; // %
+  /** „einzel" = Menge × Einzelpreis (Default). „pauschal" = ein großer Block + ein Festpreis. */
+  modus?: PositionModus;
+  /** Pauschalpreis (netto), nur relevant wenn modus = "pauschal". */
+  pauschalpreisNetto?: number;
+  /** Optionaler Frequenz-Tag der Ausführung (z. B. „Mo–Fr · 5× wöchentlich"). Wird im PDF in Spalte „Ausführung" gerendert. */
+  ausfuehrung?: string;
 }
 
 export type AngebotStatus =
@@ -137,6 +145,18 @@ export interface BelegOptionen {
   eigenesOutro?: string;
   /** Wiederkehrend / Dauerauftrag */
   wiederkehrend: boolean;
+  /** Detail-Konfiguration für „Wiederkehrend": Rhythmus + Wochentage. Optional. */
+  wiederkehrendDetails?: WiederkehrendDetails;
+}
+
+export type WiederkehrendRhythmus = "woechentlich" | "monatlich" | "quartalsweise" | "jaehrlich";
+
+export interface WiederkehrendDetails {
+  rhythmus: WiederkehrendRhythmus;
+  /** Wochentage 0=So, 1=Mo, … 6=Sa. Mehrfach-Auswahl. Nur für Rhythmus „woechentlich" wirklich sinnvoll, kann aber überall mitgeschickt werden. */
+  wochentage: number[];
+  /** Häufigkeit pro Monat (z. B. 2 = „2× monatlich"). Nur informativ, optional. */
+  proMonat?: number;
 }
 
 /** Status der automatischen Google-Drive-Synchronisation eines PDFs. Wird vom Pi-Backend gesetzt. */

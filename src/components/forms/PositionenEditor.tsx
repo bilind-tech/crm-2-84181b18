@@ -1,4 +1,4 @@
-import { Trash2, Plus } from "lucide-react";
+import { Trash2, Plus, FileText, Receipt } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -9,14 +9,19 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { formatEUR } from "@/lib/format";
-import type { Position, Einheit } from "@/lib/api/types";
+import type { Position, Einheit, PositionModus } from "@/lib/api/types";
+import { LeistungsBeschreibung } from "./LeistungsBeschreibung";
+import { cn } from "@/lib/utils";
 
 export interface PositionDraft {
   id: string;
+  modus: PositionModus;
   beschreibung: string;
   menge: number;
   einheit: Einheit;
   einzelpreisNetto: number;
+  pauschalpreisNetto: number;
+  ausfuehrung: string;
   steuersatz: number;
   rabatt: number;
 }
@@ -25,6 +30,8 @@ interface Props {
   positionen: PositionDraft[];
   onChange: (next: PositionDraft[]) => void;
   defaultSteuersatz?: number;
+  /** Wird vom Form als Default-Wert für „Ausführung" durchgereicht (z. B. „Mo–Fr · 5× wöchentlich"). */
+  defaultAusfuehrung?: string;
 }
 
 const EINHEITEN: { value: Einheit; label: string }[] = [
@@ -36,19 +43,25 @@ const EINHEITEN: { value: Einheit; label: string }[] = [
   { value: "monat", label: "Monat" },
 ];
 
-export function emptyPosition(steuersatz = 19): PositionDraft {
+export function emptyPosition(steuersatz = 19, modus: PositionModus = "einzel"): PositionDraft {
   return {
     id: crypto.randomUUID(),
+    modus,
     beschreibung: "",
-    menge: 1,
-    einheit: "stk",
+    menge: modus === "einzel" ? 1 : 1,
+    einheit: modus === "pauschal" ? "pauschal" : "stk",
     einzelpreisNetto: 0,
+    pauschalpreisNetto: 0,
+    ausfuehrung: "",
     steuersatz,
     rabatt: 0,
   };
 }
 
 export function summe(p: PositionDraft) {
+  if (p.modus === "pauschal") {
+    return p.pauschalpreisNetto * (1 - p.rabatt / 100);
+  }
   return p.menge * p.einzelpreisNetto * (1 - p.rabatt / 100);
 }
 
@@ -63,7 +76,12 @@ export function summen(positionen: PositionDraft[]) {
   return { netto, steuer, brutto: netto + steuer };
 }
 
-export function PositionenEditor({ positionen, onChange, defaultSteuersatz = 19 }: Props) {
+export function PositionenEditor({
+  positionen,
+  onChange,
+  defaultSteuersatz = 19,
+  defaultAusfuehrung,
+}: Props) {
   const totals = summen(positionen);
 
   function update(idx: number, patch: Partial<PositionDraft>) {
@@ -74,85 +92,23 @@ export function PositionenEditor({ positionen, onChange, defaultSteuersatz = 19 
   function remove(idx: number) {
     onChange(positionen.filter((_, i) => i !== idx));
   }
-  function add() {
-    onChange([...positionen, emptyPosition(defaultSteuersatz)]);
+  function add(modus: PositionModus) {
+    const p = emptyPosition(defaultSteuersatz, modus);
+    if (modus === "pauschal" && defaultAusfuehrung) p.ausfuehrung = defaultAusfuehrung;
+    onChange([...positionen, p]);
   }
 
   return (
     <div className="rounded-2xl border border-border bg-card/50">
-      {/* Mobil: Card-View pro Position */}
-      <div className="space-y-3 p-3 md:hidden">
+      <div className="space-y-3 p-3">
         {positionen.map((p, i) => (
-          <div key={p.id} className="rounded-xl border border-border bg-background p-3 shadow-sm">
-            <div className="mb-2 flex items-center justify-between">
-              <span className="text-xs font-semibold text-muted-foreground">Position {i + 1}</span>
-              <button
-                onClick={() => remove(i)}
-                className="rounded-md p-1.5 text-destructive hover:bg-destructive/10"
-                aria-label="Position entfernen"
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
-            </div>
-            <Input
-              value={p.beschreibung}
-              onChange={(e) => update(i, { beschreibung: e.target.value })}
-              placeholder="Leistungsbeschreibung"
-              className="mb-2 h-10"
-            />
-            <div className="grid grid-cols-2 gap-2">
-              <label className="block">
-                <span className="mb-1 block text-[11px] font-medium text-muted-foreground">Menge</span>
-                <Input
-                  type="number"
-                  inputMode="decimal"
-                  value={p.menge}
-                  onChange={(e) => update(i, { menge: Number(e.target.value) || 0 })}
-                  className="h-10"
-                />
-              </label>
-              <label className="block">
-                <span className="mb-1 block text-[11px] font-medium text-muted-foreground">Einheit</span>
-                <Select
-                  value={p.einheit}
-                  onValueChange={(v) => update(i, { einheit: v as Einheit })}
-                >
-                  <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {EINHEITEN.map((u) => (
-                      <SelectItem key={u.value} value={u.value}>{u.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </label>
-              <label className="block">
-                <span className="mb-1 block text-[11px] font-medium text-muted-foreground">Einzelpreis €</span>
-                <Input
-                  type="number"
-                  inputMode="decimal"
-                  step="0.01"
-                  value={p.einzelpreisNetto}
-                  onChange={(e) => update(i, { einzelpreisNetto: Number(e.target.value) || 0 })}
-                  className="h-10"
-                />
-              </label>
-              <label className="block">
-                <span className="mb-1 block text-[11px] font-medium text-muted-foreground">MwSt %</span>
-                <Input
-                  type="number"
-                  inputMode="decimal"
-                  value={p.steuersatz}
-                  onChange={(e) => update(i, { steuersatz: Number(e.target.value) || 0 })}
-                  className="h-10"
-                />
-              </label>
-            </div>
-            <div className="mt-2 flex justify-end border-t border-border pt-2 text-sm">
-              <span className="text-muted-foreground">
-                Summe <span className="ml-1 font-semibold text-foreground">{formatEUR(summe(p))}</span>
-              </span>
-            </div>
-          </div>
+          <PositionCard
+            key={p.id}
+            index={i}
+            position={p}
+            onChange={(patch) => update(i, patch)}
+            onRemove={() => remove(i)}
+          />
         ))}
         {positionen.length === 0 && (
           <div className="rounded-xl border border-dashed border-border p-6 text-center text-xs text-muted-foreground">
@@ -161,97 +117,15 @@ export function PositionenEditor({ positionen, onChange, defaultSteuersatz = 19 
         )}
       </div>
 
-      {/* Desktop: Tabelle */}
-      <div className="hidden overflow-x-auto md:block">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-border bg-muted/40 text-left text-[11px] uppercase tracking-wider text-muted-foreground">
-              <th className="px-3 py-2 font-medium">#</th>
-              <th className="px-3 py-2 font-medium">Beschreibung</th>
-              <th className="px-3 py-2 font-medium">Menge</th>
-              <th className="px-3 py-2 font-medium">Einheit</th>
-              <th className="px-3 py-2 font-medium">Einzelpreis €</th>
-              <th className="px-3 py-2 font-medium">MwSt %</th>
-              <th className="px-3 py-2 text-right font-medium">Summe</th>
-              <th className="px-3 py-2" />
-            </tr>
-          </thead>
-          <tbody>
-            {positionen.map((p, i) => (
-              <tr key={p.id} className="border-b border-border last:border-0">
-                <td className="px-3 py-2 text-xs text-muted-foreground">{i + 1}</td>
-                <td className="px-3 py-2">
-                  <Input
-                    value={p.beschreibung}
-                    onChange={(e) => update(i, { beschreibung: e.target.value })}
-                    placeholder="Leistungsbeschreibung"
-                    className="h-9"
-                  />
-                </td>
-                <td className="px-3 py-2 w-20">
-                  <Input
-                    type="number"
-                    value={p.menge}
-                    onChange={(e) => update(i, { menge: Number(e.target.value) || 0 })}
-                    className="h-9"
-                  />
-                </td>
-                <td className="px-3 py-2 w-24">
-                  <Select
-                    value={p.einheit}
-                    onValueChange={(v) => update(i, { einheit: v as Einheit })}
-                  >
-                    <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {EINHEITEN.map((u) => (
-                        <SelectItem key={u.value} value={u.value}>{u.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </td>
-                <td className="px-3 py-2 w-28">
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={p.einzelpreisNetto}
-                    onChange={(e) => update(i, { einzelpreisNetto: Number(e.target.value) || 0 })}
-                    className="h-9"
-                  />
-                </td>
-                <td className="px-3 py-2 w-20">
-                  <Input
-                    type="number"
-                    value={p.steuersatz}
-                    onChange={(e) => update(i, { steuersatz: Number(e.target.value) || 0 })}
-                    className="h-9"
-                  />
-                </td>
-                <td className="px-3 py-2 text-right font-semibold whitespace-nowrap">{formatEUR(summe(p))}</td>
-                <td className="px-3 py-2 text-right">
-                  <button
-                    onClick={() => remove(i)}
-                    className="rounded-md p-1.5 text-destructive hover:bg-destructive/10"
-                    title="Position entfernen"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </td>
-              </tr>
-            ))}
-            {positionen.length === 0 && (
-              <tr>
-                <td colSpan={8} className="px-3 py-6 text-center text-xs text-muted-foreground">
-                  Noch keine Positionen.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border bg-muted/20 px-3 py-3">
-        <Button variant="outline" size="sm" onClick={add} className="rounded-full">
-          <Plus className="mr-1 h-3.5 w-3.5" /> Position hinzufügen
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" size="sm" onClick={() => add("einzel")} className="rounded-full">
+            <Plus className="mr-1 h-3.5 w-3.5" /> Einzelposition
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => add("pauschal")} className="rounded-full">
+            <Receipt className="mr-1 h-3.5 w-3.5" /> Pauschal-Block
+          </Button>
+        </div>
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs sm:text-sm">
           <span className="text-muted-foreground">
             Netto <span className="ml-1 font-semibold text-foreground">{formatEUR(totals.netto)}</span>
@@ -268,6 +142,219 @@ export function PositionenEditor({ positionen, onChange, defaultSteuersatz = 19 
   );
 }
 
+interface CardProps {
+  index: number;
+  position: PositionDraft;
+  onChange: (patch: Partial<PositionDraft>) => void;
+  onRemove: () => void;
+}
+
+function PositionCard({ index, position: p, onChange, onRemove }: CardProps) {
+  const istPauschal = p.modus === "pauschal";
+
+  return (
+    <div className="rounded-xl border border-border bg-background p-3 shadow-sm">
+      {/* Kopf: Index + Modus-Switch + Löschen */}
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <span className="text-xs font-semibold text-muted-foreground">Position {index + 1}</span>
+        <div className="flex items-center gap-2">
+          <ModusSwitch value={p.modus} onChange={(m) => onChange({ modus: m })} />
+          <button
+            onClick={onRemove}
+            className="rounded-md p-1.5 text-destructive hover:bg-destructive/10"
+            aria-label="Position entfernen"
+            title="Position entfernen"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+
+      {istPauschal ? (
+        <div className="space-y-3">
+          {/* Ausführung */}
+          <div>
+            <label className="mb-1 block text-[11px] font-medium text-muted-foreground">
+              Ausführung (optional, z. B. „Mo–Fr · 5× wöchentlich")
+            </label>
+            <Input
+              value={p.ausfuehrung}
+              onChange={(e) => onChange({ ausfuehrung: e.target.value })}
+              placeholder="z. B. Täglich · Mo–Fr · 5× wöchentlich"
+              className="h-10"
+            />
+          </div>
+
+          {/* Große Beschreibung */}
+          <div>
+            <label className="mb-1 block text-[11px] font-medium text-muted-foreground">
+              Leistungsbeschreibung
+            </label>
+            <LeistungsBeschreibung
+              value={p.beschreibung}
+              onChange={(v) => onChange({ beschreibung: v })}
+              placeholder={
+                "Büro Unterhalts- + Sanitäranlagenreinigung\n• Böden feucht wischen / Teppichböden saugen\n• Schreibtische & freie Oberflächen abwischen\n• Papierkörbe entleeren"
+              }
+              minRows={6}
+              maxRows={20}
+              withToolbar
+            />
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              Tipp: <kbd className="rounded border border-border bg-muted px-1">Enter</kbd> nach „•" setzt
+              automatisch einen neuen Aufzählungspunkt.
+            </p>
+          </div>
+
+          {/* Pauschalpreis + MwSt */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-[11px] font-medium text-muted-foreground">
+                Pauschalpreis (netto) €
+              </label>
+              <Input
+                type="number"
+                inputMode="decimal"
+                step="0.01"
+                value={p.pauschalpreisNetto || ""}
+                onChange={(e) => onChange({ pauschalpreisNetto: Number(e.target.value) || 0 })}
+                placeholder="z. B. 3750.00"
+                className="h-11 text-base font-semibold"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-[11px] font-medium text-muted-foreground">MwSt %</label>
+              <Input
+                type="number"
+                inputMode="decimal"
+                value={p.steuersatz}
+                onChange={(e) => onChange({ steuersatz: Number(e.target.value) || 0 })}
+                className="h-11"
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end border-t border-border pt-2 text-sm">
+            <span className="text-muted-foreground">
+              Pauschal <span className="ml-1 font-semibold text-foreground">{formatEUR(summe(p))}</span>
+            </span>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {/* Beschreibung — Auto-Resize-Textarea */}
+          <div>
+            <label className="mb-1 block text-[11px] font-medium text-muted-foreground">
+              Leistungsbeschreibung
+            </label>
+            <LeistungsBeschreibung
+              value={p.beschreibung}
+              onChange={(v) => onChange({ beschreibung: v })}
+              placeholder="z. B. Treppenhaus-Reinigung"
+              minRows={2}
+              maxRows={10}
+            />
+          </div>
+
+          {/* Menge / Einheit / Preis / MwSt */}
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <div>
+              <label className="mb-1 block text-[11px] font-medium text-muted-foreground">Menge</label>
+              <Input
+                type="number"
+                inputMode="decimal"
+                value={p.menge}
+                onChange={(e) => onChange({ menge: Number(e.target.value) || 0 })}
+                className="h-10"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-[11px] font-medium text-muted-foreground">Einheit</label>
+              <Select
+                value={p.einheit}
+                onValueChange={(v) => onChange({ einheit: v as Einheit })}
+              >
+                <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {EINHEITEN.map((u) => (
+                    <SelectItem key={u.value} value={u.value}>{u.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="mb-1 block text-[11px] font-medium text-muted-foreground">Einzelpreis €</label>
+              <Input
+                type="number"
+                inputMode="decimal"
+                step="0.01"
+                value={p.einzelpreisNetto}
+                onChange={(e) => onChange({ einzelpreisNetto: Number(e.target.value) || 0 })}
+                className="h-10"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-[11px] font-medium text-muted-foreground">MwSt %</label>
+              <Input
+                type="number"
+                inputMode="decimal"
+                value={p.steuersatz}
+                onChange={(e) => onChange({ steuersatz: Number(e.target.value) || 0 })}
+                className="h-10"
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end border-t border-border pt-2 text-sm">
+            <span className="text-muted-foreground">
+              Summe <span className="ml-1 font-semibold text-foreground">{formatEUR(summe(p))}</span>
+            </span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ModusSwitch({
+  value,
+  onChange,
+}: {
+  value: PositionModus;
+  onChange: (m: PositionModus) => void;
+}) {
+  return (
+    <div className="inline-flex rounded-lg border border-border bg-muted p-0.5 text-xs">
+      <button
+        type="button"
+        onClick={() => onChange("einzel")}
+        className={cn(
+          "flex items-center gap-1 rounded-md px-2 py-1 font-medium transition",
+          value === "einzel"
+            ? "bg-background text-foreground shadow-sm"
+            : "text-muted-foreground hover:text-foreground",
+        )}
+      >
+        <FileText className="h-3 w-3" />
+        Einzel
+      </button>
+      <button
+        type="button"
+        onClick={() => onChange("pauschal")}
+        className={cn(
+          "flex items-center gap-1 rounded-md px-2 py-1 font-medium transition",
+          value === "pauschal"
+            ? "bg-background text-foreground shadow-sm"
+            : "text-muted-foreground hover:text-foreground",
+        )}
+      >
+        <Receipt className="h-3 w-3" />
+        Pauschal
+      </button>
+    </div>
+  );
+}
+
 export function toApiPositionen(draft: PositionDraft[]): Position[] {
   return draft.map((p) => ({
     id: p.id,
@@ -277,5 +364,24 @@ export function toApiPositionen(draft: PositionDraft[]): Position[] {
     einzelpreisNetto: p.einzelpreisNetto,
     steuersatz: p.steuersatz,
     rabatt: p.rabatt,
+    modus: p.modus,
+    pauschalpreisNetto: p.modus === "pauschal" ? p.pauschalpreisNetto : undefined,
+    ausfuehrung: p.ausfuehrung || undefined,
   }));
+}
+
+/** Lädt eine API-Position zurück in einen Draft (für „Bearbeiten"-Flows). */
+export function fromApiPosition(p: Position): PositionDraft {
+  return {
+    id: p.id,
+    modus: p.modus ?? "einzel",
+    beschreibung: p.beschreibung,
+    menge: p.menge,
+    einheit: p.einheit,
+    einzelpreisNetto: p.einzelpreisNetto,
+    pauschalpreisNetto: p.pauschalpreisNetto ?? 0,
+    ausfuehrung: p.ausfuehrung ?? "",
+    steuersatz: p.steuersatz,
+    rabatt: p.rabatt,
+  };
 }

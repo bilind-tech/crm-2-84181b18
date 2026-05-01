@@ -1,6 +1,11 @@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import type { WiederkehrendDetails } from "@/lib/api/types";
+import {
+  DauerauftragKonfig,
+  defaultWiederkehrendDetails,
+} from "./DauerauftragKonfig";
 
 export interface OptionenState {
   materialBereitgestellt: boolean;
@@ -10,6 +15,7 @@ export interface OptionenState {
   eigenesOutroAktiv: boolean;
   eigenesOutro: string;
   wiederkehrend: boolean;
+  wiederkehrendDetails: WiederkehrendDetails;
 }
 
 export const defaultOptionen: OptionenState = {
@@ -20,6 +26,7 @@ export const defaultOptionen: OptionenState = {
   eigenesOutroAktiv: false,
   eigenesOutro: "",
   wiederkehrend: false,
+  wiederkehrendDetails: defaultWiederkehrendDetails,
 };
 
 interface Props {
@@ -78,6 +85,12 @@ export function OptionenBlock({ value, onChange }: Props) {
         </div>
       )}
 
+      {value.wiederkehrend && (
+        <DauerauftragKonfig
+          value={value.wiederkehrendDetails}
+          onChange={(v) => set("wiederkehrendDetails", v)}
+        />
+      )}
     </div>
   );
 }

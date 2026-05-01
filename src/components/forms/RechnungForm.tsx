@@ -20,6 +20,7 @@ import {
   type PositionDraft,
 } from "./PositionenEditor";
 import { OptionenBlock, defaultOptionen, type OptionenState } from "./OptionenBlock";
+import { formatWiederkehrend } from "./DauerauftragKonfig";
 import { AnsprechpartnerPicker } from "./AnsprechpartnerPicker";
 import { Repeat } from "lucide-react";
 
@@ -85,6 +86,7 @@ export function RechnungForm({ onClose, defaultKundeId, defaultObjektId }: Props
         eigenesIntro: optionen.eigenesIntroAktiv ? optionen.eigenesIntro : undefined,
         eigenesOutro: optionen.eigenesOutroAktiv ? optionen.eigenesOutro : undefined,
         wiederkehrend: optionen.wiederkehrend,
+        wiederkehrendDetails: optionen.wiederkehrend ? optionen.wiederkehrendDetails : undefined,
       },
     });
     toast.success("Rechnung angelegt", { description: `${r.nummer} • erfolgreich gespeichert.` });
@@ -175,7 +177,14 @@ export function RechnungForm({ onClose, defaultKundeId, defaultObjektId }: Props
         <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
           Leistungen & Preise
         </p>
-        <PositionenEditor positionen={positionen} onChange={setPositionen} defaultSteuersatz={steuersatz} />
+        <PositionenEditor
+          positionen={positionen}
+          onChange={setPositionen}
+          defaultSteuersatz={steuersatz}
+          defaultAusfuehrung={
+            optionen.wiederkehrend ? formatWiederkehrend(optionen.wiederkehrendDetails) : undefined
+          }
+        />
       </div>
 
       <OptionenBlock value={optionen} onChange={setOptionen} />
