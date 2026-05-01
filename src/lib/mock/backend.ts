@@ -958,6 +958,150 @@ export async function mockBackend<T>(method: string, path: string, body?: unknow
     return undefined as T;
   }
 
+  // ---- E-Mail-Vorlagen ----
+  else if (m === "GET" && match(path, "/email/vorlagen")) {
+    result = d.emailVorlagen;
+  } else if (m === "POST" && match(path, "/email/vorlagen")) {
+    const v = body as Partial<EmailVorlage>;
+    const neu: EmailVorlage = {
+      id: uuid(),
+      name: v.name ?? "Neue Vorlage",
+      kontext: v.kontext ?? "allgemein",
+      betreff: v.betreff ?? "",
+      koerperHtml: v.koerperHtml ?? "",
+      istStandard: v.istStandard ?? false,
+      erstelltAm: now(),
+      aktualisiertAm: now(),
+    };
+    if (neu.istStandard) {
+      d.emailVorlagen.filter((x) => x.kontext === neu.kontext).forEach((x) => (x.istStandard = false));
+    }
+    d.emailVorlagen.push(neu);
+    persist();
+    result = neu;
+  } else if (matchRoute(m, path, "PATCH", "/email/vorlagen/:id")) {
+    const id = match(path, "/email/vorlagen/:id")!.id;
+    const v = d.emailVorlagen.find((x) => x.id === id);
+    if (!v) throw new ApiError("Vorlage nicht gefunden", 404);
+    Object.assign(v, body, { aktualisiertAm: now() });
+    if (v.istStandard) {
+      d.emailVorlagen
+        .filter((x) => x.kontext === v.kontext && x.id !== v.id)
+        .forEach((x) => (x.istStandard = false));
+    }
+    persist();
+    result = v;
+  } else if (matchRoute(m, path, "DELETE", "/email/vorlagen/:id")) {
+    const id = match(path, "/email/vorlagen/:id")!.id;
+    d.emailVorlagen = d.emailVorlagen.filter((x) => x.id !== id);
+    persist();
+    return undefined as T;
+  }
+
+  // ---- E-Mail-Signaturen ----
+  else if (m === "GET" && match(path, "/email/signaturen")) {
+    result = d.emailSignaturen;
+  } else if (m === "POST" && match(path, "/email/signaturen")) {
+    const s = body as Partial<EmailSignatur>;
+    const neu: EmailSignatur = {
+      id: uuid(),
+      name: s.name ?? "Neue Signatur",
+      html: s.html ?? "",
+      istStandard: s.istStandard ?? false,
+      erstelltAm: now(),
+    };
+    if (neu.istStandard) d.emailSignaturen.forEach((x) => (x.istStandard = false));
+    d.emailSignaturen.push(neu);
+    persist();
+    result = neu;
+  } else if (matchRoute(m, path, "PATCH", "/email/signaturen/:id")) {
+    const id = match(path, "/email/signaturen/:id")!.id;
+    const s = d.emailSignaturen.find((x) => x.id === id);
+    if (!s) throw new ApiError("Signatur nicht gefunden", 404);
+    Object.assign(s, body);
+    if (s.istStandard) d.emailSignaturen.filter((x) => x.id !== s.id).forEach((x) => (x.istStandard = false));
+    persist();
+    result = s;
+  } else if (matchRoute(m, path, "DELETE", "/email/signaturen/:id")) {
+    const id = match(path, "/email/signaturen/:id")!.id;
+    d.emailSignaturen = d.emailSignaturen.filter((x) => x.id !== id);
+    persist();
+    return undefined as T;
+  }
+
+  // ---- E-Mail-Versand ----
+  else if (m === "GET" && match(path.split("?")[0], "/email/versand")) {
+    const q = query(path);
+    const belegId = q.get("belegId");
+    const belegTyp = q.get("belegTyp");
+    let liste = [...d.emailVersand];
+    if (belegId) liste = liste.filter((v) => v.belegId === belegId);
+    if (belegTyp) liste = liste.filter((v) => v.belegTyp === belegTyp);
+    result = liste.sort((a, b) => (b.versendetAm ?? "").localeCompare(a.versendetAm ?? ""));
+  } else if (m === "POST" && match(path, "/email/versand")) {
+    const v = body as Partial<EmailVersand>;
+    // Mock: 90% Erfolg, 10% zufälliger Fehler — Spinner bleibt sichtbar
+    await new Promise((r) => setTimeout(r, 1200));
+    const erfolgreich = Math.random() > 0.1;
+    const moeglicheFehler = [
+      "SMTP-Verbindung fehlgeschlagen — Server nicht erreichbar.",
+      "Empfänger-Adresse wurde vom Server abgelehnt.",
+      "Authentifizierung fehlgeschlagen — Passwort prüfen.",
+    ];
+    const eintrag: EmailVersand = {
+      id: uuid(),
+      belegTyp: v.belegTyp ?? "allgemein",
+      belegId: v.belegId,
+      kundeId: v.kundeId,
+      empfaenger: v.empfaenger ?? [],
+      cc: v.cc ?? [],
+      bcc: v.bcc ?? [],
+      betreff: v.betreff ?? "",
+      koerperHtml: v.koerperHtml ?? "",
+      vorlageId: v.vorlageId,
+      signaturId: v.signaturId,
+      anhaenge: v.anhaenge ?? [],
+      status: erfolgreich ? "sent" : "failed",
+      versendetAm: now(),
+      fehlerGrund: erfolgreich
+        ? undefined
+        : moeglicheFehler[Math.floor(Math.random() * moeglicheFehler.length)],
+      messageId: erfolgreich ? `<${uuid()}@mock.local>` : undefined,
+    };
+    d.emailVersand.unshift(eintrag);
+
+    // Bei Erfolg: Beleg-Status hochziehen
+    if (erfolgreich && eintrag.belegId) {
+      if (eintrag.belegTyp === "angebot") {
+        const a = d.angebote.find((x) => x.id === eintrag.belegId);
+        if (a && a.status === "entwurf") {
+          a.status = "versendet";
+          a.versendetAm = now();
+        }
+      } else if (eintrag.belegTyp === "rechnung") {
+        const r = d.rechnungen.find((x) => x.id === eintrag.belegId);
+        if (r && r.status === "entwurf") {
+          r.status = "versendet";
+          r.versendetAm = now();
+        }
+      }
+    }
+
+    if (erfolgreich) {
+      logAktivitaet(
+        eintrag.belegTyp === "rechnung" ? "rechnung_versendet" : "angebot_versendet",
+        `E-Mail an ${eintrag.empfaenger.join(", ")} versendet · ${eintrag.betreff}`,
+        eintrag.belegId ? { typ: eintrag.belegTyp, id: eintrag.belegId } : undefined,
+      );
+    }
+
+    persist();
+    if (!erfolgreich) {
+      throw new ApiError(eintrag.fehlerGrund ?? "Versand fehlgeschlagen", 502, eintrag);
+    }
+    result = eintrag;
+  }
+
   // ---- Backup ----
   else if (m === "POST" && match(path, "/backup/erstellen")) {
     logAktivitaet("backup_erstellt", "Backup erstellt (Mock)");
