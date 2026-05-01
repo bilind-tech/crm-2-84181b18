@@ -1,6 +1,13 @@
 import { Trash2, Plus } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { formatEUR } from "@/lib/format";
 import type { Position, Einheit } from "@/lib/api/types";
 
