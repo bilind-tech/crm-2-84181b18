@@ -27,6 +27,7 @@ import type {
   DauerauftragLauf,
   DauerauftragSonderposition,
   Dokument,
+  UploadSession,
   EmailSignatur,
   EmailVersand,
   EmailVorlage,
@@ -99,15 +100,42 @@ interface DB {
   dauerauftragLaeufe: DauerauftragLauf[];
   dauerauftragSonderpositionen: DauerauftragSonderposition[];
   dauerauftragEinstellungen: DauerauftragEinstellungen;
+  uploadSessions: UploadSession[];
   zaehler: { kunde: number; objekt: number; angebot: number; rechnung: number; dauerauftrag: number };
   /** Pro Kunde + "YYYY-MM" laufende Nummer für Rechnungen/Angebote mit eigenem Kürzel. */
   zaehlerProKunde?: Record<string, Record<string, number>>;
 }
 
 let db: DB | null = null;
+let lastPersistAt = 0;
+const STORAGE_TS_KEY = "mcc_mock_db_ts";
+
+/** Cross-Tab-Sync: wenn ein anderer Tab geschrieben hat (neuerer TS), DB neu laden. */
+function syncIfStale() {
+  if (typeof window === "undefined" || !db) return;
+  try {
+    const ts = Number(window.localStorage.getItem(STORAGE_TS_KEY) ?? "0");
+    if (ts > lastPersistAt) {
+      const raw = window.localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const fresh = JSON.parse(raw) as DB;
+        // unlocked-Status NICHT überschreiben (jeder Tab hat eigene Session).
+        const unlocked = db.unlocked;
+        const unlockedAt = db.unlockedAt;
+        db = fresh;
+        db.unlocked = unlocked;
+        db.unlockedAt = unlockedAt;
+        lastPersistAt = ts;
+      }
+    }
+  } catch { /* ignore */ }
+}
 
 function load(): DB {
-  if (db) return db;
+  if (db) {
+    syncIfStale();
+    return db;
+  }
   if (typeof window === "undefined") {
     db = seed();
     return db;
@@ -119,6 +147,9 @@ function load(): DB {
       // Sitzungs-Lock immer beim Laden zurücksetzen — Lock-Screen erscheint erneut
       db.unlocked = false;
       db.unlockedAt = undefined;
+      // uploadSessions kann in alten DBs fehlen
+      if (!db.uploadSessions) db.uploadSessions = [];
+      lastPersistAt = Number(window.localStorage.getItem(STORAGE_TS_KEY) ?? "0");
       return db;
     }
     // Legacy-Keys aufräumen, frisch seeden (Settings & Daten gehen verloren — bewusst)
@@ -137,6 +168,8 @@ function persist() {
   if (!db || typeof window === "undefined") return;
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
+    lastPersistAt = Date.now();
+    window.localStorage.setItem(STORAGE_TS_KEY, String(lastPersistAt));
   } catch {
     /* ignore */
   }
@@ -746,6 +779,85 @@ export async function mockBackend<T>(method: string, path: string, body?: unknow
     const id = match(path, "/dokumente/:id")!.id;
     d.dokumente = d.dokumente.filter((x) => x.id !== id);
     persist();
+    return undefined as T;
+  }
+
+  // ---- Upload-Sessions (Handy-Scan-Brücke) ----
+  else if (m === "POST" && match(path, "/upload-sessions")) {
+    const tokenChars = "abcdefghijklmnopqrstuvwxyz0123456789";
+    let token = "";
+    for (let i = 0; i < 24; i++) token += tokenChars[Math.floor(Math.random() * tokenChars.length)];
+    const jetzt = Date.now();
+    const session: UploadSession = {
+      id: uuid(),
+      token,
+      erstelltAm: new Date(jetzt).toISOString(),
+      ablaufAm: new Date(jetzt + 15 * 60 * 1000).toISOString(),
+      beendet: false,
+      dokumentIds: [],
+    };
+    if (!d.uploadSessions) d.uploadSessions = [];
+    d.uploadSessions.push(session);
+    // alte Sessions aufräumen (>1h)
+    d.uploadSessions = d.uploadSessions.filter(
+      (s) => jetzt - new Date(s.erstelltAm).getTime() < 60 * 60 * 1000,
+    );
+    persist();
+    result = session;
+  } else if (matchRoute(m, path, "GET", "/upload-sessions/:token")) {
+    const token = match(path, "/upload-sessions/:token")!.token;
+    const session = (d.uploadSessions ?? []).find((s) => s.token === token);
+    if (!session) throw new ApiError("Upload-Sitzung nicht gefunden", 404);
+    if (Date.now() > new Date(session.ablaufAm).getTime()) {
+      throw new ApiError("Upload-Sitzung abgelaufen", 410);
+    }
+    const dateien = d.dokumente.filter((dok) => session.dokumentIds.includes(dok.id));
+    result = { ...session, dateien };
+  } else if (matchRoute(m, path, "POST", "/upload-sessions/:token/dateien")) {
+    const token = match(path, "/upload-sessions/:token/dateien")!.token;
+    const session = (d.uploadSessions ?? []).find((s) => s.token === token);
+    if (!session) throw new ApiError("Upload-Sitzung nicht gefunden", 404);
+    if (session.beendet) throw new ApiError("Upload-Sitzung beendet", 410);
+    if (Date.now() > new Date(session.ablaufAm).getTime()) {
+      throw new ApiError("Upload-Sitzung abgelaufen", 410);
+    }
+    const payload = body as { dateien: Partial<Dokument>[] };
+    const erzeugt: Dokument[] = [];
+    for (const dok of payload.dateien ?? []) {
+      const neu: Dokument = {
+        id: uuid(),
+        titel: dok.titel ?? "Foto vom Handy",
+        beschreibung: dok.beschreibung,
+        typ: dok.typ ?? "bild",
+        kundeId: dok.kundeId,
+        objektId: dok.objektId,
+        dateiname: dok.dateiname ?? "foto.jpg",
+        mimeType: dok.mimeType ?? "image/jpeg",
+        groesseBytes: dok.groesseBytes ?? 0,
+        url: dok.url ?? "",
+        dokumentdatum: dok.dokumentdatum ?? new Date().toISOString().slice(0, 10),
+        betrag: dok.betrag,
+        steuerrelevant: dok.steuerrelevant ?? false,
+        hochgeladenAm: now(),
+        quelle: "handy-scan",
+      };
+      d.dokumente.push(neu);
+      session.dokumentIds.push(neu.id);
+      erzeugt.push(neu);
+    }
+    logAktivitaet(
+      "dokument_hochgeladen",
+      `${erzeugt.length} Foto(s) per Handy-Scan hochgeladen`,
+    );
+    persist();
+    result = { dateien: erzeugt };
+  } else if (matchRoute(m, path, "POST", "/upload-sessions/:token/beenden")) {
+    const token = match(path, "/upload-sessions/:token/beenden")!.token;
+    const session = (d.uploadSessions ?? []).find((s) => s.token === token);
+    if (session) {
+      session.beendet = true;
+      persist();
+    }
     return undefined as T;
   }
 
