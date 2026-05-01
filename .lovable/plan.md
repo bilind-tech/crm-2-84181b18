@@ -1,131 +1,95 @@
+## Mobile-Optimierung: Sidebar, horizontaler Scroll & Suche
 
-# Vollständige Einstellungen-Seite
+Drei klar abgegrenzte Probleme auf dem Handy:
 
-Alle Tabs in `/einstellungen` bekommen vollwertige Frontend-UIs — Lade/Speichern/Validierung — mit Mock-Backend-Persistenz, damit später nur die echten Pi-Endpoints angeschlossen werden müssen. Schwerpunkt: **SMTP** (Passwort verschlüsselt, nach Speichern nicht mehr sichtbar) und **Google Drive** (kompletter Connect-Flow mit allen für die spätere Pi-Integration nötigen Feldern).
+1. **Sidebar bleibt offen** nach Klick auf einen Menüpunkt
+2. **Horizontaler Scroll** in den Listen (Rechnungen/Angebote) und in den Anlege-Formularen (Positionen-Tabelle, breite Filter-Bar)
+3. **Globale Suche** öffnet einen hässlichen zentrierten Dialog — soll auf Mobil als saubere Top-Bar erscheinen
 
-## Tab-Übersicht & geplanter Inhalt
+---
 
-### 1. Firmendaten ✅ bereits vorhanden — nur Politur
-- `Logo`-Upload-Feld ergänzen (Drop-Zone, Vorschau, Base64 in Mock).
-- Pflichtfeld-Validierung mit Zod, Inline-Fehler.
+### 1. Sidebar nach Klick automatisch schließen (Mobil)
 
-### 2. E-Mail-Vorlagen ✅ vollständig vorhanden — keine Änderung.
-### 3. E-Mail-Signaturen ✅ vollständig vorhanden — keine Änderung.
+**Datei:** `src/components/layout/AppSidebar.tsx`
 
-### 4. SMTP-Server ✅ Logik vorhanden — Härtung
-- Passwort-Feld:
-  - Wenn `passwortGesetzt = true`: Feld leer + Placeholder `••••••••`, `autoComplete="new-password"`, leeres Senden = Passwort behalten.
-  - Server-Antwort enthält **nie** das Passwort (Typ erzwingt das schon).
-  - Hinweisbox: „AES-GCM verschlüsselt im Pi gespeichert, nicht mehr lesbar".
-- Sichtbarer Status: grüner Punkt + „Passwort hinterlegt" wenn `passwortGesetzt`, sonst gelber Punkt + „Noch kein Passwort".
-- Test-Verbindung-Button (existiert) + Anzeige der letzten Test-Antwort (Erfolg/Datum).
-- Vorbelegte Strato-Defaults via „Strato"-Schnellauswahl-Button (Server `smtp.strato.de`, Port `465`, SSL on).
+- Aus `useSidebar()` zusätzlich `setOpenMobile` und `isMobile` ziehen.
+- Auf jedem `<Link>` im Menü (innerhalb von `SidebarMenuButton`) `onClick` hinzufügen, das `setOpenMobile(false)` aufruft, wenn `isMobile === true`.
+- Greift nur am Handy — am Desktop ändert sich nichts.
 
-### 5. Erscheinungsbild — NEU
-- Theme-Wahl: System / Hell / Dunkel (Cards mit Vorschau-Mini).
-- Akzentfarbe: 8 vordefinierte Swatches + Custom-HEX-Input mit Live-Vorschau-Knopf.
-- Speichern via existierendem `useUpdateAppearance`. Theme wird sofort über bestehenden `ThemeProvider` angewendet.
+---
 
-### 6. Nummernkreise — NEU
-- Drei Felder: Kunde-Präfix, Angebot-Präfix, Rechnung-Präfix.
-- Live-Vorschau jedes Schemas (`{YYYY}` → 2026, `{####}` → 0042) unterhalb jedes Inputs.
-- Validierung: Pflicht-Platzhalter `{####}` muss vorkommen.
-- Verknüpft mit existierendem `useNummernkreise` / `useUpdateNummernkreise`.
+### 2. Horizontaler Overflow vollständig verhindern
 
-### 7. Mahnwesen ✅ bereits vorhanden — keine Änderung.
+**a) Listen-Seiten — `overflow-x-auto` ist nur am Desktop nötig**
 
-### 8. Daueraufträge ✅ bereits vorhanden — keine Änderung.
+- `src/routes/rechnungen.tsx` (Zeile 215–216): Der Tabellen-Wrapper ist bereits `hidden md:block`. Trotzdem rutscht er manchmal raus, weil die Mobile-Card-Liste darüber `overflow-visible` hat. → Sicherstellen, dass die äußere Page-Container (Top-Level `<div>` der Route) `min-w-0` und `overflow-x-hidden` bekommt.
+- `src/routes/angebote.tsx`: gleiche Behandlung.
+- Zusätzlich in `src/routes/__root.tsx` den `<main>` mit `min-w-0 overflow-x-hidden` versehen, damit kein Kind die Viewport-Breite sprengen kann.
 
-### 9. Textbausteine & Vorlagen — NEU
-Zwei Sektionen in einem Tab:
-- **Positionsvorlagen** (Reinigung, Stundensatz etc.): Liste + „Neu"-Dialog mit Bezeichnung, Beschreibung, Einheit, Preis, MwSt. CRUD via existierende Hooks `usePositionsvorlagen` / `useCreate*` / `useDelete*`.
-- **Textvorlagen**: Liste gruppiert nach Zweck (Angebot Intro/Outro, Rechnung Intro/Outro, E-Mail Angebot/Rechnung). Inline-Edit. CRUD via existierende `useTextvorlagen`-Hooks.
+**b) FilterBar (`src/routes/angebote.tsx`, Zeile 275–304) — wird auch in Rechnungen genutzt**
 
-### 10. Google Drive — NEU (Schwerpunkt)
-**Datenmodell (neu in `types.ts`):**
-```ts
-interface GoogleDriveEinstellungen {
-  verbunden: boolean;
-  kontoEmail?: string;             // z.B. "buero@mycleancenter.cm"
-  verbundenAm?: ISODateTime;
-  rootOrdnerName: string;          // default "mycleancenter.cm"
-  rootOrdnerId?: string;           // wird vom Pi nach Verbindung gesetzt
-  unterordnerSchema: {
-    rechnungen: string;            // default "Rechnungen/{YYYY}/{MM}"
-    angebote: string;              // default "Angebote/{YYYY}/{MM}"
-  };
-  dateinameSchema: {
-    rechnung: string;              // default "{nummer} {kunde} {leistung} {MM}-{YYYY}"
-    angebot: string;               // default "{nummer} {kunde} {leistung} {MM}-{YYYY}"
-  };
-  autoUpload: boolean;             // default true
-  letzteSynchronisation?: ISODateTime;
-  letzterFehler?: string;
-}
+- Aktuell: `min-w-[200px]` auf dem Such-Input erzwingt Mindestbreite, dazu `flex-wrap` auf dem Container → das Such-Feld bricht zwar um, sprengt aber bei sehr schmalen Viewports (<360 px) trotzdem.
+- Fix: `min-w-[200px]` durch `min-w-0` ersetzen, Container behält `flex-wrap` + `gap-2 sm:gap-3`. Tabs-Pillen-Container bekommt `flex-wrap`, damit auch die Status-Filter umbrechen statt zu überlaufen.
+
+**c) Positionen-Editor im Anlege-Formular**
+
+- `src/components/forms/BelegForm.tsx` Zeile 213/230: aktuell `sm:grid-cols-[24px_1fr_70px_80px_110px_70px_110px_32px]` — das addiert sich auf ~530 px Mindestbreite und bricht auf 360-px-Viewports.
+- Fix: Die Mobile-Variante (`grid-cols-2`) nicht erst ab `sm:` umschalten, sondern erst ab `md:` (≥768 px) auf das 8-Spalten-Grid wechseln. Dazu Header-Zeile (213) ebenfalls auf `md:grid` statt `sm:grid` ändern.
+- `src/components/forms/PositionenEditor.tsx` Zeile 165: Wrapper-`overflow-x-auto` bleibt, ist aber bereits in `hidden md:block` gekapselt → ok, kein Eingriff nötig.
+
+**d) Belegformular-Grids**
+
+- `BelegForm.tsx` Zeile 372 `sm:grid-cols-5` (Rechnungs-Daten) → wird auf 360 px bei Beschriftung „Skontofrist (Tage)" zu eng. Auf `sm:grid-cols-2 md:grid-cols-5` ändern.
+- Gleiches Schema präventiv für Zeile 360 (`sm:grid-cols-3` → `grid-cols-2 md:grid-cols-3`).
+
+---
+
+### 3. Suche als Top-Bar statt Center-Dialog (nur Mobil)
+
+**Datei:** `src/components/layout/GlobalSearch.tsx` und `AppHeader.tsx`
+
+Aktuell wird `CommandDialog` (shadcn) genutzt — der rendert ein zentriertes Modal mit Backdrop, das auf dem Handy mittig „schwebt".
+
+**Neue Struktur:**
+
+- Über `useIsMobile()` (`src/hooks/use-mobile.tsx`) erkennen, ob Mobile-Viewport.
+- **Desktop:** Verhalten bleibt wie bisher (CommandDialog mittig — passt da gut).
+- **Mobile:** Statt `CommandDialog` ein eigenes Overlay mit `fixed inset-0 z-50 bg-background flex flex-col`:
+  - Oben (`sticky top-0`) eine Suchleiste mit Zurück-Pfeil + `<input>` (autoFocus) + X-Button
+  - Darunter scrollbare Resultliste (`Command` ohne Dialog-Wrapper, nur `CommandList` + `CommandGroup`)
+  - Animation: Slide von oben (`animate-in slide-in-from-top duration-200`)
+
+So sieht es aus wie eine native iOS/Android-Suche: Tippt der User auf die Lupe, klappt sofort eine Suchleiste am oberen Rand auf, der Cursor steht im Feld, Tastatur fährt hoch — keine zentrale Dialog-Box mehr.
+
+**`AppHeader.tsx`** bleibt fast unverändert — der Lupen-Button öffnet weiterhin `setSearchOpen(true)`, die Render-Logik liegt in `GlobalSearch.tsx`.
+
+---
+
+### Technische Details
+
+```text
+AppSidebar.tsx
+└── const { state, isMobile, setOpenMobile } = useSidebar()
+└── <Link onClick={() => isMobile && setOpenMobile(false)}>
+
+__root.tsx <main>
+└── className="... min-w-0 overflow-x-hidden"
+
+FilterBar (angebote.tsx)
+└── min-w-[200px] → min-w-0
+└── tabs-container: + flex-wrap
+
+BelegForm.tsx
+└── sm:grid-cols-[24px_1fr_...] → md:grid-cols-[24px_1fr_...]
+└── sm:grid-cols-5 → grid-cols-2 md:grid-cols-5
+
+GlobalSearch.tsx
+└── if (isMobile) return <MobileSearchSheet/>
+└── else return <CommandDialog/>  (wie bisher)
 ```
 
-**UI-Aufbau:**
-- **Verbindungs-Karte** oben:
-  - Nicht verbunden → großer Button „Mit Google verbinden" (öffnet Mock-Dialog, simuliert OAuth-Erfolg, setzt `kontoEmail` + `verbundenAm`).
-  - Verbunden → grüner Status-Badge, verbundenes Konto, „Verbindung trennen"-Button (mit Bestätigung), letzte Synchronisation, ggf. roter Banner mit `letzterFehler`.
-- **Ordnerstruktur**:
-  - Root-Ordner-Name (default `mycleancenter.cm`, einmalig setzbar nach Verbindung).
-  - Unterordner-Schema für Rechnungen/Angebote mit Live-Vorschau-Pfad (z. B. `mycleancenter.cm/Rechnungen/2026/05/`).
-- **Dateinamen-Schema** mit Platzhalter-Chips (`{nummer}` `{kunde}` `{leistung}` `{MM}` `{YYYY}` `{datum}`) + Live-Vorschau eines Beispiel-Dateinamens.
-- **Auto-Upload-Toggle** (default an): „Beim Erstellen automatisch hochladen — fehlerfrei und ohne User-Klick."
-- **Test-Upload-Button**: lädt eine Test-PDF hoch und zeigt Drive-Link.
+### Was NICHT angefasst wird
 
-**Backend (Mock):** neuer Endpoint `/einstellungen/google-drive` (GET/PATCH), `POST /einstellungen/google-drive/connect` (Mock setzt `verbunden=true`), `POST /einstellungen/google-drive/disconnect`, `POST /einstellungen/google-drive/test`.
-
-### 11. Backup & Download — NEU
-- **Auto-Backup-Toggle** + Zeitpunkt (Time-Picker, default `02:00`) + Aufbewahrung (Anzahl, default 7) + Zielordner (Pfad-Input, default `/mnt/ssd/backups`).
-- **Manuelle Backups**: Liste der letzten Backups (Datum, Größe, Status) — Button „Jetzt sichern" (`useCreateBackup`) + Download-Button pro Eintrag.
-- **Daten-Export**: Buttons „CRM-Daten als JSON exportieren", „Kunden als CSV", „Rechnungen als CSV".
-
-### 12. Sicherheit — NEU
-- **Auto-Lock**: Slider 1–60 Minuten („Nach X Minuten Inaktivität sperren"). Verknüpft mit existierendem `useSicherheit` / `useUpdateSicherheit`.
-- **Geräte/Sitzungen**: Liste aktueller LAN-Geräte (Mock-Liste mit Hostname + letzter Aktivität) — Button „Alle abmelden". (Nur UI; Pi-Backend liefert später echte Daten.)
-
-### 13. Verlauf — NEU
-- Auflistung aus `useAktivitaeten()` mit Filter (alle / Einstellungs-Änderungen / Backups / System).
-- Spalten: Zeitpunkt, Typ-Badge, Beschreibung, optional Link zur Entität.
-- Pagination 50 pro Seite.
-
-## Layout / Navigation
-
-Auf dem Smartphone wird die heutige horizontale Tab-Leiste schnell unübersichtlich. Lösung:
-- **Desktop (≥md)**: linke Sub-Sidebar mit Tab-Liste, rechts Inhaltsbereich. Maximalbreite 5xl.
-- **Mobil**: oberhalb des Inhalts ein `Select`-Dropdown mit dem aktuellen Tab. Tippen öffnet die Liste mit Icons.
-- Sticky-Save-Bar bleibt unten am Viewport (nutzt bereits eingeführtes Muster). Pro Tab: links „Zurücksetzen" (deaktiviert wenn `!dirty`), rechts „Speichern".
-
-## Validierung & UX-Standards
-
-- **Zod** für jedes Formular (Pflichtfelder, E-Mail-Format, Port-Bereich, HEX-Farbe, Pfad).
-- **Toast** bei Erfolg + Fehler (sonner ist eingerichtet).
-- **Optimistic Updates** wo unkritisch (Theme), sonst auf Server-Antwort warten.
-- **`ConfirmDialog`** für destruktive Aktionen (Drive trennen, Backup löschen, Vorlage löschen).
-- **Keine Sparkles/Glitzer-Icons**, keine Gradient-Hintergründe in Dialogen — bestehende Designregel halten.
-
-## Technische Schritte (Reihenfolge)
-
-1. **Typen** (`src/lib/api/types.ts`): `GoogleDriveEinstellungen` ergänzen. `SmtpEinstellungen.passwortGesetzt` bleibt — Antwort niemals Klartext.
-2. **Hooks** (`src/hooks/useApi.ts`): `useGoogleDrive`, `useUpdateGoogleDrive`, `useConnectGoogleDrive`, `useDisconnectGoogleDrive`, `useTestGoogleDrive` ergänzen. Alle anderen Hooks existieren bereits.
-3. **Mock-Backend** (`src/lib/mock/backend.ts` + `seed.ts`): Endpoints für Google Drive ergänzen. Sicherstellen, dass `/einstellungen/smtp`-PATCH das Passwort entgegennimmt und `passwortGesetzt=true` setzt, aber nie zurückgibt.
-4. **Neue Tab-Komponenten** in `src/components/einstellungen/`:
-   - `ErscheinungsbildTab.tsx`
-   - `NummernkreiseTab.tsx`
-   - `VorlagenTab.tsx` (Positions- + Textvorlagen)
-   - `GoogleDriveTab.tsx`
-   - `BackupTab.tsx`
-   - `SicherheitTab.tsx`
-   - `VerlaufTab.tsx`
-5. **`einstellungen.tsx`** umbauen: Sidebar/Select-Navigation, Tab-Routing, alle neuen Komponenten einbinden, Platzhalter-Block entfernen.
-6. **Logo-Upload** im FirmendatenTab als Drop-Zone (Base64 im Mock).
-7. **Testen**: jeden Tab durchklicken, Speichern, Reload → Werte bleiben.
-
-## Was bewusst NICHT Teil ist
-
-- Echte Google-OAuth-Integration (kommt erst auf dem Pi — Mock simuliert nur den Connect-Flow).
-- Echte SMTP-Verschlüsselung (Mock speichert kein Klartext-Passwort, der echte AES-GCM-Schritt erfolgt im Pi-Backend).
-- Echtes Backup-File-Handling (Mock liefert Dummy-Liste, Pi-Backend ersetzt das später).
-- E-Mail-Sender-Domain-Setup (Strato-SMTP reicht — kein Lovable Email).
+- Desktop-Layout der Listen, Formulare, Suche
+- Funktionalität (Suche-Endpoint, Sidebar-Routing, Form-Logik)
+- Sidebar-Struktur, Icons, Badges

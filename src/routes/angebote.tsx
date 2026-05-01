@@ -274,8 +274,8 @@ interface FilterBarProps {
 
 export function FilterBar({ filter, setFilter, q, setQ, tabs, placeholder, extra }: FilterBarProps) {
   return (
-    <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-border bg-card p-2.5 shadow-sm">
-      <div className="flex gap-1 rounded-full bg-muted p-1">
+    <div className="flex w-full min-w-0 flex-wrap items-center gap-2 rounded-2xl border border-border bg-card p-2.5 shadow-sm sm:gap-3">
+      <div className="flex flex-wrap gap-1 rounded-full bg-muted p-1">
         {tabs.map((t) => (
           <button
             key={t.value}
@@ -291,13 +291,13 @@ export function FilterBar({ filter, setFilter, q, setQ, tabs, placeholder, extra
         ))}
       </div>
       {extra}
-      <div className="relative ml-auto min-w-[200px] flex-1">
+      <div className="relative ml-auto w-full min-w-0 flex-1 sm:w-auto">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           placeholder={placeholder}
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          className="h-9 rounded-full border-border bg-background pl-9"
+          className="h-9 w-full rounded-full border-border bg-background pl-9"
         />
       </div>
     </div>

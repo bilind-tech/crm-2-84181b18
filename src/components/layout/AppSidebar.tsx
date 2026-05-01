@@ -35,10 +35,13 @@ type NavItem = {
 };
 
 export function AppSidebar() {
-  const { state } = useSidebar();
+  const { state, isMobile, setOpenMobile } = useSidebar();
   const collapsed = state === "collapsed";
   const path = useRouterState({ select: (r) => r.location.pathname });
   const { lock } = useAuth();
+  const closeOnMobile = () => {
+    if (isMobile) setOpenMobile(false);
+  };
 
   const uebersicht: NavItem[] = [
     { title: "Dashboard", url: "/", icon: LayoutDashboard, exact: true },
@@ -87,6 +90,7 @@ export function AppSidebar() {
                   <Link
                     to={item.url}
                     preload="intent"
+                    onClick={closeOnMobile}
                     className="flex items-center gap-2.5"
                   >
                     <span className="relative flex h-4 w-4 items-center justify-center">
@@ -140,7 +144,7 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible="icon" className="border-r">
       <SidebarHeader className="border-b border-sidebar-border/60 pb-3">
-        <Link to="/" className="flex items-center gap-2.5 px-2 py-1">
+        <Link to="/" onClick={closeOnMobile} className="flex items-center gap-2.5 px-2 py-1">
           <img
             src={logo}
             alt="My Clean Center"

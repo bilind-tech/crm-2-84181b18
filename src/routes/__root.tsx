@@ -92,11 +92,11 @@ function Shell() {
   return (
     <SidebarProvider>
       <TopLoader />
-      <div className="flex min-h-screen w-full">
+      <div className="flex min-h-screen w-full overflow-x-hidden">
         <AppSidebar />
         <div className="flex min-w-0 flex-1 flex-col">
           <AppHeader />
-          <main key={pathname} className="flex-1 p-4 motion-safe:animate-fade-in-fast sm:p-6">
+          <main key={pathname} className="min-w-0 flex-1 overflow-x-hidden p-4 motion-safe:animate-fade-in-fast sm:p-6">
             <Outlet />
           </main>
         </div>

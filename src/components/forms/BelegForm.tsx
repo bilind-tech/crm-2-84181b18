@@ -210,7 +210,7 @@ export function BelegForm({ mode, onClose, defaultKundeId }: Props) {
           Trage hier ein, was {mode === "angebot" ? "angeboten" : "abgerechnet"} wird — der Betrag wird live berechnet.
         </p>
 
-        <div className="mt-4 hidden grid-cols-[24px_1fr_70px_80px_110px_70px_110px_32px] items-center gap-2 px-1 text-[11px] font-medium uppercase tracking-wider text-muted-foreground sm:grid">
+        <div className="mt-4 hidden grid-cols-[24px_1fr_70px_80px_110px_70px_110px_32px] items-center gap-2 px-1 text-[11px] font-medium uppercase tracking-wider text-muted-foreground md:grid">
           <span>#</span>
           <span>Beschreibung</span>
           <span>Menge</span>
@@ -227,7 +227,7 @@ export function BelegForm({ mode, onClose, defaultKundeId }: Props) {
             return (
               <div
                 key={r._key}
-                className="grid grid-cols-2 items-center gap-2 rounded-xl border border-border bg-background p-2 sm:grid-cols-[24px_1fr_70px_80px_110px_70px_110px_32px]"
+                className="grid grid-cols-2 items-center gap-2 rounded-xl border border-border bg-background p-2 md:grid-cols-[24px_1fr_70px_80px_110px_70px_110px_32px]"
               >
                 <span className="text-xs text-muted-foreground">{i + 1}</span>
                 <Input
@@ -357,7 +357,7 @@ export function BelegForm({ mode, onClose, defaultKundeId }: Props) {
       </div>
 
       {mode === "angebot" ? (
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
           <Field label="Gültig bis">
             <Input type="date" value={gueltigBis} onChange={(e) => setGueltigBis(e.target.value)} />
           </Field>
@@ -369,7 +369,7 @@ export function BelegForm({ mode, onClose, defaultKundeId }: Props) {
           </Field>
         </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-5">
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-5">
           <Field label="Rechnungsdatum">
             <Input type="date" value={rechnungsdatum} onChange={(e) => setRechnungsdatum(e.target.value)} />
           </Field>
