@@ -60,20 +60,22 @@ export function KpiCard({ label, value, sublabel, tone = "default", icon: Icon }
       ? "bg-primary/10 text-primary"
       : "bg-muted text-muted-foreground";
   return (
-    <div className="relative overflow-hidden rounded-xl border border-border bg-card p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition hover:shadow-md">
+    <div className="relative min-w-0 overflow-hidden rounded-xl border border-border bg-card p-3 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition hover:shadow-md sm:p-5">
       <span className={`absolute left-0 top-0 h-full w-1 ${accentBar}`} aria-hidden />
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+      <div className="flex items-start justify-between gap-2 sm:gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[10px] font-semibold uppercase tracking-wider text-muted-foreground sm:text-xs">
             {label}
           </p>
-          <p className={`mt-2 text-2xl font-bold tracking-tight ${valueColor}`}>{value}</p>
+          <p className={`mt-1.5 truncate text-lg font-bold tracking-tight sm:mt-2 sm:text-2xl ${valueColor}`}>
+            {value}
+          </p>
           {sublabel && (
-            <p className="mt-1 text-xs text-muted-foreground">{sublabel}</p>
+            <p className="mt-1 truncate text-[11px] text-muted-foreground sm:text-xs">{sublabel}</p>
           )}
         </div>
         {Icon && (
-          <div className={`rounded-lg p-2 ${iconBg}`}>
+          <div className={`hidden shrink-0 rounded-lg p-2 sm:block ${iconBg}`}>
             <Icon className="h-5 w-5" />
           </div>
         )}

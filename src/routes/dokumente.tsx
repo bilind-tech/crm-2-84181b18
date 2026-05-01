@@ -63,7 +63,7 @@ function Page() {
         }
       />
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         <KpiCard label="Dokumente gesamt" value={counts.gesamt} tone="primary" />
         <KpiCard label="Quittungen" value={counts.quittungen} tone="success" />
         <KpiCard label={`Steuerrelevant ${jahr}`} value={counts.steuerrelevant} tone="success" />
