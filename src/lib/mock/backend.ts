@@ -107,9 +107,35 @@ interface DB {
 }
 
 let db: DB | null = null;
+let lastPersistAt = 0;
+const STORAGE_TS_KEY = "mcc_mock_db_ts";
+
+/** Cross-Tab-Sync: wenn ein anderer Tab geschrieben hat (neuerer TS), DB neu laden. */
+function syncIfStale() {
+  if (typeof window === "undefined" || !db) return;
+  try {
+    const ts = Number(window.localStorage.getItem(STORAGE_TS_KEY) ?? "0");
+    if (ts > lastPersistAt) {
+      const raw = window.localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const fresh = JSON.parse(raw) as DB;
+        // unlocked-Status NICHT überschreiben (jeder Tab hat eigene Session).
+        const unlocked = db.unlocked;
+        const unlockedAt = db.unlockedAt;
+        db = fresh;
+        db.unlocked = unlocked;
+        db.unlockedAt = unlockedAt;
+        lastPersistAt = ts;
+      }
+    }
+  } catch { /* ignore */ }
+}
 
 function load(): DB {
-  if (db) return db;
+  if (db) {
+    syncIfStale();
+    return db;
+  }
   if (typeof window === "undefined") {
     db = seed();
     return db;
@@ -121,6 +147,9 @@ function load(): DB {
       // Sitzungs-Lock immer beim Laden zurücksetzen — Lock-Screen erscheint erneut
       db.unlocked = false;
       db.unlockedAt = undefined;
+      // uploadSessions kann in alten DBs fehlen
+      if (!db.uploadSessions) db.uploadSessions = [];
+      lastPersistAt = Number(window.localStorage.getItem(STORAGE_TS_KEY) ?? "0");
       return db;
     }
     // Legacy-Keys aufräumen, frisch seeden (Settings & Daten gehen verloren — bewusst)
@@ -139,6 +168,8 @@ function persist() {
   if (!db || typeof window === "undefined") return;
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
+    lastPersistAt = Date.now();
+    window.localStorage.setItem(STORAGE_TS_KEY, String(lastPersistAt));
   } catch {
     /* ignore */
   }
