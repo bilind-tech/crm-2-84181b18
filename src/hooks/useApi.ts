@@ -12,6 +12,7 @@ import type {
   Benachrichtigung,
   DashboardKennzahlen,
   Dokument,
+  UploadSession,
   EmailSignatur,
   EmailVersand,
   EmailVorlage,
@@ -376,6 +377,42 @@ export const useDeleteDokument = () => {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["dokumente"] }),
   });
 };
+
+// ---------- Upload-Sessions (Handy-Scan-Brücke) ----------
+export type UploadSessionMitDateien = UploadSession & { dateien: Dokument[] };
+
+export const useCreateUploadSession = () =>
+  useMutation({
+    mutationFn: () => api.post<UploadSession>("/upload-sessions", {}),
+  });
+
+/** Pollt eine Upload-Session alle 1.5s, solange der Hook aktiv ist. */
+export const useUploadSessionLive = (token: string | undefined) =>
+  useQuery({
+    queryKey: ["upload-session", token ?? "none"],
+    enabled: !!token,
+    queryFn: () => api.get<UploadSessionMitDateien>(`/upload-sessions/${token}`),
+    refetchInterval: 1500,
+    staleTime: 0,
+  });
+
+export const useUploadDateienToSession = (token: string) => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (dateien: Partial<Dokument>[]) =>
+      api.post<{ dateien: Dokument[] }>(`/upload-sessions/${token}/dateien`, { dateien }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["upload-session", token] });
+      qc.invalidateQueries({ queryKey: ["dokumente"] });
+    },
+  });
+};
+
+export const useBeendeUploadSession = () =>
+  useMutation({
+    mutationFn: (token: string) =>
+      api.post<void>(`/upload-sessions/${token}/beenden`, {}),
+  });
 
 // ---------- Notizen ----------
 export const useCreateNotiz = () => {
