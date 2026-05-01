@@ -13,6 +13,8 @@ import { useAngebotPdf } from "@/hooks/useBelegPdf";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { FlowBar } from "@/components/flow/FlowBar";
+import { PdfViewButton } from "@/components/pdf/PdfViewButton";
+import { PdfPreviewCard } from "@/components/pdf/PdfPreviewCard";
 import { angebotFlow } from "@/lib/flow/flows";
 import { EmailVersandDialog } from "@/components/email/EmailVersandDialog";
 import { EmailVersandHistorie } from "@/components/email/EmailVersandHistorie";
@@ -183,19 +185,13 @@ function Page() {
           <EmailVersandHistorie belegId={a.id} belegTyp="angebot" />
         </div>
 
-        <div className="overflow-hidden rounded-2xl border border-border bg-muted/40 shadow-sm">
-          {pdf.status === "loading" && (
-            <div className="grid h-[800px] place-content-center text-sm text-muted-foreground">PDF wird erzeugt …</div>
-          )}
-          {pdf.status === "error" && (
-            <div className="grid h-[800px] place-content-center px-6 text-center text-sm text-destructive">
-              PDF konnte nicht erzeugt werden.<br />{pdf.error}
-            </div>
-          )}
-          {pdf.url && (
-            <iframe title="Angebot PDF" src={pdf.url} className="block h-[900px] w-full border-0" />
-          )}
-        </div>
+        <PdfPreviewCard
+          title={`Angebot ${a.nummer}`}
+          status={pdf.status}
+          errorMessage={pdf.error}
+          drive={a.drive}
+          viewButton={<PdfViewButton kind="angebot" beleg={a} variant="icon-text" label="PDF ansehen" />}
+        />
       </div>
 
       <EmailVersandDialog

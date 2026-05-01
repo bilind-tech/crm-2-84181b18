@@ -139,6 +139,20 @@ export interface BelegOptionen {
   wiederkehrend: boolean;
 }
 
+/** Status der automatischen Google-Drive-Synchronisation eines PDFs. Wird vom Pi-Backend gesetzt. */
+export interface DriveSyncInfo {
+  /** Drive File-ID, sobald hochgeladen. */
+  fileId?: string;
+  /** Webview-Link auf Drive (https://drive.google.com/...). */
+  webViewLink?: string;
+  /** Zeitpunkt des letzten erfolgreichen Uploads. */
+  syncedAt?: ISODateTime;
+  /** Letzte Fehlermeldung, falls Upload fehlgeschlagen ist. */
+  error?: string;
+  /** Ordnername im Drive (z. B. "2026/05"). Nur informativ. */
+  ordner?: string;
+}
+
 export interface Angebot {
   id: ID;
   nummer: string; // "AN-2025-001"
@@ -157,6 +171,8 @@ export interface Angebot {
   versendetAm?: ISODateTime;
   archiviert: boolean;
   optionen?: BelegOptionen;
+  /** Status der Drive-Synchronisation des PDFs. */
+  drive?: DriveSyncInfo;
   erstelltAm: ISODateTime;
   geaendertAm: ISODateTime;
 }
@@ -214,6 +230,8 @@ export interface Rechnung {
   mahnPausiertBis?: ISODate;
   /** True wenn manuell „inkasso-reif" markiert (nach Stufe 3). */
   inkassoMarkiert?: boolean;
+  /** Status der Drive-Synchronisation des PDFs. */
+  drive?: DriveSyncInfo;
   erstelltAm: ISODateTime;
   geaendertAm: ISODateTime;
 }

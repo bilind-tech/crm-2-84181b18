@@ -1,108 +1,153 @@
 ## Ziel
 
-Zwei Verbesserungen, die sich „magisch" anfühlen:
+Überall, wo es ein PDF gibt (Rechnungen, Angebote, Mahnungen, später Dauerauftrag-Läufe), erscheint ein **Auge-Icon-Button**. Klick → modal-artiges Fenster auf derselben Seite mit:
 
-1. **Smart-Prefill** für Telefon-, Mobil- und Webseite-Felder (`+49 ` bzw. `https://` ist sofort da, beim ersten Klick steht der Cursor schon richtig — Backspace löscht das Präfix wie jedes andere Zeichen).
-2. **Kunden-Kürzel** (3–4 Zeichen) als neues Feld im Tab „Basis" beim Anlegen eines Kunden, mit **Live-Vorschau** der zukünftigen Rechnungs-/Angebotsnummer im Format `KÜRZEL-YYYY-MM-##`.
+- vollständiger PDF-Vorschau (alle Seiten, scrollbar)
+- Seitenanzahl-Info („Seite 1 von 2")
+- Download-Button im Fenster
+- Google-Drive-Sync-Status („Lokal" / „Auf Drive synchronisiert ✓" / „Sync ausstehend")
+
+Kein neuer Tab. Nichts wird zur Laufzeit installiert — nur das, was beim nächsten Build mitkommt (`bun add`).
 
 ---
 
-## Teil 1 — Smart-Prefill Inputs
+## Technik
 
-### Neue Komponente `src/components/ui/smart-input.tsx`
+### Bibliothek
+**`react-pdf`** (basiert auf pdf.js, läuft 100 % im Browser, keine Server-Komponente, keine Native-Bindings — Pi-kompatibel).
 
-Ein leichter Wrapper um den bestehenden `<Input>` mit einer Prop `prefix` (z. B. `"+49 "` oder `"https://"`).
+```bash
+bun add react-pdf
+```
+
+`react-pdf` rendert jede Seite als `<canvas>`, gibt uns die Seitenanzahl direkt aus dem Dokument und funktioniert mit dem bestehenden Blob-URL-Mechanismus aus `useBelegPdf.ts` ohne Änderungen.
+
+PDF.js-Worker wird über Vite-Asset-Import eingebunden:
+```ts
+import pdfjsWorker from "pdfjs-dist/build/pdf.worker.min.mjs?url";
+pdfjs.GlobalWorkerOptions.workerSrc = pdfjsWorker;
+```
+
+### Neue Komponenten
+
+**1. `src/components/pdf/PdfViewerDialog.tsx`** — der wiederverwendbare Viewer.
+
+Props:
+```ts
+{
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  title: string;            // z. B. "Rechnung RE-2026-05-001"
+  pdfUrl: string | null;    // Blob-URL aus useBelegPdf
+  status: "idle" | "loading" | "ready" | "error";
+  fileName: string;         // z. B. "RE-2026-05-001.pdf"
+  driveStatus?: DriveStatus; // optional, Default = "lokal"
+}
+```
+
+Layout (Radix `Dialog`, max. `90vw × 90vh`, im App-Stil — kein Gradient, `bg-background`):
+```text
+┌─────────────────────────────────────────────────────┐
+│  Rechnung RE-2026-05-001        [⤓ Download] [✕]    │
+│  Seite 1 von 2 · 📄 Lokal (wird synchronisiert)     │
+├─────────────────────────────────────────────────────┤
+│ ┌─────────────────────────────────────────────────┐ │
+│ │              [PDF-Seite 1]                      │ │
+│ └─────────────────────────────────────────────────┘ │
+│ ┌─────────────────────────────────────────────────┐ │
+│ │              [PDF-Seite 2]                      │ │
+│ └─────────────────────────────────────────────────┘ │
+│ (scrollbar)                                         │
+└─────────────────────────────────────────────────────┘
+```
 
 Verhalten:
-- Beim Mount: ist der Wert leer → Wert = Präfix setzen, sodass `f.telefon = "+49 "` schon im Form-State steht.
-- Beim Fokus: wenn nur das Präfix steht, Cursor ans Ende setzen (kein Auto-Selektieren — fühlt sich natürlicher an).
-- Backspace/Delete funktioniert normal — Nutzer kann das Präfix komplett löschen, auch ohne Präfix wieder tippen.
-- Beim Speichern: wenn der Wert exakt = Präfix (nur Whitespace dahinter), als „leer" behandeln → `undefined` ans Backend.
-- Optional: dezente `placeholder=""` (weil Präfix selbst sichtbar ist).
+- Lade-Skeleton während `status === "loading"`
+- Fehler-Zustand mit Retry-Hinweis
+- Bei Erfolg: alle Seiten untereinander, automatisch breiten-skaliert (ResizeObserver auf den Container, `width={containerWidth}`)
+- Download-Button = `<a href={pdfUrl} download={fileName}>` mit Icon
+- ESC schließt, Backdrop-Klick schließt, kein Auto-Focus-Trap-Drama
 
-### Einsatzorte
+**2. `src/components/pdf/PdfViewButton.tsx`** — kompakter Trigger.
 
-| Feld | Präfix |
-|---|---|
-| `KundeForm` Telefon | `+49 ` |
-| `KundeForm` Mobil | `+49 ` |
-| `KundeForm` Webseite | `https://` |
-| `AnsprechpartnerForm` Telefon/Mobil (falls vorhanden) | `+49 ` |
-| `EinstellungenTab` Firmen-Telefon / -Webseite | analog |
+Wickelt den Eye-Icon-Button + Dialog in einer einzigen Komponente. Lazy: erzeugt das PDF erst beim ersten Öffnen, nicht beim Listen-Render.
 
-Speicher-Logik in `KundeForm.submit()` so anpassen, dass `telefon === "+49 "` (trim) als `undefined` gilt.
+```tsx
+<PdfViewButton kind="rechnung" beleg={r} />
+<PdfViewButton kind="angebot" beleg={a} />
+```
 
----
+Intern entscheidet sie zwischen `useAngebotPdf`/`useRechnungPdf` und füllt Titel + Dateiname automatisch aus der Belegnummer.
 
-## Teil 2 — Kunden-Kürzel + Live-Nummer-Vorschau
+**3. `src/components/pdf/DriveStatusBadge.tsx`** — kleiner dezenter Status-Chip.
 
-### Datenmodell
+Drei Zustände:
+- `lokal` → grau, „📄 Lokal"
+- `pending` → gelb-pulsierend, „🔄 Wird hochgeladen …"
+- `synced` → grün, „☁ Auf Google Drive · MM/YYYY-Ordner"
 
-`src/lib/api/types.ts` — `interface Kunde` ergänzen:
+Quelle: optionale Felder `driveFileId?`, `driveSyncedAt?`, `driveSyncError?` auf `Rechnung`/`Angebot`. Diese existieren noch nicht im Datenmodell — ich ergänze sie als optionale Felder in `types.ts`. Solange das Pi-Backend sie nicht setzt, ist der Status immer `lokal` — Frontend ist trotzdem schon fertig verdrahtet.
 
+### Datenmodell — minimal-invasive Erweiterung
+
+`src/lib/api/types.ts`:
 ```ts
-kuerzel?: string; // 3-4 Zeichen Großbuchstaben, optional, einmalig pro Kunde
+interface DriveSyncInfo {
+  fileId?: string;
+  syncedAt?: ISODateTime;
+  error?: string;
+}
+// auf Angebot, Rechnung jeweils:
+drive?: DriveSyncInfo;
 ```
 
-### Form-Erweiterung `KundeForm.tsx`
-
-Im Tab **Basis**, oben (direkt unter Typ/Status), neuer Bereich:
-
-```text
-┌─ Basis ────────────────────────────────────────────┐
-│ Typ          Status                                │
-│ Firmenname *                                       │
-│ ─────────────────────────────────────────────────  │
-│ Kürzel  [MUST]   ← 3–4 Zeichen, automatisch upper  │
-│  Vorschau:  MUST-2026-05-01  ✨                    │
-│ ─────────────────────────────────────────────────  │
-│ Anrede / Vorname / Nachname                        │
-│ Telefon (+49 ) / Mobil (+49 )                      │
-│ E-Mail / Webseite (https://)                       │
-└────────────────────────────────────────────────────┘
-```
-
-Logik:
-- Input nimmt max. 4 Zeichen, automatisch `toUpperCase()`, nur `[A-Z0-9]` erlaubt.
-- Vorschlag-Generator: aus Firmenname → erste Buchstaben pro Wort, max. 4. Beispiel: „Müller Reinigung GmbH" → `MRG`. Wird beim Verlassen des Firmenname-Feldes nur dann gesetzt, wenn der Kürzel-Wert noch leer ist.
-- **Live-Vorschau** unter dem Input, animiert (sanftes Fade beim Tippen):
-  ```
-  Vorschau: MUST-2026-05-01
-  ```
-  Format = `{KÜRZEL}-{YYYY}-{MM}-{##}` mit aktuellem Monat/Jahr und `01` als erste Rechnung. Monospace-Font, dezenter Akzent.
-- Helper-Text: „3–4 Zeichen. So beginnen alle Rechnungen & Angebote dieses Kunden."
-
-### Nummernschema
-
-`nextNumber()` in `src/lib/mock/backend.ts` erweitern: zweite Variante `nextCustomerNumber(kuerzel, sequenz)` → `MUST-2026-05-01`. Sequenz pro Kunde + Monat.
-
-State im Mock-Backend: `zaehler.proKunde: Record<kundeId, Record<"YYYY-MM", number>>`.
-
-In den Stellen, die Rechnungen/Angebote anlegen (Zeilen 473, 540, 575, 607, 1521 in `backend.ts`):
-- Wenn `kunde.kuerzel` gesetzt → neues Schema verwenden.
-- Sonst → bestehendes globales Schema (Rückwärtskompatibilität für Alt-Kunden).
-
-### Einstellungen → Nummernkreise
-
-Hinweistext ergänzen: „Kunden mit eigenem Kürzel verwenden ihr eigenes Schema (`KÜRZEL-YYYY-MM-##`). Diese Vorlagen gelten für alle anderen."
+Backend setzt das später ohne Migration — alle Felder sind optional.
 
 ---
 
-## Geänderte Dateien
+## Einsatzorte für `<PdfViewButton>`
 
-- **neu** `src/components/ui/smart-input.tsx`
-- `src/components/forms/KundeForm.tsx` — Kürzel-Feld + Live-Vorschau, SmartInput für Telefon/Mobil/Webseite, leer-Erkennung im submit
-- `src/lib/api/types.ts` — `Kunde.kuerzel?`
-- `src/lib/mock/backend.ts` — `nextCustomerNumber()`, Zähler-State pro Kunde+Monat, alle 5 Anlage-Stellen
-- `src/components/einstellungen/*` (falls Telefon/Web-Felder vorhanden) — SmartInput
-- `src/routes/einstellungen.tsx` — kurzer Hinweistext bei Nummernkreisen
+| Ort | Datei | Wie |
+|---|---|---|
+| Rechnungs-Detail (statt der bestehenden Inline-iframe) | `src/routes/rechnungen.$id.tsx` | Iframe entfernen, durch Auge-Button + Dialog ersetzen — Detailseite wird leichter |
+| Angebots-Detail (analog) | `src/routes/angebote.$id.tsx` | dito |
+| Rechnungs-Liste — Spalte „Aktionen" | `src/routes/rechnungen.tsx` | Eye-Icon-Button neben Status |
+| Angebots-Liste | `src/routes/angebote.tsx` | dito |
+| Mahnungen-Liste | `src/routes/mahnungen.tsx` | bereits `useRechnungPdf` da — Auge-Button hinzufügen |
+| Dauerauftrag-Läufe (zukünftige erzeugte Rechnungen) | `src/routes/dauerauftraege.$id.tsx` | wenn Lauf-Rechnung existiert, Auge zeigen |
+| Kunden-Detail → Tab Rechnungen/Angebote | `src/routes/kunden.$id.tsx` | dito |
+
+In den Detailseiten wird die bestehende fest verbaute iframe-Vorschau durch den schlankeren Eye-Button + Dialog ersetzt — die Detailseite wird kürzer und mobil viel angenehmer.
+
+---
+
+## Geänderte / neue Dateien
+
+**Neu**
+- `src/components/pdf/PdfViewerDialog.tsx`
+- `src/components/pdf/PdfViewButton.tsx`
+- `src/components/pdf/DriveStatusBadge.tsx`
+- `src/lib/pdf/pdfjsWorker.ts` (Worker-Setup, einmaliger Import)
+
+**Bearbeitet**
+- `src/lib/api/types.ts` — `DriveSyncInfo`, `Angebot.drive?`, `Rechnung.drive?`
+- `src/routes/rechnungen.$id.tsx` — Inline-iframe → PdfViewButton
+- `src/routes/angebote.$id.tsx` — dito
+- `src/routes/rechnungen.tsx` — Eye-Spalte
+- `src/routes/angebote.tsx` — Eye-Spalte
+- `src/routes/mahnungen.tsx` — Eye-Button
+- `src/routes/dauerauftraege.$id.tsx` — Eye-Button bei Läufen
+- `src/routes/kunden.$id.tsx` — Eye-Buttons in den Listen-Tabs
+- `package.json` — `react-pdf` + `pdfjs-dist`
 
 ---
 
 ## Was es NICHT ändert
 
-- Bestehende Kunden ohne Kürzel behalten ihr globales `RE-2026-####`-Schema. Kein Daten-Migrationsschritt nötig.
-- Andere Inputs (E-Mail, Adresse, Notizen) bleiben unangetastet.
-- Backend-Pi-Phase wird nicht berührt; alles läuft im Mock weiter.
+- E-Mail-Versand-Dialog hat bereits eine eigene iframe-Vorschau für den Anhang — bleibt unangetastet.
+- Keine echte Drive-Synchronisation (Backend-Pi-Phase). Status-Badge zeigt bis dahin nur „Lokal" — sobald das Backend `drive.fileId` setzt, wird der Badge automatisch grün.
+- Kein neues Theme, kein neues Icon-Set, kein Sparkles-Glitter. 
 
-Sag „los" und ich setze es um.
+---
+
+Sag „los" und ich baue.
