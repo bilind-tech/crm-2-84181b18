@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { LoadingPlaceholder } from "@/components/layout/LoadingPlaceholder";
+import { DetailSkeleton } from "@/components/layout/DetailSkeleton";
+import { NotFoundState } from "@/components/layout/NotFoundState";
 import { useState } from "react";
 import { Download, Send, FileCheck2, ThumbsUp, ThumbsDown } from "lucide-react";
 import {
