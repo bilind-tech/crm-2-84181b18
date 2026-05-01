@@ -20,6 +20,7 @@ import {
   type PositionDraft,
 } from "./PositionenEditor";
 import { OptionenBlock, defaultOptionen, type OptionenState } from "./OptionenBlock";
+import { formatWiederkehrend } from "./DauerauftragKonfig";
 import { AnsprechpartnerPicker } from "./AnsprechpartnerPicker";
 import { Repeat } from "lucide-react";
 
