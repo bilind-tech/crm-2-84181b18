@@ -1,5 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
-import { Building2, FileText, FolderClosed, Receipt, Sparkles, Users } from "lucide-react";
+import { Building2, FileText, FolderClosed, Receipt, Users } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -56,22 +56,15 @@ export function QuickCreate({
   const navigate = useNavigate();
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="quick-create-dialog max-w-[640px] overflow-hidden rounded-2xl border-border/60 bg-gradient-to-br from-background via-background to-accent/30 p-0 shadow-2xl">
+      <DialogContent className="quick-create-dialog max-w-[640px] overflow-hidden rounded-2xl border-border/60 bg-background p-0 shadow-2xl">
         <div className="px-7 pt-7">
           <DialogHeader className="text-left">
-            <div className="flex items-center gap-3">
-              <div className="grid h-10 w-10 place-content-center rounded-xl bg-primary/10 text-primary ring-1 ring-inset ring-primary/15">
-                <Sparkles className="h-5 w-5" />
-              </div>
-              <div>
-                <DialogTitle className="text-xl font-semibold tracking-tight">
-                  Schnell anlegen
-                </DialogTitle>
-                <DialogDescription className="mt-0.5">
-                  Wähle aus, was du erstellen möchtest.
-                </DialogDescription>
-              </div>
-            </div>
+            <DialogTitle className="text-xl font-semibold tracking-tight">
+              Schnell anlegen
+            </DialogTitle>
+            <DialogDescription className="mt-1">
+              Wähle aus, was du erstellen möchtest.
+            </DialogDescription>
           </DialogHeader>
         </div>
 
