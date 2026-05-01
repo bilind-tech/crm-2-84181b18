@@ -1,8 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { LoadingPlaceholder } from "@/components/layout/LoadingPlaceholder";
 import { useState } from "react";
-import { Download, Send, CheckCircle2, Wallet, Banknote } from "lucide-react";
-import { useRechnung, useAngebot, useKunde } from "@/hooks/useApi";
+import { Download, Send, CheckCircle2, Wallet, Banknote, Trash2 } from "lucide-react";
+import { useRechnung, useAngebot, useKunde, useDeleteZahlung } from "@/hooks/useApi";
+import { useConfirm } from "@/hooks/useConfirm";
 import { useRechnungPdf } from "@/hooks/useBelegPdf";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -26,6 +27,8 @@ function Page() {
   const [emailOpen, setEmailOpen] = useState(false);
   const { data: quellAngebot } = useAngebot(r?.quellAngebotId ?? "");
   const { data: kunde } = useKunde(r?.kundeId ?? "");
+  const delZahlung = useDeleteZahlung(id);
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   if (!r) return <LoadingPlaceholder />;
   const s = summenRechnung(r.positionen, r.rabattGesamt);
@@ -160,7 +163,32 @@ function Page() {
                           </p>
                         )}
                       </div>
-                      <span className="shrink-0 font-medium">{formatEUR(z.betrag)}</span>
+                      <div className="flex shrink-0 items-center gap-1.5">
+                        <span className="font-medium">{formatEUR(z.betrag)}</span>
+                        <button
+                          type="button"
+                          aria-label="Zahlung löschen"
+                          className="rounded-md p-1 text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive"
+                          onClick={() =>
+                            confirm(
+                              {
+                                title: "Zahlung löschen?",
+                                description: `${formatEUR(z.betrag)} vom ${formatDate(z.datum)} entfernen. Der Rechnungsstatus wird neu berechnet.`,
+                                variant: "destructive",
+                                confirmLabel: "Löschen",
+                              },
+                              () =>
+                                delZahlung.mutate(z.id, {
+                                  onSuccess: () => toast.success("Zahlung gelöscht"),
+                                  onError: (e) =>
+                                    toast.error(e instanceof Error ? e.message : "Löschen fehlgeschlagen"),
+                                }),
+                            )
+                          }
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
                     </li>
                   );
                 })}
@@ -208,6 +236,7 @@ function Page() {
         pdfBlobUrl={pdf.url}
         pdfDateiname={`${r.nummer}.pdf`}
       />
+      {confirmDialog}
     </div>
   );
 }
