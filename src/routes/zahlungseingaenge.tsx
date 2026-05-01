@@ -106,7 +106,7 @@ function Page() {
           value={teilweise}
           sublabel="Rest offen"
           icon={Wand2}
-          tone={teilweise > 0 ? "warning" : "default"}
+          tone={teilweise > 0 ? "danger" : "default"}
         />
         <KpiCard
           label="Eingänge"
