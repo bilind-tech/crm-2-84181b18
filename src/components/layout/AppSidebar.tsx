@@ -26,6 +26,7 @@ import {
 import logo from "@/assets/logo.png";
 import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
+import { PiStatusIndikator } from "@/components/layout/PiStatusIndikator";
 
 type NavItem = {
   title: string;
@@ -183,6 +184,7 @@ export function AppSidebar() {
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
+        <PiStatusIndikator />
       </SidebarFooter>
     </Sidebar>
   );
