@@ -154,20 +154,20 @@ export function versendeMahnungJetzt(opts: VersendeOpts): {
 /** Hauptlauf: prüft alle offenen Rechnungen einmal. Idempotent — keine doppelten Sends durch idempotenzKey. */
 export function runMahnAutomatik(opts: AutomatikOptions = {}): AutomatikResult {
   const cfg = ladeMahnEinstellungen();
-  const modus = opts.modusOverride ?? cfg.modus;
   const quelle: MahnLaufQuelle = opts.quelle ?? "manuell";
   const heute = opts.heute ?? new Date().toISOString().slice(0, 10);
 
   // HARTER GUARD: niemals automatischer Mail-Versand.
   // Selbst wenn jemand den Cron-Scheduler reaktiviert, läuft der Job nicht.
   if (quelle === "cron") {
-    return { laufId: "", modus, geprueft: 0, vorschlaege: 0, versendet: 0, uebersprungen: 0, fehler: 0 };
+    return { laufId: "", modus: "aus", geprueft: 0, vorschlaege: 0, versendet: 0, uebersprungen: 0, fehler: 0 };
   }
   // Auto-Modus ist generell deaktiviert — wird auf "vorschlag" zurückgestuft,
   // damit niemals automatisch Mails enqueued werden.
-  const sicherererModus: MahnLaufModus = modus === "auto" ? "vorschlag" : modus;
+  const rohmodus = opts.modusOverride ?? cfg.modus;
+  const modus: MahnLaufModus = rohmodus === "auto" ? "vorschlag" : rohmodus;
 
-  const laufId = createLauf(quelle, sicherererModus);
+  const laufId = createLauf(quelle, modus);
 
   let geprueft = 0;
   let vorschlaege = 0;
