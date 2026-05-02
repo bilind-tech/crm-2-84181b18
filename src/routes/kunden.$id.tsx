@@ -12,6 +12,7 @@ import { ObjektForm } from "@/components/forms/ObjektForm";
 import { AnsprechpartnerTab } from "@/components/kunden/AnsprechpartnerTab";
 import { AngebotForm } from "@/components/forms/AngebotForm";
 import { RechnungForm } from "@/components/forms/RechnungForm";
+import { KundeBearbeitenDialog } from "@/components/forms/KundeBearbeitenDialog";
 import { formatEUR, formatDate } from "@/lib/format";
 import { summenRechnung } from "@/lib/mock/backend";
 import { FlowBar } from "@/components/flow/FlowBar";
