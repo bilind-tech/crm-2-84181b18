@@ -1,9 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useRef, useState, type ChangeEvent } from "react";
+import { useState, type ChangeEvent } from "react";
 import { Camera, Trash2, Check, Upload, Loader2, FolderOpen, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { uploadDokumentToSession, MAX_BYTES } from "@/lib/dokument/upload";
-import { PrimaryAction } from "@/components/layout/PrimaryAction";
 
 export const Route = createFileRoute("/m/upload/$session")({
   component: MobileUploadPage,
@@ -18,8 +17,6 @@ interface DateiEntry {
 
 function MobileUploadPage() {
   const { session: token } = Route.useParams();
-  const cameraRef = useRef<HTMLInputElement>(null);
-  const pickerRef = useRef<HTMLInputElement>(null);
   const [dateien, setDateien] = useState<DateiEntry[]>([]);
   const [uploading, setUploading] = useState(false);
   const [done, setDone] = useState(false);
@@ -45,13 +42,7 @@ function MobileUploadPage() {
     if (neue.length) setDateien((prev) => [...prev, ...neue]);
   }
 
-  function onCamera(e: ChangeEvent<HTMLInputElement>) {
-    const files = e.target.files;
-    e.target.value = "";
-    if (files) verarbeite(files);
-  }
-
-  function onPicker(e: ChangeEvent<HTMLInputElement>) {
+  function onPick(e: ChangeEvent<HTMLInputElement>) {
     const files = e.target.files;
     e.target.value = "";
     if (files) verarbeite(files);
@@ -102,6 +93,51 @@ function MobileUploadPage() {
     }
   }
 
+  // Großer Button mit nativem File-Input als unsichtbares Overlay.
+  // iOS-Safari öffnet den Picker nicht zuverlässig per programmatischem .click(),
+  // daher liegt der echte <input type="file"> direkt über dem Button-Visual,
+  // sodass der Tap als native User-Gesture beim Input ankommt.
+  function FileButton({
+    icon: Icon,
+    label,
+    accept,
+    capture,
+    multiple,
+    onChange,
+  }: {
+    icon: React.ComponentType<{ className?: string }>;
+    label: string;
+    accept: string;
+    capture?: "environment" | "user";
+    multiple?: boolean;
+    onChange: (e: ChangeEvent<HTMLInputElement>) => void;
+  }) {
+    return (
+      <div className="relative">
+        <div
+          className={
+            "pointer-events-none flex h-14 w-full items-center justify-center gap-2 rounded-lg px-5 text-base font-semibold text-white " +
+            "bg-[linear-gradient(180deg,#3B82F6_0%,#2563EB_55%,#1D4ED8_100%)] " +
+            "shadow-[0_1px_0_rgba(255,255,255,0.25)_inset,0_8px_22px_-8px_rgba(37,99,235,0.55),0_1px_2px_rgba(15,23,42,0.18)] " +
+            "ring-1 ring-inset ring-white/15"
+          }
+        >
+          <Icon className="h-5 w-5" />
+          <span>{label}</span>
+        </div>
+        <input
+          type="file"
+          accept={accept}
+          {...(capture ? { capture } : {})}
+          {...(multiple ? { multiple: true } : {})}
+          onChange={onChange}
+          className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+          aria-label={label}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <header className="border-b border-border bg-card px-4 py-3">
@@ -112,37 +148,19 @@ function MobileUploadPage() {
       </header>
 
       <main className="flex-1 space-y-3 p-4">
-        <input
-          ref={cameraRef}
-          type="file"
-          accept="image/*"
-          capture="environment"
-          multiple
-          className="sr-only"
-          onChange={onCamera}
-        />
-        <input
-          ref={pickerRef}
-          type="file"
-          accept="image/*,application/pdf"
-          multiple
-          className="sr-only"
-          onChange={onPicker}
-        />
-
-        <PrimaryAction
+        <FileButton
           icon={Camera}
           label={dateien.length === 0 ? "Foto aufnehmen" : "Noch ein Foto"}
-          size="lg"
-          fullWidth
-          onClick={() => cameraRef.current?.click()}
+          accept="image/*"
+          capture="environment"
+          onChange={onPick}
         />
-        <PrimaryAction
+        <FileButton
           icon={FolderOpen}
           label="Aus Galerie / Dateien"
-          size="lg"
-          fullWidth
-          onClick={() => pickerRef.current?.click()}
+          accept="image/*,application/pdf"
+          multiple
+          onChange={onPick}
         />
 
         {done && dateien.length === 0 && (
@@ -193,15 +211,19 @@ function MobileUploadPage() {
 
       {dateien.length > 0 && (
         <div className="sticky bottom-0 border-t border-border bg-card p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-          <PrimaryAction
-            icon={uploading ? Loader2 : Upload}
-            label={uploading ? "Wird hochgeladen…" : `Alle senden (${dateien.length})`}
-            size="lg"
-            fullWidth
+          <button
+            type="button"
             disabled={uploading}
             onClick={alleHochladen}
-            className={uploading ? "[&_svg]:animate-spin" : undefined}
-          />
+            className={
+              "flex h-14 w-full items-center justify-center gap-2 rounded-lg px-5 text-base font-semibold text-white " +
+              "bg-[linear-gradient(180deg,#3B82F6_0%,#2563EB_55%,#1D4ED8_100%)] " +
+              "shadow-[0_8px_22px_-8px_rgba(37,99,235,0.55)] ring-1 ring-inset ring-white/15 disabled:opacity-60"
+            }
+          >
+            {uploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Upload className="h-5 w-5" />}
+            <span>{uploading ? "Wird hochgeladen…" : `Alle senden (${dateien.length})`}</span>
+          </button>
         </div>
       )}
     </div>
