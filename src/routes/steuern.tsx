@@ -206,19 +206,23 @@ function Page() {
         <div className="mt-6 space-y-2.5 border-t border-border pt-5">
           <RuecklageZeile
             label="Umsatzsteuer-Schuld"
-            sub="exakt — alle offenen Voranmeldungen"
+            sub={
+              einstellungen.ustPufferSatz > 0
+                ? `inkl. ${einstellungen.ustPufferSatz} % Vorsteuer-Puffer für noch nicht erfasste Belege`
+                : "ohne Puffer — alle Vorsteuer-Belege müssen erfasst sein"
+            }
             betrag={ruecklage.ust}
-            ton="exakt"
+            ton="schaetzung"
           />
           <RuecklageZeile
             label="Körperschaftsteuer + Soli"
-            sub={`Hochrechnung Jahr ${jahr} · ${einstellungen.kstSatz}% + ${einstellungen.soliSatz}% Soli`}
+            sub={`${einstellungen.kstSatz} % + ${einstellungen.soliSatz} % auf bisher realisierten Gewinn ${jahr}`}
             betrag={ruecklage.kst + ruecklage.soli}
             ton="schaetzung"
           />
           <RuecklageZeile
             label="Gewerbesteuer"
-            sub={`Hochrechnung Jahr ${jahr} · Hebesatz Sankt Augustin ${einstellungen.gewstHebesatz}%`}
+            sub={`Hebesatz ${einstellungen.gewstHebesatz} % auf bisher realisierten Gewinn ${jahr}`}
             betrag={ruecklage.gewst}
             ton="schaetzung"
           />
