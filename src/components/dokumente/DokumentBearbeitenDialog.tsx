@@ -19,10 +19,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useUpdateDokument, useDeleteDokument } from "@/hooks/useApi";
+import { useUpdateDokument, useDeleteDokument, useKunden, useObjekte } from "@/hooks/useApi";
 import type { Dokument, DokumentTyp } from "@/lib/api/types";
 import { useConfirm } from "@/hooks/useConfirm";
 import { fristStatus, FRIST_LABEL, fristBadgeClass } from "@/lib/dokument/frist";
+import { DriveSyncRow } from "./DriveSyncBadge";
 
 interface Props {
   dokument: Dokument | null;
@@ -44,6 +45,7 @@ export function DokumentBearbeitenDialog({ dokument, open, onOpenChange }: Props
   const update = useUpdateDokument();
   const del = useDeleteDokument();
   const { confirm, dialog: confirmDialog } = useConfirm();
+  const { data: kunden = [] } = useKunden();
 
   const [titel, setTitel] = useState("");
   const [beschreibung, setBeschreibung] = useState("");
@@ -53,6 +55,9 @@ export function DokumentBearbeitenDialog({ dokument, open, onOpenChange }: Props
   const [betrag, setBetrag] = useState("");
   const [steuerrelevant, setSteuerrelevant] = useState(false);
   const [erledigt, setErledigt] = useState(false);
+  const [kundeId, setKundeId] = useState<string>("");
+  const [objektId, setObjektId] = useState<string>("");
+  const { data: objekte = [] } = useObjekte(kundeId || undefined);
 
   useEffect(() => {
     if (!dokument) return;
@@ -64,6 +69,8 @@ export function DokumentBearbeitenDialog({ dokument, open, onOpenChange }: Props
     setBetrag(dokument.betrag != null ? String(dokument.betrag) : "");
     setSteuerrelevant(dokument.steuerrelevant);
     setErledigt(!!dokument.erledigtAm);
+    setKundeId(dokument.kundeId ?? "");
+    setObjektId(dokument.objektId ?? "");
   }, [dokument]);
 
   if (!dokument) return null;
