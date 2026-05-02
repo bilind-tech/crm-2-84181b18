@@ -1,5 +1,5 @@
 // Sicherheits-Dialog für Backup-Wiederherstellung.
-// Zwei Schritte: Warnung lesen → Bestätigungswort eintippen → Restore.
+// Zwei Hürden: Bestätigungswort tippen + Admin-Passwort eingeben.
 import { useState } from "react";
 import {
   Dialog,
@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { AlertTriangle, Loader2, RotateCcw } from "lucide-react";
+import { AlertTriangle, Loader2, RotateCcw, Shield, ShieldCheck } from "lucide-react";
 import type { BackupEintrag } from "@/lib/api/types";
 
 const BESTAETIGUNG = "WIEDERHERSTELLEN";
@@ -37,17 +37,26 @@ export function RestoreBackupDialog({
   open: boolean;
   isUploadRestore?: boolean;
   onClose: () => void;
-  onConfirm: (b: BackupEintrag) => Promise<void>;
+  onConfirm: (b: BackupEintrag, passwort: string) => Promise<void>;
 }) {
   const [eingabe, setEingabe] = useState("");
+  const [passwort, setPasswort] = useState("");
   const [busy, setBusy] = useState(false);
+  const [fehler, setFehler] = useState<string | null>(null);
   const matches = eingabe.trim().toUpperCase() === BESTAETIGUNG;
+  const passwortOk = passwort.trim().length >= 1;
+  const canSubmit = matches && passwortOk;
 
   const handle = async () => {
     setBusy(true);
+    setFehler(null);
     try {
-      await onConfirm(backup);
+      await onConfirm(backup, passwort);
       setEingabe("");
+      setPasswort("");
+    } catch (e) {
+      const msg = (e as Error).message ?? "Fehler bei der Wiederherstellung";
+      setFehler(msg.includes("Passwort") ? "Passwort ist falsch." : msg);
     } finally {
       setBusy(false);
     }
@@ -81,28 +90,65 @@ export function RestoreBackupDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-2 py-2">
-          <p className="text-sm">
-            Tippe <code className="rounded bg-muted px-1 py-0.5 text-xs font-bold">{BESTAETIGUNG}</code>{" "}
-            zur Bestätigung:
+        <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3 text-xs text-emerald-700 dark:text-emerald-400">
+          <p className="flex items-start gap-1.5 font-medium">
+            <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            Daten werden ausschließlich aus dem gewählten Backup geladen.
           </p>
-          <Input
-            autoFocus
-            value={eingabe}
-            onChange={(e) => setEingabe(e.target.value)}
-            placeholder={BESTAETIGUNG}
-            disabled={busy}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && matches) handle();
-            }}
-          />
+          <p className="mt-1 pl-5 text-emerald-700/80 dark:text-emerald-400/80">
+            Außerhalb dieses Wiederherstellungs-Vorgangs wird im Datenverzeichnis
+            nichts verändert, gelöscht oder überschrieben.
+          </p>
+        </div>
+
+        <div className="space-y-3 py-2">
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium">
+              1. Tippe{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs font-bold">
+                {BESTAETIGUNG}
+              </code>{" "}
+              zur Bestätigung
+            </label>
+            <Input
+              autoFocus
+              value={eingabe}
+              onChange={(e) => setEingabe(e.target.value)}
+              placeholder={BESTAETIGUNG}
+              disabled={busy}
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="flex items-center gap-1.5 text-xs font-medium">
+              <Shield className="h-3.5 w-3.5 text-muted-foreground" />
+              2. Admin-Passwort eingeben
+            </label>
+            <Input
+              type="password"
+              value={passwort}
+              onChange={(e) => setPasswort(e.target.value)}
+              placeholder="••••••••"
+              disabled={busy}
+              autoComplete="current-password"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && canSubmit) handle();
+              }}
+            />
+          </div>
+
+          {fehler && (
+            <p className="rounded-md border border-destructive/30 bg-destructive/5 px-2 py-1.5 text-xs text-destructive">
+              {fehler}
+            </p>
+          )}
         </div>
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={busy}>
             Abbrechen
           </Button>
-          <Button variant="destructive" onClick={handle} disabled={!matches || busy}>
+          <Button variant="destructive" onClick={handle} disabled={!canSubmit || busy}>
             {busy ? (
               <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
             ) : (
