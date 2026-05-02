@@ -57,15 +57,6 @@ import { useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/einstellungen")({ component: Page });
 
-// Tabs, die nur für Owner sichtbar sind:
-const OWNER_ONLY: ReadonlyArray<TabId> = [
-  "drive",
-  "backup",
-  "system-update",
-  "sicherheit",
-  "steuern",
-];
-
 type TabId =
   | "firmendaten"
   | "email-vorlagen"
@@ -84,6 +75,15 @@ type TabId =
   | "sicherheit"
   | "backend"
   | "verlauf";
+
+// Tabs, die nur für Owner sichtbar sind:
+const OWNER_ONLY: ReadonlyArray<TabId> = [
+  "drive",
+  "backup",
+  "system-update",
+  "sicherheit",
+  "steuern",
+];
 
 const tabs: { id: TabId; label: string; icon: typeof Building2; gruppe: string }[] = [
   { id: "firmendaten", label: "Firmendaten", icon: Building2, gruppe: "Stammdaten" },
