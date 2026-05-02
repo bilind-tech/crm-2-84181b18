@@ -1,79 +1,42 @@
-# Steuer-Seite: Polish + manuelle Bezahlt-Erfassung
+## Problem
 
-## 1. Sparschwein-Karte aufräumen
+Beim Erstellen einer Rechnung oder eines Angebots zeigt die Belegnummer-Vorschau (nach Auswahl des Kunden) immer `…/01`, auch wenn der Kunde im aktuellen Monat schon mehrere Belege hat oder der Start-Zähler in den Stammdaten z. B. auf `12` gesetzt wurde. Die tatsächlich gespeicherte Nummer ist korrekt — nur die Vorschau lügt und das ist verwirrend.
 
-- **Sparschwein-Icon raus** — komplett, kein Ersatz-Icon. Nur Text + Zahlen.
-- **Überschrift neutral**: „Was du zurücklegen solltest" → **„Empfohlene Rücklage"**
-- **Untertext neutral**: „Damit das Finanzamt jederzeit bedient werden kann." → **„Reicht aus, um alle aktuell offenen Steuerforderungen zu decken."**
-- Aufschlüsselungs-Zeilen mit „exakt"/„Schätzung"-Badges bleiben unverändert.
+## Ursache
 
-## 2. Rhythmus aus Überschrift entfernen
+`src/lib/belegNummer.ts` → `vorschauBelegnummer()` hängt hart `"/01"` an, statt den nächsten freien Zähler aus dem Backend zu lesen.
 
-- „Umsatzsteuer · monatliche Voranmeldungen" → schlicht **„Umsatzsteuer"**
-- Rhythmus bleibt nur noch in den Einstellungen sichtbar.
+Im Backend existiert bereits der passende Endpoint:
+- `GET /kunden/:id/zaehler` → `{ periode, naechsterStart }`
+- React-Hook: `useKundenZaehler(id)` (in `src/hooks/useApi.ts`)
 
-## 3. Manuelle Bezahlt-Erfassung mit Eingabe
+Dieser Hook wird heute nur im Kunden-Bearbeiten-Dialog verwendet, nicht in den Erstell-Formularen.
 
-Neuer dezenter Button **„Zahlung erfassen"** rechts oben im Header (statt des entfernten „Termin anlegen"). Klick öffnet einen Dialog im Stil des `ZahlungErfassenDialog` für Rechnungen.
+## Lösung
 
-### Dialog „Steuerzahlung erfassen"
+Vorschau in den Forms gegen den echten nächsten Zähler des gewählten Kunden austauschen.
 
-Schritte (kompakt, alles in einem Dialog ohne mehrstufige Frage):
+### `src/lib/belegNummer.ts`
+Zweiten Parameter ergänzen, der den nächsten Zähler erhält (Fallback `1`, wenn noch nicht geladen):
 
-**Eingabefelder:**
+```
+vorschauBelegnummer(kuerzel, fallbackPraefix, naechsterZaehler = 1, basisDatum = new Date())
+```
+- Mit Kürzel: `${KUERZEL}${MM}${YY}/${String(naechsterZaehler).padStart(2,"0")}`
+- Ohne Kürzel: bestehender Fallback, aber `{####}` / `{###}` mit `naechsterZaehler` statt `1`.
 
-1. **Welche Steuer?** — Dropdown: Umsatzsteuer · Körperschaftsteuer · Solidaritätszuschlag · Gewerbesteuer
-2. **Welcher Zeitraum?** — abhängig von der Steuer:
-   - USt monatlich → Monat-Picker (Dropdown „Mai 2026" usw.)
-   - USt quartalsweise → Quartal-Picker („Q2 2026")
-   - USt jährlich → Jahr-Picker
-   - KSt/Soli/GewSt → Quartal-Picker („Q2 2026")
-   - Default-Vorauswahl: aktuell offener / nächst-fälliger Posten dieser Art
-3. **Bezahlter Betrag (€)** — vorausgefüllt mit dem geschätzten Betrag des passenden Postens, editierbar
-4. **Datum** — Default heute, editierbar (date-input)
-5. *(Optional)* **Notiz** — Textfeld, klein, kann leer bleiben
+### `src/components/forms/RechnungForm.tsx` und `AngebotForm.tsx`
+- `useKundenZaehler(kundeId)` aufrufen (greift dank `enabled: !!id` nur wenn Kunde gewählt).
+- `vorschauNummer` neu berechnen mit `zaehlerQ.data?.naechsterStart ?? 1`.
+- Während `zaehlerQ.isLoading`: dezenter Hinweis „wird ermittelt …" statt einer falschen Nummer.
 
-**Aktionen:**
-- „Speichern" → Posten wird als bezahlt markiert (siehe unten)
-- „Abbrechen"
+### Frische Daten beim Öffnen
+Damit nach dem Anlegen einer Rechnung sofort `…/02` als nächste Vorschau erscheint, in den `onSuccess`-Handlern von `useCreateRechnung` und `useCreateAngebot` die Query `["kunden", kundeId, "zaehler"]` invalidieren.
 
-### Wie wird das gespeichert
+## Was sich nicht ändert
+- Vergabe der echten Belegnummer im Backend bleibt unverändert (`nextCustomerNumber` in `src/lib/mock/backend.ts`).
+- Format `{KÜRZEL}{MM}{YY}/{NN}` bleibt identisch.
+- Start-Zähler-Logik in den Kundenstammdaten bleibt unverändert — sie wird durch die korrekte Vorschau jetzt sichtbar.
 
-Das **bestehende `useBezahltMarkierungen`-Store** aus dem letzten Durchgang wird wieder aktiv genutzt:
-- Bei Auswahl im Dialog wird die passende Posten-ID berechnet (`auto-ust-2026-M05`, `auto-kst-2026-Q2`, etc.)
-- Eintrag in den Store: `{ bezahltAm: datum, tatsaechlicherBetrag: betrag, notiz?: notiz }`
-- Die `BezahltMarkierung`-Schnittstelle wird um optionales `notiz` erweitert
-
-In `steuern.tsx` wird wieder das Overlay aus `bezahltMap` über die generierten Posten gelegt (Logik aus dem Durchgang davor, war mit dem letzten Schritt rausgefallen).
-
-### Was sich auf der Seite ändert
-
-- **Posten-Liste**: bezahlte Posten verschwinden aus „Offene"-Listen und erscheinen in einer neuen Sektion **„Bereits bezahlt {jahr}"** unten — kleiner, dezenter, mit „Widerrufen"-Aktion (kleines X-Icon, kein großer Button)
-- **Empfohlene-Rücklage-Karte**: Aufschlüsselung zeigt nur noch **offene** Beträge (= das, was noch zurückgelegt werden muss). Bezahlte Posten fließen nicht mehr ein.
-- **Neue KPI „Bezahlt {jahr}"**: ersetzt eine der vier Kacheln. Vorschlag: KPIs in dieser Reihenfolge — *Empfohlene Rücklage · Nächste Fälligkeit · Bezahlt {jahr} · Gewinn YTD*
-- **Detail-Dialog**: zeigt für bezahlte Posten zusätzlich Datum + Betrag + Notiz (falls vorhanden)
-
-## 4. Zod-Validierung im Dialog
-
-- Steuerart: Pflicht
-- Zeitraum: Pflicht
-- Betrag: > 0, max 9 Stellen
-- Datum: gültiges ISO-Datum, nicht in ferner Zukunft (max heute + 30 Tage)
-- Notiz: optional, max 200 Zeichen
-
-## Technische Umsetzung — Dateien
-
-- **Neu** `src/components/steuern/SteuerZahlungDialog.tsx` — der oben beschriebene Dialog
-- **Geändert** `src/lib/steuern/store.ts` — `BezahltMarkierung` um optionales `notiz` erweitern
-- **Geändert** `src/routes/steuern.tsx`:
-  - Sparschwein + Texte aus Karte raus
-  - Überschrift „Umsatzsteuer" ohne Rhythmus
-  - Header-Action „Zahlung erfassen" wieder rein
-  - `useBezahltMarkierungen` wieder aktiv, Overlay über generierte Posten
-  - Bezahlte Posten in eigene Sektion + aus Rücklagen-Aufschlüsselung ausschließen
-  - Neue KPI-Kachel „Bezahlt {jahr}"
-- **Geändert** `src/components/steuern/SteuerDetailDialog.tsx` — bei `posten.bezahltAm` zusätzliche Info-Zeile mit Datum/Betrag/Notiz
-
-Manueller `useManuellePosten`-Store bleibt komplett raus (keine „Steuer-Termin anlegen"-Funktion), wir tracken nur **Zahlungen** zu **automatisch generierten** Posten.
-
-Bestätige, dann setze ich das in einem Rutsch um.
+## Ergebnis
+Nach Auswahl des Kunden im Erstell-Dialog steht die Belegnummer, die der Beleg auch wirklich bekommen würde — z. B. `GFU0526/13`, wenn im Mai 2026 schon 12 Belege für diesen Kunden existieren.

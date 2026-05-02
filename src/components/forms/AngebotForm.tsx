@@ -10,7 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useKunden, useObjekte, useCreateAngebot, useNummernkreise } from "@/hooks/useApi";
+import { useKunden, useObjekte, useCreateAngebot, useNummernkreise, useKundenZaehler } from "@/hooks/useApi";
 import { vorschauBelegnummer } from "@/lib/belegNummer";
 import { toast } from "sonner";
 import { addDays, todayISO } from "@/lib/format";
@@ -55,11 +55,14 @@ export function AngebotForm({ onClose, defaultKundeId, defaultObjektId }: Props)
     [objekteAlle, kundeId]
   );
 
+  const zaehlerQ = useKundenZaehler(kundeId);
   const vorschauNummer = useMemo(() => {
     if (!kundeId || !nummernkreise) return "";
     const kunde = kunden.find((k) => k.id === kundeId);
-    return vorschauBelegnummer(kunde?.kuerzel, nummernkreise.angebotPraefix);
-  }, [kundeId, kunden, nummernkreise]);
+    const naechster = zaehlerQ.data?.naechsterStart ?? 1;
+    return vorschauBelegnummer(kunde?.kuerzel, nummernkreise.angebotPraefix, naechster);
+  }, [kundeId, kunden, nummernkreise, zaehlerQ.data?.naechsterStart]);
+  const vorschauLaedt = !!kundeId && zaehlerQ.isLoading;
 
   async function submit() {
     if (!kundeId) return toast.error("Bitte Kunde wählen");
@@ -159,10 +162,14 @@ export function AngebotForm({ onClose, defaultKundeId, defaultObjektId }: Props)
         </button>
       </div>
 
-      {vorschauNummer && (
+      {kundeId && (
         <p className="-mt-3 text-xs text-muted-foreground">
           Belegnummer:{" "}
-          <span className="font-mono font-semibold text-foreground">{vorschauNummer}</span>
+          {vorschauLaedt || !vorschauNummer ? (
+            <span className="text-muted-foreground/70">wird ermittelt …</span>
+          ) : (
+            <span className="font-mono font-semibold text-foreground">{vorschauNummer}</span>
+          )}
         </p>
       )}
 

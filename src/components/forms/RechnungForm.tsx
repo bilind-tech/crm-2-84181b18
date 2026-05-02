@@ -10,7 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useKunden, useObjekte, useCreateRechnung, useNummernkreise } from "@/hooks/useApi";
+import { useKunden, useObjekte, useCreateRechnung, useNummernkreise, useKundenZaehler } from "@/hooks/useApi";
 import { vorschauBelegnummer } from "@/lib/belegNummer";
 import { toast } from "sonner";
 import { addDays, todayISO } from "@/lib/format";
@@ -57,11 +57,14 @@ export function RechnungForm({ onClose, defaultKundeId, defaultObjektId }: Props
     [objekteAlle, kundeId]
   );
 
+  const zaehlerQ = useKundenZaehler(kundeId);
   const vorschauNummer = useMemo(() => {
     if (!kundeId || !nummernkreise) return "";
     const kunde = kunden.find((k) => k.id === kundeId);
-    return vorschauBelegnummer(kunde?.kuerzel, nummernkreise.rechnungPraefix);
-  }, [kundeId, kunden, nummernkreise]);
+    const naechster = zaehlerQ.data?.naechsterStart ?? 1;
+    return vorschauBelegnummer(kunde?.kuerzel, nummernkreise.rechnungPraefix, naechster);
+  }, [kundeId, kunden, nummernkreise, zaehlerQ.data?.naechsterStart]);
+  const vorschauLaedt = !!kundeId && zaehlerQ.isLoading;
 
   function setFristTage(tage: number) {
     setFrist(tage);
@@ -171,10 +174,14 @@ export function RechnungForm({ onClose, defaultKundeId, defaultObjektId }: Props
         </button>
       </div>
 
-      {vorschauNummer && (
+      {kundeId && (
         <p className="-mt-3 text-xs text-muted-foreground">
           Belegnummer:{" "}
-          <span className="font-mono font-semibold text-foreground">{vorschauNummer}</span>
+          {vorschauLaedt || !vorschauNummer ? (
+            <span className="text-muted-foreground/70">wird ermittelt …</span>
+          ) : (
+            <span className="font-mono font-semibold text-foreground">{vorschauNummer}</span>
+          )}
         </p>
       )}
 

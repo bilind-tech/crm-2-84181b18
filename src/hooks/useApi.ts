@@ -248,9 +248,12 @@ export const useCreateAngebot = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (data: Partial<Angebot>) => api.post<Angebot>("/angebote", data),
-    onSuccess: () => {
+    onSuccess: (created) => {
       qc.invalidateQueries({ queryKey: ["angebote"] });
       qc.invalidateQueries({ queryKey: qk.dashboard.kennzahlen });
+      if (created?.kundeId) {
+        qc.invalidateQueries({ queryKey: ["kunden", created.kundeId, "zaehler"] });
+      }
     },
   });
 };
@@ -322,9 +325,12 @@ export const useCreateRechnung = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (data: Partial<Rechnung>) => api.post<Rechnung>("/rechnungen", data),
-    onSuccess: () => {
+    onSuccess: (created) => {
       qc.invalidateQueries({ queryKey: ["rechnungen"] });
       qc.invalidateQueries({ queryKey: qk.dashboard.kennzahlen });
+      if (created?.kundeId) {
+        qc.invalidateQueries({ queryKey: ["kunden", created.kundeId, "zaehler"] });
+      }
     },
   });
 };
