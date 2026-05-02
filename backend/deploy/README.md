@@ -118,3 +118,43 @@ sudo bash /opt/mycleancenter/current/backend/deploy/install.sh --check
 - `master.key` (`/var/lib/mycleancenter/keys/`) wird beim ersten Start generiert. **Verschlüsselt alle Settings-Geheimnisse** (SMTP-Passwort, Google-Drive-Token). Geht der Key verloren, sind die Geheimnisse unbrauchbar — daher gehört er ins Backup.
 - Der Service läuft als unprivilegierter User `mycleancenter` mit systemd-Hardening (`ProtectSystem=strict`, `ReadWritePaths=/var/lib/mycleancenter`, `NoNewPrivileges`).
 - Web-UI ist via Cookie-Auth gesichert (Setup-Wizard beim ersten Aufruf).
+
+## Build-Maschine einrichten (für `bun run release`)
+
+Der Release-Builder (`scripts/build-release.ts`) signiert das Manifest mit dem
+gleichen `master.key`, den der Pi beim ersten Start generiert hat. Damit das
+Backend auf dem Pi das ZIP akzeptiert, muss die Build-Maschine denselben Key
+besitzen.
+
+Einmalig:
+
+```bash
+mkdir -p ~/.mycleancenter
+scp pi@mycleancenter.local:/var/lib/mycleancenter/keys/master.key \
+  ~/.mycleancenter/master.key
+chmod 0600 ~/.mycleancenter/master.key
+```
+
+Anschließend lokal ein neues Release bauen:
+
+```bash
+bun run release
+# → dist-release/mycleancenter-v0.2.0.zip + .sha256
+```
+
+CLI-Flags:
+- `--out=<dir>` (default `dist-release/`)
+- `--key=<path>` (default `~/.mycleancenter/master.key`)
+- `--allow-same-version` (für Test-Builds)
+- `--skip-frontend` / `--skip-backend` (Schnell-Iteration)
+- `--min-backend=<x.y.z>` setzt minBackendVersion (default = appVersion)
+
+`RELEASE_NOTES.md` (Repo-Root) wird, falls vorhanden, in `manifest.hinweise`
+übernommen (max. 4000 Zeichen).
+
+## CI (optional)
+
+Der Builder läuft headless. Für CI:
+1. `master.key` als Secret bereitstellen (z. B. `MCC_MASTER_KEY_B64`).
+2. In der Pipeline dekodieren, `chmod 0600`, dann `bun run release --key=<pfad>`.
+3. ZIP + SHA256 als Artefakt veröffentlichen.
