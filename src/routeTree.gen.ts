@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as SteuernRouteImport } from './routes/steuern'
 import { Route as RechnungenRouteImport } from './routes/rechnungen'
 import { Route as ObjekteRouteImport } from './routes/objekte'
 import { Route as KundenRouteImport } from './routes/kunden'
@@ -32,6 +33,11 @@ import { Route as RechnungenIdBearbeitenRouteImport } from './routes/rechnungen.
 import { Route as MUploadSessionRouteImport } from './routes/m.upload.$session'
 import { Route as AngeboteIdBearbeitenRouteImport } from './routes/angebote.$id.bearbeiten'
 
+const SteuernRoute = SteuernRouteImport.update({
+  id: '/steuern',
+  path: '/steuern',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const RechnungenRoute = RechnungenRouteImport.update({
   id: '/rechnungen',
   path: '/rechnungen',
@@ -154,6 +160,7 @@ export interface FileRoutesByFullPath {
   '/kunden': typeof KundenRouteWithChildren
   '/objekte': typeof ObjekteRouteWithChildren
   '/rechnungen': typeof RechnungenRouteWithChildren
+  '/steuern': typeof SteuernRoute
   '/angebote/$id': typeof AngeboteIdRouteWithChildren
   '/angebote/neu': typeof AngeboteNeuRoute
   '/dauerauftraege/$id': typeof DauerauftraegeIdRoute
@@ -178,6 +185,7 @@ export interface FileRoutesByTo {
   '/kunden': typeof KundenRouteWithChildren
   '/objekte': typeof ObjekteRouteWithChildren
   '/rechnungen': typeof RechnungenRouteWithChildren
+  '/steuern': typeof SteuernRoute
   '/angebote/$id': typeof AngeboteIdRouteWithChildren
   '/angebote/neu': typeof AngeboteNeuRoute
   '/dauerauftraege/$id': typeof DauerauftraegeIdRoute
@@ -203,6 +211,7 @@ export interface FileRoutesById {
   '/kunden': typeof KundenRouteWithChildren
   '/objekte': typeof ObjekteRouteWithChildren
   '/rechnungen': typeof RechnungenRouteWithChildren
+  '/steuern': typeof SteuernRoute
   '/angebote/$id': typeof AngeboteIdRouteWithChildren
   '/angebote/neu': typeof AngeboteNeuRoute
   '/dauerauftraege/$id': typeof DauerauftraegeIdRoute
@@ -229,6 +238,7 @@ export interface FileRouteTypes {
     | '/kunden'
     | '/objekte'
     | '/rechnungen'
+    | '/steuern'
     | '/angebote/$id'
     | '/angebote/neu'
     | '/dauerauftraege/$id'
@@ -253,6 +263,7 @@ export interface FileRouteTypes {
     | '/kunden'
     | '/objekte'
     | '/rechnungen'
+    | '/steuern'
     | '/angebote/$id'
     | '/angebote/neu'
     | '/dauerauftraege/$id'
@@ -277,6 +288,7 @@ export interface FileRouteTypes {
     | '/kunden'
     | '/objekte'
     | '/rechnungen'
+    | '/steuern'
     | '/angebote/$id'
     | '/angebote/neu'
     | '/dauerauftraege/$id'
@@ -302,11 +314,19 @@ export interface RootRouteChildren {
   KundenRoute: typeof KundenRouteWithChildren
   ObjekteRoute: typeof ObjekteRouteWithChildren
   RechnungenRoute: typeof RechnungenRouteWithChildren
+  SteuernRoute: typeof SteuernRoute
   MUploadSessionRoute: typeof MUploadSessionRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/steuern': {
+      id: '/steuern'
+      path: '/steuern'
+      fullPath: '/steuern'
+      preLoaderRoute: typeof SteuernRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/rechnungen': {
       id: '/rechnungen'
       path: '/rechnungen'
@@ -566,6 +586,7 @@ const rootRouteChildren: RootRouteChildren = {
   KundenRoute: KundenRouteWithChildren,
   ObjekteRoute: ObjekteRouteWithChildren,
   RechnungenRoute: RechnungenRouteWithChildren,
+  SteuernRoute: SteuernRoute,
   MUploadSessionRoute: MUploadSessionRoute,
 }
 export const routeTree = rootRouteImport
