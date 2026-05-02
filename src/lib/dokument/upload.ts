@@ -7,7 +7,7 @@
 
 import type { Dokument, DokumentTyp } from "@/lib/api/types";
 import { getBackendUrl, isBackendUrlExplicit } from "@/lib/api/backendUrl";
-import { piApi, PiApiError } from "@/lib/api/piClient";
+import { piApi, PiApiError, postWithProgress } from "@/lib/api/piClient";
 import { mockBackend } from "@/lib/mock/backend";
 
 export const MAX_BYTES = 20 * 1024 * 1024; // 20 MB
@@ -126,18 +126,25 @@ async function shouldFallbackToMock(err: unknown): Promise<boolean> {
 }
 
 /** Lädt Datei live ans Backend. Im Mock-Modus: base64 in JSON-POST. */
-export async function uploadDokument(file: File, meta: DokumentMeta): Promise<Dokument> {
+export async function uploadDokument(
+  file: File,
+  meta: DokumentMeta,
+  opts: { onProgress?: (ratio: number) => void; signal?: AbortSignal } = {},
+): Promise<Dokument> {
   const prep = await prepareUpload(file, meta);
-  // Live: Multipart
+  // Live: Multipart mit Upload-Progress
   try {
-    return await piApi.post<Dokument>(
+    return await postWithProgress<Dokument>(
       "/dokumente",
       buildFormData(prep.blob, prep.filename, prep.meta),
+      opts.onProgress,
+      opts.signal,
     );
   } catch (err) {
     if (!(await shouldFallbackToMock(err))) throw err;
   }
   // Mock: base64
+  opts.onProgress?.(1);
   const dataUrl = await fileToDataUrl(prep.blob);
   return mockBackend<Dokument>("POST", "/dokumente", {
     ...prep.meta,
