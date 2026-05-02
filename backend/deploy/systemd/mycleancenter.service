@@ -13,6 +13,7 @@ Environment=NODE_ENV=production
 Environment=DATA_DIR=/var/lib/mycleancenter
 Environment=PORT=8787
 Environment=HOST=0.0.0.0
+Environment=FRONTEND_DIR=/opt/mycleancenter/current/dist
 # CORS muss in Production explizit gesetzt werden — kommagetrennte Liste der erlaubten Origins.
 # Beispiel: http://mycleancenter.local,https://mycleancenter.local
 Environment=CORS_ORIGINS=http://mycleancenter.local,http://mycleancenter.local:80
