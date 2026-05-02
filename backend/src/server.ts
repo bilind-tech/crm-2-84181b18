@@ -182,8 +182,9 @@ async function main(): Promise<void> {
       const akt = purgeOldAktivitaeten();
       const ben = purgeOldWegwischte();
       const pak = purgeExpiredPakete();
-      if (sess + audit + lock + akt + ben + pak > 0) {
-        app.log.info({ sess, audit, lock, akt, ben, pak }, "background sweep");
+      const ups = purgeExpiredUploadSessions();
+      if (sess + audit + lock + akt + ben + pak + ups > 0) {
+        app.log.info({ sess, audit, lock, akt, ben, pak, ups }, "background sweep");
       }
     } catch (e) {
       app.log.warn({ err: e }, "sweep failed");
