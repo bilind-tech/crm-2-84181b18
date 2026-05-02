@@ -5,6 +5,7 @@ import helmet from "@fastify/helmet";
 import rateLimit from "@fastify/rate-limit";
 import multipart from "@fastify/multipart";
 import { existsSync, mkdirSync } from "node:fs";
+import path from "node:path";
 import { config } from "./config.js";
 import { openDatabase, closeDatabase, getSchemaVersion } from "./db/index.js";
 import { ensureMasterKey } from "./crypto/masterkey.js";
