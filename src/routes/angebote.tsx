@@ -199,6 +199,7 @@ function Page() {
               <th className="px-4 py-3 font-medium">Gültig bis</th>
               <th className="px-4 py-3 text-right font-medium">Summe</th>
               <th className="px-4 py-3 font-medium">Status</th>
+              <th className="px-4 py-3 font-medium">Fortschritt</th>
               <th className="px-4 py-3 text-right font-medium">Aktionen</th>
             </tr>
           </thead>
