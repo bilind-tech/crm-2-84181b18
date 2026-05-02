@@ -16,6 +16,7 @@ import {
   type PositionInput,
 } from "./positionen.js";
 import { recomputeRechnungStatus } from "./status.js";
+import { emitBelegMutated } from "./events.js";
 
 const RECHNUNG_COLS = `
   id, nummer, kunde_id, objekt_id, ansprechpartner_id, quell_angebot_id,
@@ -172,6 +173,7 @@ export function createRechnung(data: RechnungWrite): ApiRechnung {
     result = getRechnung(id)!;
   });
   tx();
+  emitBelegMutated("rechnung", id);
   return result;
 }
 
@@ -238,6 +240,7 @@ export function updateRechnung(id: string, patch: Record<string, unknown>): ApiR
   });
   tx();
   recomputeRechnungStatus(id);
+  emitBelegMutated("rechnung", id);
   return getRechnung(id);
 }
 
@@ -249,9 +252,11 @@ export function deleteRechnung(id: string): "soft" | "hard" | "missing" {
   if (!cur) return "missing";
   if (cur.versendet_am || cur.status !== "entwurf") {
     db.prepare(`UPDATE rechnung SET archiviert = 1 WHERE id = ?`).run(id);
+    emitBelegMutated("rechnung", id);
     return "soft";
   }
   db.prepare(`DELETE FROM rechnung WHERE id = ?`).run(id);
+  emitBelegMutated("rechnung", id);
   return "hard";
 }
 
@@ -263,6 +268,7 @@ export function sendeRechnung(id: string): ApiRechnung | null {
   if (!cur) return null;
   if (cur.status !== "entwurf") return getRechnung(id);
   db.prepare(`UPDATE rechnung SET status='versendet', versendet_am=datetime('now') WHERE id = ?`).run(id);
+  emitBelegMutated("rechnung", id);
   return getRechnung(id);
 }
 

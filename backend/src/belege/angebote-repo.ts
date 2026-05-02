@@ -13,6 +13,7 @@ import {
   type PositionInput,
 } from "./positionen.js";
 import { isValidAngebotTransition } from "./status.js";
+import { emitBelegMutated } from "./events.js";
 
 const ANGEBOT_COLS = `
   id, nummer, kunde_id, objekt_id, ansprechpartner_id, titel,
@@ -121,6 +122,7 @@ export function createAngebot(data: AngebotWrite): ApiAngebot {
     result = getAngebot(id)!;
   });
   tx();
+  emitBelegMutated("angebot", id);
   return result;
 }
 
@@ -184,6 +186,7 @@ export function updateAngebot(id: string, patch: Record<string, unknown>): ApiAn
     }
   });
   tx();
+  emitBelegMutated("angebot", id);
   return getAngebot(id);
 }
 
@@ -195,9 +198,11 @@ export function deleteAngebot(id: string): "soft" | "hard" | "missing" {
   if (!cur) return "missing";
   if (cur.versendet_am) {
     db.prepare(`UPDATE angebot SET archiviert = 1 WHERE id = ?`).run(id);
+    emitBelegMutated("angebot", id);
     return "soft";
   }
   db.prepare(`DELETE FROM angebot WHERE id = ?`).run(id);
+  emitBelegMutated("angebot", id);
   return "hard";
 }
 
@@ -209,6 +214,7 @@ export function sendeAngebot(id: string): ApiAngebot | null {
   if (!cur) return null;
   if (!isValidAngebotTransition(cur.status, "versendet")) return getAngebot(id);
   db.prepare(`UPDATE angebot SET status='versendet', versendet_am=datetime('now') WHERE id = ?`).run(id);
+  emitBelegMutated("angebot", id);
   return getAngebot(id);
 }
 
