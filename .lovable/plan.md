@@ -1,90 +1,87 @@
 ## Ziel
 
-Die Umsatz-Grafik im Dashboard wird vom statischen Balkendiagramm zu einem kompakten, interaktiven Chart-Modul — mit eigenem Zeitraum, Diagramm-Typ und sinnvollen Vergleichswerten. Übersichtlich, nicht überladen.
+Beide dedizierten Dauerauftrag-Seiten löschen — Liste und Posteingang. Die Funktionalität existiert bereits in den normalen Rechnungs-/Angebotslisten (jede generierte Rechnung ist eine ganz normale Rechnung mit Belegnummer und Bezahlt-Markierung). Der „wiederkehrend"-Charakter wird auf der Rechnungs-/Angebot-**Detailseite** sichtbarer gemacht, sodass man den Dauerauftrag dort prüfen, pausieren und beenden kann — und Monat für Monat als bezahlt markieren.
 
-## Was sich ändert
+## Was gelöscht wird
 
-### 1. Neue Komponente `UmsatzChartCard`
+- `src/routes/dauerauftraege.tsx` — Übersichts-Seite
+- `src/routes/dauerauftraege.posteingang.tsx` — Posteingang-Seite
+- `src/routes/dauerauftraege.$id.tsx` — Detail-Seite
+- Alle Sidebar-/Dashboard-Links, die auf `/dauerauftraege*` zeigen (siehe unten).
 
-Datei: `src/components/dashboard/UmsatzChartCard.tsx`
-Ersetzt im Dashboard den bisherigen Inline-Chart-Block (Zeilen 190–236 in `src/routes/index.tsx`).
+Routen, die im Backend bleiben (weil sie der Hintergrund-Generator und der Rechnungs-Detail-Block weiter nutzen):
 
-Enthält drei kleine, schlichte Bedien-Elemente in der Card-Header-Zeile (rechtsbündig, dezent):
+- `GET/POST/PATCH/DELETE /dauerauftraege` und `…/:id`
+- `…/:id/sofort-lauf`, `…/:id/pausieren`, `…/:id/beenden`
+- `useDauerauftraege`, `useDauerauftrag`, `useUpdateDauerauftrag`, `useDeleteDauerauftrag`, `usePausiereDauerauftrag`, `useBeendeDauerauftrag`, `useSofortLauf`
 
-1. **Zeitraum** (eigener, lokaler Zeitraum — unabhängig vom globalen Dashboard-Filter, damit man oben „aktueller Monat" sehen und in der Grafik trotzdem 12 Monate vergleichen kann):
-   - `Letzte 6 Monate` (Default)
-   - `Letzte 12 Monate`
-   - `Aktuelles Jahr`
-   - `Letztes Jahr`
-   - `Quartalsweise (4 Quartale)`
-2. **Diagramm-Typ** (Icon-Toggle, 3 Optionen):
-   - Balken (Default)
-   - Linie
-   - Fläche
-3. **Wert** (kleines Segment-Toggle):
-   - Brutto (Default)
-   - Netto
+`DauerauftragForm.tsx` wird nicht mehr direkt aufgerufen → entfernen. Daueraufträge werden ausschließlich über das Häkchen „wiederkehrend" beim Anlegen einer Rechnung/eines Angebots erzeugt (existierende Logik in `OptionenBlock` + `RechnungForm`/`AngebotForm`).
 
-### 2. Was die Karte zusätzlich anzeigt
+## Was sich an bestehenden Stellen ändert
 
-Über dem Chart eine schlanke Kennzahlen-Zeile mit drei Werten — knapp, eine Zeile:
+### `src/routes/index.tsx` (Dashboard)
 
-- **Summe** im gewählten Zeitraum
-- **Ø pro Monat** (bzw. pro Quartal im Quartals-Modus)
-- **Δ vs. Vorperiode** mit kleinem Pfeil + Prozent (grün/rot, dezent)
+- Die Karte „Daueraufträge" mit „Aktive Aufträge / MRR / Posteingang" entfällt komplett (Zeilen ~258–308).
+- Der Posteingang-Hinweis wandert in eine kleine Banderole **oben** im Dashboard (nur sichtbar, wenn offene Entwürfe aus Daueraufträgen existieren): „N Rechnungs-Entwürfe aus Daueraufträgen warten auf Freigabe → zur Rechnungsliste mit Filter Entwurf".
+- MRR (`Wiederkehrender Umsatz`) wandert als zusätzlicher KPI nicht mit — gehört thematisch nicht ins Übersichts-Dashboard. Falls gewünscht, könnten wir es später einer Statistik-Seite hinzufügen.
 
-Der vorhandene „Summe" rechts oben entfällt — geht in die neue Zeile auf.
+### `src/routes/rechnungen.$id.tsx` (Rechnungsdetail) — Hauptort für „Dauerauftrag verwalten"
 
-### 3. Chart-Verhalten
+Wenn die Rechnung aus einem Dauerauftrag stammt (`r.optionen?.wiederkehrend === true` und im Backend ein verknüpfter `dauerauftragId` existiert), wird im rechten Optionen-Block aus dem heutigen reinen Info-Eintrag eine **Dauerauftrag-Karte**:
 
-- Eine `<ResponsiveContainer>` rendert je nach Auswahl `BarChart` / `LineChart` / `AreaChart` aus `recharts`.
-- Tooltip zeigt: Label, Brutto **und** Netto (egal welche Option aktiv ist) + Monatsname lang.
-- Klick auf einen Datenpunkt setzt den **globalen** Dashboard-Zeitraum oben auf diesen Monat (so springt man von der Grafik in die Detailsicht der KPI-Kacheln und der Listen unter dem Chart).
-- Quartals-Modus aggregiert die 12 Monate des Jahres clientseitig zu Q1–Q4.
-- Achsen, Grid, Farben bleiben wie bisher (`var(--primary)`, `var(--border)`), Linien-/Flächen-Variante nutzt eine sanfte `primary`-Tönung (`color-mix` mit transparent für die Fläche).
+```text
+┌─ Dauerauftrag · monatlich ────────────────┐
+│ Nächster Lauf: 01.06.2026                 │
+│ Modus: Entwurf zur Freigabe               │
+│                                            │
+│ [Pausieren]  [Beenden]  [Sofort erzeugen] │
+└────────────────────────────────────────────┘
+```
 
-### 4. Datenbeschaffung
+- Pausieren/Beenden/Sofort-Lauf nutzen die bestehenden Hooks (`usePausiereDauerauftrag`, `useBeendeDauerauftrag`, `useSofortLauf`).
+- Bezahlt-Markierung pro Monat ist **kein neuer Mechanismus** — jede generierte Monatsrechnung hat eine eigene Belegnummer und ihren eigenen „Als bezahlt markieren"-Button (existiert schon). Ein Hinweis im Card-Footer macht das transparent: „Jeder Monat ist eine eigene Rechnung — bezahlt-Markierung erfolgt pro Monat in der jeweiligen Rechnung."
+- Eine kleine Liste „Letzte 3 Läufe" mit Status (bezahlt/offen/entwurf) und Link zur jeweiligen Rechnung darunter — so sieht man auf einen Blick, welche Monate schon bezahlt sind.
 
-- `useUmsatz()` wird mit dem **lokalen** Chart-Zeitraum aufgerufen, nicht mit dem globalen Dashboard-Filter.
-  - „Letzte 12 Monate" → `useUmsatz()` ohne Argumente (Backend liefert bereits 12 Monate).
-  - „Letzte 6 Monate" → `useUmsatz()` ohne Argumente, clientseitig auf die letzten 6 gekürzt.
-  - „Aktuelles Jahr" / „Letztes Jahr" → `useUmsatz({ jahr, monat: "alle" })` (Backend liefert genau diese 12 Monate).
-  - „Quartalsweise" → wie aktuelles Jahr, danach clientseitig zu 4 Quartalen aggregiert.
-- Keine Backend-Änderung nötig — die bestehende Route `/dashboard/umsatz` deckt alle Fälle ab.
-- „Δ vs. Vorperiode" wird mit einem zweiten `useUmsatz`-Aufruf für die Vorperiode geholt (gleiche Länge, davorliegender Zeitraum).
+Backend-Ergänzung dazu (klein):
+- `GET /dauerauftraege/:id/laeufe` liefert bereits Läufe mit `rechnungId` — für die „Letzte 3 Läufe"-Liste reicht das.
+- Damit `r.dauerauftragId` auf der Rechnung verfügbar ist: bereits im Generator gesetzt (siehe `lib/dauerauftrag/generator.ts`); falls nicht, kleine Anpassung.
 
-### 5. Persistenz der Auswahl
+### `src/routes/angebote.$id.tsx` (Angebotsdetail)
 
-Die drei Bedien-Werte werden in `localStorage` unter dem Key `dashboard.umsatzChart` gespeichert (Zeitraum / Typ / Wert), sodass die Einstellung beim nächsten Besuch erhalten bleibt. Reine Client-State, kein Backend-Roundtrip.
+Analog: Wenn das Angebot als „wiederkehrend" markiert ist und daraus bereits ein Dauerauftrag entstanden ist, kleine Dauerauftrag-Karte mit Pausieren/Beenden + Hinweis. Wenn noch kein Dauerauftrag entstand (Angebot noch nicht in Rechnung umgewandelt), bleibt es bei der reinen Info-Zeile wie heute.
 
-### 6. Mobile
+### `src/routes/rechnungen.tsx` (Rechnungs-Liste)
 
-- Die drei Toggles fließen unter den Titel, nicht in die Header-Zeile rechts (Stack auf `< sm`).
-- Chart-Höhe bleibt 256 px (`h-64`).
+- Neue dezente Spalte/Badge „⟲" (Repeat-Icon) hinter der Belegnummer für Rechnungen aus Dauerauftrag — schnelles visuelles Erkennen.
+- Filterleiste bekommt eine zusätzliche Option „nur Daueraufträge" (Checkbox/Toggle, klein).
+- Damit ist der „Posteingang" auf natürliche Weise abgebildet: Filter `Status = Entwurf` + `nur Daueraufträge` zeigt genau die Liste, die heute auf der Posteingang-Seite steht.
 
-### 7. Was bewusst NICHT kommt
+### `src/routes/__root.tsx`
 
-- Kein Export-Button, kein Datums-Picker, keine Vergleichs-Overlays — würden die Karte überladen.
-- Kein zweites Diagramm (z. B. Kunden-Anteile) auf dem Dashboard — gehört auf eine spätere Auswertungs-Seite.
-- Keine Animationen/Verzierungen (Memory-Regel: keine Deko-Icons, keine Gradients in Cards).
+- Falls in der Sidebar ein Eintrag „Daueraufträge" existiert: entfernen. (Schnell-Check zeigt nur einen Toast-Verweis im Generator-Code, keinen Sidebar-Link — bleibt also nur der Toast-Text.)
 
-## Technische Details (Kurz)
+## Datei-Operationen
 
-- Recharts ist bereits installiert (`Bar`, `BarChart`, `CartesianGrid`, `ResponsiveContainer`, `Tooltip`, `XAxis`, `YAxis` werden heute schon genutzt).
-- Neu importiert: `Line`, `LineChart`, `Area`, `AreaChart` aus `recharts`.
-- Lucide-Icons für Toggles: `BarChart3`, `LineChart` (als Icon), `AreaChart` (als Icon), `TrendingUp`, `TrendingDown`.
-- `src/routes/index.tsx` schrumpft um ca. 50 Zeilen, der Chart-Block wird zu `<UmsatzChartCard onMonatKlick={(monat) => setZeitraum({ jahr, monat })} />`.
-- Keine neuen Dependencies.
+**Löschen:**
+- `src/routes/dauerauftraege.tsx`
+- `src/routes/dauerauftraege.posteingang.tsx`
+- `src/routes/dauerauftraege.$id.tsx`
+- `src/components/forms/DauerauftragForm.tsx`
+
+**Anpassen:**
+- `src/routes/index.tsx` — Daueraufträge-Card raus, kleine Banderole rein
+- `src/routes/rechnungen.$id.tsx` — Optionen-Eintrag „Dauerauftrag" zur Verwaltungs-Card erweitern + „Letzte Läufe"
+- `src/routes/angebote.$id.tsx` — analog (nur wenn ein Dauerauftrag verknüpft ist)
+- `src/routes/rechnungen.tsx` — Repeat-Badge + Filter „nur Daueraufträge"
+
+`src/routeTree.gen.ts` wird vom TanStack-Router-Plugin automatisch neu generiert — nicht händisch anfassen.
+
+## Was bewusst NICHT entfernt wird
+
+- Der Hintergrund-Generator, der monatlich neue Rechnungs-Entwürfe erzeugt (`__root.tsx` löst das beim App-Start aus).
+- Die Datenstrukturen `Dauerauftrag`/`DauerauftragLauf` und alle zugehörigen API-Routen.
+- Das Häkchen „wiederkehrend" mit Frequenz-Konfiguration in Rechnung/Angebot anlegen.
 
 ## Ergebnis
 
-Eine einzige, ruhige Card mit:
-
-```text
-┌─ Umsatz ──────────────────  [6M] [12M] [Jahr] …  [Bal│Lin│Flä]  [Brutto│Netto] ┐
-│ Summe 24.300 €    Ø 4.050 €/Monat    +12 % vs. Vorperiode                       │
-│                                                                                  │
-│   ▮  ▮  ▮▮  ▮▮▮  ▮▮▮▮  ▮▮▮                                                       │
-│                                                                                  │
-└─ Klick auf Balken → globaler Zeitraum springt auf diesen Monat ────────────────┘
-```
+Keine eigene Daueraufträge-Sektion mehr. Daueraufträge sind nur noch ein **Aspekt** einer Rechnung/eines Angebots — sichtbar als Badge in der Liste und als Verwaltungs-Card auf der Detailseite. Bezahlt wird pro Monat in der jeweiligen erzeugten Rechnung — wie bei jeder anderen Rechnung auch.
