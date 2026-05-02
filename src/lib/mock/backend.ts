@@ -968,13 +968,27 @@ export async function mockBackend<T>(method: string, path: string, body?: unknow
   }
 
   // ---- Dashboard ----
-  else if (m === "GET" && match(path, "/dashboard/kennzahlen")) {
+  else if (m === "GET" && match(path.split("?")[0], "/dashboard/kennzahlen")) {
+    const qs = new URLSearchParams(path.split("?")[1] ?? "");
+    const jahr = qs.get("jahr");
+    const monat = qs.get("monat");
+    const passt = (iso: string | undefined): boolean => {
+      if (!jahr) return true;
+      if (!iso || iso.length < 7) return false;
+      if (iso.slice(0, 4) !== jahr) return false;
+      if (monat && iso.slice(5, 7) !== monat) return false;
+      return true;
+    };
     const aktiveKunden = d.kunden.filter((k) => k.status === "aktiv" && !k.archiviert).length;
     const aktiveObjekte = d.objekte.filter((o) => o.status === "aktiv" && !o.archiviert).length;
     const offeneAngebote = d.angebote.filter(
-      (a) => a.status === "versendet" || a.status === "entwurf",
+      (a) =>
+        (a.status === "versendet" || a.status === "entwurf") &&
+        passt(a.erstelltAm),
     ).length;
-    const rechnungenLive = d.rechnungen.map((r) => ({ ...r, status: rechnungStatusAuto(r) }));
+    const rechnungenLive = d.rechnungen
+      .map((r) => ({ ...r, status: rechnungStatusAuto(r) }))
+      .filter((r) => passt(r.rechnungsdatum));
     const offeneRechnungen = rechnungenLive.filter(
       (r) => r.status === "versendet" || r.status === "teilbezahlt" || r.status === "ueberfaellig",
     ).length;
@@ -994,12 +1008,25 @@ export async function mockBackend<T>(method: string, path: string, body?: unknow
     };
     result = k;
   } else if (m === "GET" && match(path.split("?")[0], "/dashboard/umsatz")) {
+    const qs = new URLSearchParams(path.split("?")[1] ?? "");
+    const jahr = qs.get("jahr");
+    const monat = qs.get("monat");
     const monate: Record<string, UmsatzPunkt> = {};
-    const heute = new Date();
-    for (let i = 11; i >= 0; i--) {
-      const dt = new Date(heute.getFullYear(), heute.getMonth() - i, 1);
-      const k = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}`;
+    if (jahr && monat) {
+      const k = `${jahr}-${monat}`;
       monate[k] = { monat: k, netto: 0, brutto: 0 };
+    } else if (jahr) {
+      for (let i = 1; i <= 12; i++) {
+        const k = `${jahr}-${String(i).padStart(2, "0")}`;
+        monate[k] = { monat: k, netto: 0, brutto: 0 };
+      }
+    } else {
+      const heute = new Date();
+      for (let i = 11; i >= 0; i--) {
+        const dt = new Date(heute.getFullYear(), heute.getMonth() - i, 1);
+        const k = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}`;
+        monate[k] = { monat: k, netto: 0, brutto: 0 };
+      }
     }
     for (const r of d.rechnungen) {
       if (r.status === "storniert" || r.status === "entwurf") continue;
@@ -1009,7 +1036,7 @@ export async function mockBackend<T>(method: string, path: string, body?: unknow
       monate[k].netto += netto;
       monate[k].brutto += brutto;
     }
-    result = Object.values(monate);
+    result = Object.values(monate).sort((a, b) => a.monat.localeCompare(b.monat));
   } else if (m === "GET" && match(path, "/dashboard/warnungen")) {
     const warnungen: Warnung[] = [];
     const rechnungenLive = d.rechnungen.map((r) => ({ ...r, status: rechnungStatusAuto(r) }));

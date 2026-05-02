@@ -1,70 +1,85 @@
 ## Ziel
 
-Beim Erstellen von Angebot und Rechnung wird der Positions-Editor (Einzel-Position) vereinfacht und das Formular am Ende aufgeräumt:
+Auf dem Dashboard (`/`) soll der gleiche **Jahr/Monat-Filter** verfügbar sein wie auf den Listen für Angebote/Rechnungen. Alle Kennzahlen, das Umsatz-Diagramm und die Listen-Widgets reagieren live auf den gewählten Zeitraum, sodass man z. B. „Mai 2026" oder „2025 gesamt" oder „letzter Monat" einsehen kann. Design schlicht, dezent, mobile-first.
 
-1. **Einzelposition**: Felder „Menge" und „Einheit" komplett entfernen. Nur noch zwei Spalten: **Einzelpreis (50 %)** und **MwSt % (50 %)**. MwSt erscheint kompakt als Stepper-Button (▲ / ▼ neben einer kleinen Anzeige) — Klick erhöht/verringert in 1 %-Schritten.
-2. **Pauschal-Position**: bleibt strukturell gleich (Pauschalpreis 50 % + MwSt 50 %), MwSt wird ebenfalls auf den Stepper umgestellt.
-3. **Form-Footer (Angebot & Rechnung)**: Das separate **MwSt-Satz-Feld** wird komplett entfernt (kommt später in die Einstellungen). Übrig bleibt nur **Gesamtrabatt (%)** auf voller Breite, direkt über dem Sticky-Action-Bar mit „Angebot anlegen" / „Rechnung anlegen".
-4. **Hintergrund**: Sicherstellen, dass der weiße/`bg-background`-Bereich des SlideOvers wirklich bis ganz nach unten geht (Sticky-Footer behält `bg-background`, Form-Container füllt Höhe).
+## UX / Design
 
-Datenmodell-Implikation: Für Einzelpositionen wird intern `menge = 1` und `einheit = "stk"` fest gesetzt — so bleibt die Position strukturell kompatibel zum bestehenden Backend (`einzelpreisNetto` ist dann automatisch der Gesamtbetrag der Position). Keine API-/Typ-Änderungen nötig.
+**Position:** Direkt unter dem `PageHeader` („Übersicht"), oberhalb der KPI-Karten. Eine schmale, ruhige Filter-Leiste — kein Karten-Container, nur eine Inline-Zeile mit zwei Dropdowns + dezentem Reset-X (X erscheint nur wenn Filter aktiv).
 
-## Detail-Änderungen
+**Komponente:** Wir verwenden die bereits bestehende `ZeitraumPills`-Logik aus `src/routes/angebote.tsx` und ziehen sie in eine eigenständige, wiederverwendbare Komponente `src/components/filters/ZeitraumSelect.tsx` hoch. So nutzen Dashboard, Angebote und Rechnungen exakt denselben Baustein (eine Quelle der Wahrheit).
 
-### A) `src/components/forms/PositionenEditor.tsx`
+**Mobile (390px, aktuelle Viewport):**
+- Volle Breite, zwei gleich große Dropdowns nebeneinander (`grid-cols-2 gap-2`), Reset-X als Icon-Button rechts (nur sichtbar wenn aktiv) → kein horizontales Scrollen.
+- Höhe `h-9`, Pill-Style (`rounded-full`), `bg-background border-border` — passt zum bestehenden Stil.
 
-- Import: `ChevronUp`, `ChevronDown` aus `lucide-react` ergänzen; `Popover` nicht nötig.
-- Neue kleine Helper-Komponente `MwStStepper` direkt in der Datei:
-  - Trigger-Button mit aktuellem Satz (z. B. „19 %"), kompakt, `h-11`, voll-breit.
-  - Daneben/innerhalb zwei kleine Buttons (▲ / ▼) zum Erhöhen/Verringern um 1 % (Klamp 0–25).
-  - Layout-Variante: ein einzelner Button mit großer Zahl in der Mitte und je einem Pfeil oben/unten rechts — passt visuell zum Einzelpreis-Input.
-- `PositionCard` (Einzel-Branch, Zeilen 244–313):
-  - Entfernen: „Menge"-Input und „Einheit"-Select (Spalten 1–2 des Grids).
-  - Neues Layout: `grid grid-cols-2 gap-3` mit
-    - links: Einzelpreis (Label „Preis (netto) €", Input `h-11`, größeres Font wie bei Pauschal)
-    - rechts: `MwStStepper`
-  - Änderungen an `update`-Aufruf so, dass `menge: 1`, `einheit: "stk"` automatisch in der Position bleiben (sind schon Default in `emptyPosition`, daher nichts zu tun — die UI-Felder werden lediglich nicht mehr angezeigt).
-- `PositionCard` (Pauschal-Branch, Zeilen 209–235):
-  - MwSt-Input durch `MwStStepper` ersetzen (gleiches Layout-Verhältnis 50/50 bleibt).
-- `EINHEITEN`-Konstante und `Einheit`-Select-Code im Einzel-Branch werden nicht mehr verwendet — Konstante darf bleiben (für künftige Nutzung / Pauschal `einheit = "pauschal"`).
+**Desktop:**
+- Inline links, Dropdowns mit fixer Breite (Jahr 120 px, Monat 140 px), kompakt.
 
-### B) `src/components/forms/AngebotForm.tsx` (Zeilen 183–193)
+**Aktiv-Hinweis:** Wenn ein Zeitraum gewählt ist, zeigt eine kleine, dezente Sub-Zeile unter dem PageHeader-Subtitle den aktiven Zeitraum als Text (z. B. „Zeitraum: Mai 2026") — keine Badges/Buttons. Reines `text-xs text-muted-foreground`.
 
-Aktuell:
-```
-grid sm:grid-cols-3
-  Field „Gültig bis"
-  Field „MwSt-Satz (%)"
-  Field „Gesamtrabatt (%)"
-```
+**Default:** „Alle Zeiten" (analog zu Listen). Auswahl bleibt nur lokal im Component-State, kein URL-Param (Dashboard ist Übersicht, kein Sharing-Use-Case). Optional später auf Search-Params umstellbar — kein Teil dieses Tasks.
 
-Neu:
-```
-grid sm:grid-cols-2
-  Field „Gültig bis"
-  Field „Gesamtrabatt (%)"  (volle Breite auf Mobile)
-```
-oder zwei getrennte Blöcke — „Gültig bis" oben, „Gesamtrabatt" als eigene Zeile in voller Breite (User wünscht: „mach Gesamtrabatt ganz lang"). Wir wählen Variante 2: „Gültig bis" alleine in einer 1-spaltigen Reihe, „Gesamtrabatt" darunter in voller Breite.
+## Was reagiert auf den Filter
 
-State `steuersatz` bleibt bestehen (Default 19) — wird weiterhin als `defaultSteuersatz` an `PositionenEditor` übergeben und an die API gesendet. Setter `setSteuersatz` wird ungenutzt, kann entfernt werden oder bleibt für späteren Einstellungs-Hook.
+1. **KPI „Umsatz Monat"** → wird zu **„Umsatz im Zeitraum"** (brutto-Summe aller `UmsatzPunkt`-Werte, die in den Zeitraum fallen). Sublabel zeigt dynamisch „Mai 2026" / „2026" / „gesamt".
+2. **KPI „Offene Rechnungen"** → zählt nur Rechnungen mit `rechnungsdatum` im Zeitraum.
+3. **KPI „Aufträge"** und **„Kunden"** → bleiben unverändert (Stammdaten ohne Zeitbezug); Sublabel deutet das nicht an.
+4. **Umsatz-Chart**:
+   - Wenn `monat = "alle"` und `jahr = "alle"`: bisheriges Verhalten (letzte 6 Monate).
+   - Wenn `jahr` gesetzt + `monat = "alle"`: zeigt alle 12 Monate dieses Jahres.
+   - Wenn `jahr` + `monat` gesetzt: zeigt diesen einen Monat als Einzel-Bar mit prominentem Wert daneben (kompakter Single-Value-Block statt Chart, damit es nicht leer wirkt).
+5. **Widget „Offene Rechnungen"** (Liste): filtert Einträge nach `rechnungsdatum` im Zeitraum. Empty-State wird angepasst („Im gewählten Zeitraum keine offenen Rechnungen").
+6. **Widget „Mahnwesen"**: Zähler werden auf Rechnungen im Zeitraum begrenzt (siehe Backend-Sektion).
+7. **Widget „Daueraufträge"**: bleibt unverändert (zeigt aktuellen Bestand, kein Zeitbezug — würde Filter verwirrend machen).
 
-### C) `src/components/forms/RechnungForm.tsx` (Zeilen 207–214)
+## Technische Änderungen (Frontend)
 
-Analog zu B):
-- Block „MwSt-Satz" entfernen.
-- „Gesamtrabatt (%)" wird ein einzelnes Feld in voller Breite, direkt über dem Sticky-Footer.
+### A) Neue gemeinsame Komponente `src/components/filters/ZeitraumSelect.tsx`
+- Exportiert `<ZeitraumSelect zeitraum setZeitraum verfuegbareDaten variant="inline" | "card" />`.
+- Inhalt = aktuelle `ZeitraumPills`-Implementierung aus `angebote.tsx`, leicht generalisiert (responsive: auf Mobile `flex-1` statt fixer Breite).
+- `angebote.tsx` und `rechnungen.tsx` werden so umgestellt, dass sie diese Komponente importieren statt eine lokale Kopie zu halten (Refactor ohne UI-Änderung dort).
 
-### D) Hintergrund / Tiefe
+### B) `src/routes/index.tsx` (Dashboard)
+- Lokaler State `const [zeitraum, setZeitraum] = useState<ZeitraumState>(ZEITRAUM_ALLE)`.
+- `verfuegbareDaten` = `rechnungen.map(r => r.rechnungsdatum)` + Umsatz-Monate.
+- Neuen Filter-Block direkt unter `PageHeader` rendern (Inline-Layout).
+- Helper-Funktion `formatZeitraumLabel(z)` → „Mai 2026" / „2026" / „gesamt" für Sublabels.
+- `useMemo` für:
+  - `umsatzImZeitraum`: Filter über `umsatz`-Array nach `monat`-String (`YYYY-MM`).
+  - `chartData`: 6/12/1-Punkte je nach Filter (siehe oben).
+  - `offeneImZeitraum`: `offene.filter(r => passtInZeitraum(r.rechnungsdatum, zeitraum))`.
+  - `summeZeitraum`: brutto-Summe.
+- KPI-Karten und Chart-Header dynamisch beschriften.
 
-- Im SlideOver ist der äußere Container bereits `bg-background` und füllt die Viewport-Höhe (`h-full flex flex-col`, Inhalt `flex-1 overflow-y-auto`). Der Sticky-Footer in beiden Forms ist bereits `bg-background`. Damit beim Scrollen kein heller Streifen unten erscheint, ergänzen wir am Form-Wrapper `min-h-full` bzw. ein Padding-bottom, sodass auch bei kurzem Inhalt der Hintergrund visuell bis unten reicht. (Konkret: `<div className="space-y-5 pb-2">` bleibt — das `flex-1` des SlideOver-Body sorgt selbst schon für vollen Hintergrund. Wenn nötig, im SlideOver-Content `bg-background` zusätzlich auf den scrollenden Bereich, falls Tests einen Spalt zeigen.)
+### C) `src/hooks/useMahnZaehler.ts`
+- Optionalen Parameter `zeitraum?: ZeitraumState` ergänzen.
+- Wenn gesetzt: vorab `rechnungen.filter(r => passtInZeitraum(r.rechnungsdatum, zeitraum))`. Default-Verhalten unverändert (rückwärtskompatibel mit Sidebar-Badge-Nutzung).
+
+### D) Refactor (begleitend, klein)
+- `src/routes/angebote.tsx`: lokale `ZeitraumPills` entfernen, neue `ZeitraumSelect` importieren.
+- `src/routes/rechnungen.tsx`: dito (falls dort eigene Variante existiert; ansonsten unverändert).
+
+## Backend-Vorbereitung (für später, ohne API-Bruch)
+
+Damit der Pi-Backend-Server den Zeitraum sauber unterstützt, ohne dass das Frontend nochmal angefasst werden muss:
+
+- **`/dashboard/kennzahlen`**: optionale Query-Params `?jahr=YYYY&monat=MM` (beide optional, „alle" = weglassen). Backend filtert `rechnungen`/`angebote` analog zur Frontend-`passtInZeitraum`-Regel. Antwort-Shape bleibt `DashboardKennzahlen` (unverändert), Werte spiegeln den Zeitraum.
+- **`/dashboard/umsatz`**: optionale Query-Params `?jahr=YYYY&monat=MM`. Verhalten:
+  - keine Params → letzte 12 Monate (heutiges Verhalten beibehalten).
+  - nur `jahr` → alle 12 Monate dieses Jahres als `UmsatzPunkt[]`.
+  - `jahr` + `monat` → genau ein `UmsatzPunkt`.
+- **Hooks** `useDashboardKennzahlen(zeitraum?)` und `useUmsatz(zeitraum?)` werden so erweitert, dass sie den Zeitraum als Query-String anhängen und in den `queryKey` aufnehmen. Solange kein Zeitraum übergeben wird, identisches Verhalten — keine Mock-/Backend-Anpassung **zwingend** nötig für diesen Schritt.
+- **Mock-Backend** (`src/lib/mock/backend.ts`): Im selben Schritt erweitern wir die Match-Regeln auf `path.split("?")[0]` (für Kennzahlen schon nötig, für Umsatz bereits vorhanden) und parsen `jahr`/`monat` aus `path` — so funktioniert die Demo nahtlos.
+
+Damit ist die End-to-End-Funktion komplett: Wenn das echte Pi-Backend dieselben Query-Params unterstützt, läuft alles ohne weitere Frontend-Änderung.
 
 ## Betroffene Dateien
 
-- `src/components/forms/PositionenEditor.tsx` (Einzel-Layout umbauen, MwSt-Stepper, Pauschal-MwSt umstellen)
-- `src/components/forms/AngebotForm.tsx` (MwSt-Feld entfernen, Gesamtrabatt voll-breit)
-- `src/components/forms/RechnungForm.tsx` (MwSt-Feld entfernen, Gesamtrabatt voll-breit)
+- **Neu:** `src/components/filters/ZeitraumSelect.tsx`
+- **Geändert:** `src/routes/index.tsx`, `src/hooks/useMahnZaehler.ts`, `src/hooks/useApi.ts` (`useDashboardKennzahlen`, `useUmsatz` um optionalen Zeitraum erweitern), `src/lib/mock/backend.ts` (Query-Param-Parsing für Kennzahlen + Umsatz), `src/routes/angebote.tsx` und `src/routes/rechnungen.tsx` (Refactor auf `ZeitraumSelect`).
 
-## Nicht betroffen / bleibt gleich
+## Nicht enthalten
 
-- API-Typen (`Position`, `Einheit`) und Backend-Aufrufe — `menge`/`einheit` bleiben im Datenmodell, werden für Einzelpositionen automatisch `1`/`"stk"`.
-- PDF-Generierung — Einzelpositionen mit `menge=1` und `einheit="stk"` werden vom Renderer bereits korrekt verarbeitet. (Falls die PDF die Spalte „Menge" zeigt, erscheint dort dann „1 Stk" — das ist akzeptabel, da der User die Anzeige nur im Editor weghaben möchte. Optional kann später die PDF-Spalte ausgeblendet werden, ist aber kein Teil dieses Tasks.)
+- Kein Wechsel auf URL-Search-Params für den Dashboard-Filter (bewusst lokaler State).
+- Keine Änderung am Daueraufträge-Widget (bleibt zeitraumlos, da Bestandsgröße).
+- Keine Änderung an `Warnungen`/Sidebar-Badge (Mahn-Zähler bleibt ungefiltert für globalen Sidebar-Badge — nur Dashboard-Widget filtert).

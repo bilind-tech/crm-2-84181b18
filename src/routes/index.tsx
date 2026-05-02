@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useMemo, useState } from "react";
 import {
   useDashboardKennzahlen,
   useUmsatz,
@@ -31,18 +32,38 @@ import {
 } from "recharts";
 import { PageHeader, KpiCard } from "@/components/layout/PageHeader";
 import { NaechsteSchritteCard } from "@/components/dashboard/NaechsteSchritteCard";
+import {
+  ZEITRAUM_ALLE,
+  passtInZeitraum,
+  zeitraumIstAktiv,
+  type ZeitraumState,
+} from "@/components/filters/ZeitraumFilter";
+import {
+  ZeitraumSelect,
+  formatZeitraumLabel,
+} from "@/components/filters/ZeitraumSelect";
 
 export const Route = createFileRoute("/")({
   component: Dashboard,
 });
 
 function Dashboard() {
-  const { data: k } = useDashboardKennzahlen();
-  const { data: umsatz = [] } = useUmsatz();
+  const [zeitraum, setZeitraum] = useState<ZeitraumState>(ZEITRAUM_ALLE);
+
+  const { data: k } = useDashboardKennzahlen(zeitraum);
+  const { data: umsatz = [] } = useUmsatz(zeitraum);
   const { data: rechnungen = [] } = useRechnungen();
-  const mahn = useMahnZaehler();
+  const mahn = useMahnZaehler(zeitraumIstAktiv(zeitraum) ? zeitraum : undefined);
   const { data: dauerauftraege = [] } = useDauerauftraege();
   const { data: laeufeErzeugt = [] } = useDauerauftragLaeufe("erzeugt");
+
+  const aktiv = zeitraumIstAktiv(zeitraum);
+  const zeitLabel = formatZeitraumLabel(zeitraum);
+
+  const verfuegbareDaten = useMemo(
+    () => rechnungen.map((r) => r.rechnungsdatum),
+    [rechnungen],
+  );
 
   const aktiveDA = dauerauftraege.filter((d) => d.status === "aktiv");
   const mrr = aktiveDA.reduce((sum, da) => {
@@ -55,30 +76,92 @@ function Dashboard() {
     return r?.status === "entwurf";
   }).length;
 
-  const offene = rechnungen.filter(
-    (r) => r.status === "versendet" || r.status === "ueberfaellig" || r.status === "teilbezahlt"
+  // Offene Rechnungen, optional gefiltert auf Zeitraum
+  const offeneAlle = rechnungen.filter(
+    (r) =>
+      r.status === "versendet" ||
+      r.status === "ueberfaellig" ||
+      r.status === "teilbezahlt",
   );
+  const offene = aktiv
+    ? offeneAlle.filter((r) => passtInZeitraum(r.rechnungsdatum, zeitraum))
+    : offeneAlle;
 
-  const summe = umsatz.reduce((acc, u) => acc + u.brutto, 0);
+  // Umsatz im Zeitraum (brutto-Summe der Punkte)
+  const summeZeitraum = umsatz.reduce((acc, u) => acc + u.brutto, 0);
 
-  // Letzte 6 Monate
-  const last6 = umsatz.slice(-6).map((u) => ({
-    ...u,
-    label: new Date(u.monat + "-01").toLocaleDateString("de-DE", { month: "short" }),
-  }));
+  // Aktueller KPI-Wert "Umsatz" — bei Einzelmonat exakt der Monat,
+  // sonst Summe über alle gelieferten Punkte
+  const umsatzKpi = aktiv
+    ? summeZeitraum
+    : umsatz[umsatz.length - 1]?.brutto ?? 0;
+  const umsatzKpiSub = aktiv
+    ? `brutto · ${zeitLabel}`
+    : "brutto · aktueller Monat";
+
+  // Chart-Daten
+  const chartData = useMemo(() => {
+    const fmt = (k: string) =>
+      new Date(k + "-01").toLocaleDateString("de-DE", { month: "short" });
+    if (!aktiv) {
+      // Letzte 6 Monate
+      return umsatz.slice(-6).map((u) => ({ ...u, label: fmt(u.monat) }));
+    }
+    // Alle gelieferten Punkte (1 oder 12)
+    return umsatz.map((u) => ({ ...u, label: fmt(u.monat) }));
+  }, [umsatz, aktiv]);
+
+  const chartTitel = aktiv
+    ? zeitraum.monat === "alle"
+      ? `Umsatz ${zeitraum.jahr}`
+      : `Umsatz ${zeitLabel}`
+    : "Umsatz";
+  const chartSubtitel = aktiv
+    ? zeitraum.monat === "alle"
+      ? "Monatsverteilung (brutto)"
+      : "brutto"
+    : "Letzte 6 Monate (brutto)";
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Übersicht"
-        subtitle="Aktueller Stand auf einen Blick"
+        subtitle={
+          aktiv
+            ? `Zeitraum: ${zeitLabel}`
+            : "Aktueller Stand auf einen Blick"
+        }
       />
+
+      {/* Schlichter Zeitraum-Filter — Inline, mobil 50/50 */}
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-xs text-muted-foreground sm:hidden">Zeitraum</p>
+        <div className="hidden sm:block text-xs font-medium text-muted-foreground">
+          Zeitraum
+        </div>
+        <div className="sm:hidden">
+          <ZeitraumSelect
+            zeitraum={zeitraum}
+            setZeitraum={setZeitraum}
+            verfuegbareDaten={verfuegbareDaten}
+            size="stretch"
+          />
+        </div>
+        <div className="hidden sm:block">
+          <ZeitraumSelect
+            zeitraum={zeitraum}
+            setZeitraum={setZeitraum}
+            verfuegbareDaten={verfuegbareDaten}
+            size="inline"
+          />
+        </div>
+      </div>
 
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         <KpiCard
-          label="Umsatz Monat"
-          value={formatEUR(last6[last6.length - 1]?.brutto ?? 0)}
-          sublabel="brutto"
+          label={aktiv ? "Umsatz Zeitraum" : "Umsatz Monat"}
+          value={formatEUR(umsatzKpi)}
+          sublabel={umsatzKpiSub}
           icon={Euro}
           tone="success"
         />
@@ -107,38 +190,49 @@ function Dashboard() {
       <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
         <div className="flex items-start justify-between">
           <div>
-            <h2 className="text-base font-semibold">Umsatz</h2>
-            <p className="text-xs text-muted-foreground">Letzte 6 Monate (brutto)</p>
+            <h2 className="text-base font-semibold">{chartTitel}</h2>
+            <p className="text-xs text-muted-foreground">{chartSubtitel}</p>
           </div>
           <div className="text-right">
             <p className="text-xs text-muted-foreground">Summe</p>
-            <p className="text-lg font-semibold">{formatEUR(summe)}</p>
+            <p className="text-lg font-semibold">{formatEUR(summeZeitraum)}</p>
           </div>
         </div>
-        <div className="mt-4 h-64">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={last6}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-              <XAxis dataKey="label" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
-              <YAxis
-                tick={{ fontSize: 11 }}
-                axisLine={false}
-                tickLine={false}
-                tickFormatter={(v) => `${Math.round(Number(v))} €`}
-              />
-              <Tooltip
-                contentStyle={{
-                  background: "var(--card)",
-                  border: "1px solid var(--border)",
-                  borderRadius: 12,
-                  fontSize: 12,
-                }}
-                formatter={(v: number) => formatEUR(v)}
-              />
-              <Bar dataKey="brutto" fill="var(--primary)" radius={[8, 8, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
+        {aktiv && zeitraum.monat !== "alle" ? (
+          // Einzelmonat: kein Diagramm, sondern großer Single-Value-Block
+          <div className="mt-4 flex h-64 flex-col items-center justify-center rounded-xl bg-muted/30">
+            <p className="text-xs text-muted-foreground">{zeitLabel}</p>
+            <p className="mt-1 text-4xl font-semibold text-success">
+              {formatEUR(umsatz[0]?.brutto ?? 0)}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">brutto</p>
+          </div>
+        ) : (
+          <div className="mt-4 h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                <XAxis dataKey="label" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+                <YAxis
+                  tick={{ fontSize: 11 }}
+                  axisLine={false}
+                  tickLine={false}
+                  tickFormatter={(v) => `${Math.round(Number(v))} €`}
+                />
+                <Tooltip
+                  contentStyle={{
+                    background: "var(--card)",
+                    border: "1px solid var(--border)",
+                    borderRadius: 12,
+                    fontSize: 12,
+                  }}
+                  formatter={(v: number) => formatEUR(v)}
+                />
+                <Bar dataKey="brutto" fill="var(--primary)" radius={[8, 8, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
       </div>
 
       <NaechsteSchritteCard />
@@ -151,7 +245,9 @@ function Dashboard() {
           </div>
           {offene.length === 0 ? (
             <p className="py-6 text-center text-sm text-muted-foreground">
-              Keine offenen Rechnungen.
+              {aktiv
+                ? `Im Zeitraum ${zeitLabel} keine offenen Rechnungen.`
+                : "Keine offenen Rechnungen."}
             </p>
           ) : (
             <ul className="divide-y divide-border">
@@ -199,7 +295,9 @@ function Dashboard() {
             <div className="py-6 text-center">
               <CheckCircle2 className="mx-auto h-6 w-6 text-success" />
               <p className="mt-2 text-sm text-muted-foreground">
-                Keine offenen Mahnvorgänge.
+                {aktiv
+                  ? `Im Zeitraum ${zeitLabel} keine offenen Mahnvorgänge.`
+                  : "Keine offenen Mahnvorgänge."}
               </p>
             </div>
           ) : (
