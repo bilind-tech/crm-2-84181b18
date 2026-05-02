@@ -74,7 +74,7 @@ export async function einstellungenRoutes(app: FastifyInstance): Promise<void> {
     "sicherheit",
     "erscheinung",
     "backup",
-    "mahnung",
+    // "mahnung" wird unten mit eigenem Mapper bedient
     "dauerauftrag",
     "steuer",
     "stundenzettel",
