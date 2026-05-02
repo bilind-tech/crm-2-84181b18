@@ -1306,7 +1306,7 @@ export async function mockBackend<T>(method: string, path: string, body?: unknow
     logAktivitaet("einstellung_geaendert", "Backup-Einstellungen aktualisiert");
     persist();
     result = d.backup;
-  } else if (m === "GET" && match(path, "/einstellungen/backup/historie")) {
+  } else if (m === "GET" && (match(path, "/einstellungen/backup/historie") || match(path, "/backup/historie"))) {
     result = d.backupHistorie ?? [];
   } else if (m === "GET" && match(path, "/einstellungen/google-drive")) {
     result = d.googleDrive;
@@ -1752,6 +1752,8 @@ export async function mockBackend<T>(method: string, path: string, body?: unknow
     result = eintrag;
   } else if (m === "GET" && match(path, "/backup/in-arbeit")) {
     result = (d.backupHistorie ?? []).filter((b) => b.status === "in_arbeit");
+  } else if (m === "GET" && match(path, "/backup/restore-status")) {
+    result = { restore: null, maintenance: { active: false } };
   } else if (m === "POST" && (path.startsWith("/backup/") && path.endsWith("/restore"))) {
     // /backup/:id/restore — legt pre-restore-Backup an, simuliert Restore
     // SICHERHEIT: Passwort-Pflicht. Das Live-Pi-Backend MUSS bcrypt-vergleichen

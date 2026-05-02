@@ -580,6 +580,7 @@ export type BackupKategorie =
   | "weekly"
   | "monthly"
   | "manuell"
+  | "manual"
   | "pre-restore"
   | "pre-update";
 

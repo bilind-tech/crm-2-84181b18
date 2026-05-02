@@ -6,7 +6,7 @@ import {
   type HealthInfo,
 } from "@/lib/api/backendUrl";
 
-export type BackendStatus = "connected" | "disconnected" | "checking";
+export type BackendStatus = "connected" | "disconnected" | "checking" | "maintenance";
 
 export interface BackendStatusResult {
   status: BackendStatus;
@@ -45,7 +45,11 @@ export function useBackendStatus(pollMs: number = POLL_MS): BackendStatusResult 
         const h = await fetchHealth(ctrl.signal);
         if (cancelled) return;
         setHealth(h);
-        setStatus(h.status === "ok" ? "connected" : "disconnected");
+        if (h.maintenance?.active || h.status === "maintenance") {
+          setStatus("maintenance");
+        } else {
+          setStatus(h.status === "ok" ? "connected" : "disconnected");
+        }
         setLastError(null);
       } catch (err) {
         if (cancelled) return;

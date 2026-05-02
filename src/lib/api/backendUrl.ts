@@ -55,11 +55,13 @@ export interface HealthInfo {
   db: { ok: boolean; wal: boolean; path: string };
   masterKey: { present: boolean };
   uptimeSec: number;
+  maintenance?: { active: boolean; reason?: string };
 }
 
 export async function fetchHealth(signal?: AbortSignal): Promise<HealthInfo> {
   const url = `${getBackendUrl()}/health`;
   const res = await fetch(url, { signal, credentials: "include" });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  // 503 im Wartungsmodus liefert JSON-Body mit status "maintenance" — auswerten statt werfen.
+  if (!res.ok && res.status !== 503) throw new Error(`HTTP ${res.status}`);
   return (await res.json()) as HealthInfo;
 }

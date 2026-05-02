@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api/client";
+import { piApi, PiApiError } from "@/lib/api/piClient";
 import type {
   Aktivitaet,
   Angebot,
@@ -629,8 +630,11 @@ export const useUpdateBackup = () => {
 export const useCreateBackup = () => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: () => api.post<BackupEintrag>("/backup/erstellen"),
-    onSuccess: () => qc.invalidateQueries({ queryKey: qk.einstellungen.backupHistorie }),
+    mutationFn: () => api.post<{ ok: boolean }>("/backup/erstellen"),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.einstellungen.backupHistorie });
+      qc.invalidateQueries({ queryKey: ["backup", "in-arbeit"] });
+    },
   });
 };
 
@@ -638,31 +642,61 @@ export const useRestoreBackup = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ backupId, passwort }: { backupId: string; passwort: string }) =>
-      api.post<{ erfolg: boolean; restoredFrom: string; restoredAt: string }>(
-        `/backup/${backupId}/restore`,
-        { passwort },
-      ),
-    onSuccess: () => qc.invalidateQueries({ queryKey: qk.einstellungen.backupHistorie }),
+      api.post<{ ok: boolean }>(`/backup/${backupId}/restore`, { passwort }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.einstellungen.backupHistorie });
+      qc.invalidateQueries({ queryKey: ["backup", "restore-status"] });
+    },
   });
 };
 
+// FormData-Upload geht direkt über piApi (multipart),
+// damit das Backend die Datei streamen kann.
+
 export const useUploadBackup = () =>
   useMutation({
-    mutationFn: (file: File) =>
-      api.post<{ uploadId: string; fileName: string; sizeBytes: number; vermutetesDatum?: string; valide: boolean }>(
-        "/backup/upload",
-        { fileName: file.name, sizeBytes: file.size },
-      ),
+    mutationFn: async (file: File) => {
+      const fd = new FormData();
+      fd.append("file", file, file.name);
+      try {
+        const res = await piApi.post<{
+          uploadId: string;
+          fileName: string;
+          sizeBytes: number;
+          version?: string;
+          schemaVersion?: number;
+          vermutetesDatum?: string;
+        }>("/backup/upload", fd);
+        return { ...res, valide: true };
+      } catch (e) {
+        if (e instanceof PiApiError && (e.status === 415 || e.status === 400)) {
+          return { uploadId: "", fileName: file.name, sizeBytes: file.size, valide: false };
+        }
+        throw e;
+      }
+    },
   });
 
 export const useRestoreUploadedBackup = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ uploadId, passwort }: { uploadId: string; passwort: string }) =>
-      api.post<{ erfolg: boolean }>(`/backup/upload/${uploadId}/restore`, { passwort }),
+      api.post<{ ok: boolean }>(`/backup/upload/${uploadId}/restore`, { passwort }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.einstellungen.backupHistorie });
+      qc.invalidateQueries({ queryKey: ["backup", "restore-status"] });
+    },
+  });
+};
+
+export const useDeleteBackup = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.delete<{ ok: boolean }>(`/backup/${id}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.einstellungen.backupHistorie }),
   });
 };
+
 export const usePositionsvorlagen = () =>
   useQuery({ queryKey: qk.einstellungen.positionsvorlagen, queryFn: () => api.get<Positionsvorlage[]>("/einstellungen/positionsvorlagen") });
 export const useCreatePositionsvorlage = () => {
@@ -889,12 +923,54 @@ export const useTestGoogleDrive = () =>
       ),
   });
 
-// ---------- Backup-Historie & Sitzungen ----------
+// ---------- Backup-Historie & Live-Status & Sitzungen ----------
 export const useBackupHistorie = () =>
   useQuery({
     queryKey: qk.einstellungen.backupHistorie,
-    queryFn: () => api.get<BackupEintrag[]>("/einstellungen/backup/historie"),
+    queryFn: () => api.get<BackupEintrag[]>("/backup/historie"),
   });
+
+export type BackupInArbeit = BackupEintrag & {
+  phase: "queued" | "snapshot" | "archive" | "checksum" | "finalize" | "done" | "error";
+  percent: number;
+  message?: string;
+};
+
+/** Live-Pollt laufende Backups (alle 800 ms wenn welche aktiv sind). */
+export const useBackupInArbeit = () =>
+  useQuery({
+    queryKey: ["backup", "in-arbeit"] as const,
+    queryFn: () => api.get<BackupInArbeit[]>("/backup/in-arbeit"),
+    refetchInterval: (q) => ((q.state.data?.length ?? 0) > 0 ? 800 : false),
+  });
+
+export type RestoreStatus = {
+  restore: {
+    id: string;
+    phase: "queued" | "safety-backup" | "extract" | "swap" | "verify" | "done" | "rollback" | "error";
+    percent: number;
+    message?: string;
+    startedAt: string;
+    finishedAt?: string;
+  } | null;
+  maintenance: { active: boolean; reason?: string; since?: string };
+};
+
+/** Pollt Restore-Status. Auch im Wartungsmodus erreichbar. */
+export const useRestoreStatus = (enabled = true) =>
+  useQuery({
+    queryKey: ["backup", "restore-status"] as const,
+    queryFn: () => api.get<RestoreStatus>("/backup/restore-status"),
+    refetchInterval: (q) => {
+      const d = q.state.data;
+      if (!d) return enabled ? 1500 : false;
+      if (d.maintenance.active) return 1000;
+      if (d.restore && d.restore.phase !== "done" && d.restore.phase !== "error") return 800;
+      return false;
+    },
+    enabled,
+  });
+
 
 export const useSitzungen = () =>
   useQuery({

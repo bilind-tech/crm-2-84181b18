@@ -11,16 +11,20 @@ export function BackendStatusIndicator() {
   const dotClass =
     status === "connected"
       ? "bg-emerald-500"
-      : status === "disconnected"
-        ? "bg-rose-500"
-        : "bg-muted-foreground animate-pulse";
+      : status === "maintenance"
+        ? "bg-amber-500 animate-pulse"
+        : status === "disconnected"
+          ? "bg-rose-500"
+          : "bg-muted-foreground animate-pulse";
 
   const label =
     status === "connected"
       ? `Backend verbunden (v${health?.version ?? "?"})`
-      : status === "disconnected"
-        ? `Backend nicht erreichbar${lastError ? ` — ${lastError}` : ""}`
-        : "Backend wird geprüft …";
+      : status === "maintenance"
+        ? "Backend im Wartungsmodus (Wiederherstellung läuft)"
+        : status === "disconnected"
+          ? `Backend nicht erreichbar${lastError ? ` — ${lastError}` : ""}`
+          : "Backend wird geprüft …";
 
   return (
     <Link
