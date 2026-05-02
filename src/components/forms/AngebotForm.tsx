@@ -35,6 +35,7 @@ export function AngebotForm({ onClose, defaultKundeId, defaultObjektId }: Props)
   const navigate = useNavigate();
   const { data: kunden = [] } = useKunden();
   const { data: objekteAlle = [] } = useObjekte();
+  const { data: nummernkreise } = useNummernkreise();
   const create = useCreateAngebot();
 
   const [kundeId, setKundeId] = useState(defaultKundeId ?? "");

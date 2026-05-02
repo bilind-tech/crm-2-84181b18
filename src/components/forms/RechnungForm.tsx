@@ -35,6 +35,7 @@ export function RechnungForm({ onClose, defaultKundeId, defaultObjektId }: Props
   const navigate = useNavigate();
   const { data: kunden = [] } = useKunden();
   const { data: objekteAlle = [] } = useObjekte();
+  const { data: nummernkreise } = useNummernkreise();
   const create = useCreateRechnung();
 
   const [kundeId, setKundeId] = useState(defaultKundeId ?? "");
