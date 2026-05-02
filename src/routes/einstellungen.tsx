@@ -50,6 +50,7 @@ import { SicherheitTab } from "@/components/einstellungen/SicherheitTab";
 import { VerlaufTab } from "@/components/einstellungen/VerlaufTab";
 import { SteuerTab } from "@/components/einstellungen/SteuerTab";
 import { StundenzettelTab } from "@/components/einstellungen/StundenzettelTab";
+import { BackendVerbindungTab } from "@/components/einstellungen/BackendVerbindungTab";
 import type { Firmendaten } from "@/lib/api/types";
 import { cn } from "@/lib/utils";
 
@@ -71,6 +72,7 @@ type TabId =
   | "backup"
   | "system-update"
   | "sicherheit"
+  | "backend"
   | "verlauf";
 
 const tabs: { id: TabId; label: string; icon: typeof Building2; gruppe: string }[] = [
@@ -89,6 +91,7 @@ const tabs: { id: TabId; label: string; icon: typeof Building2; gruppe: string }
   { id: "stundenzettel", label: "Stundenzettel", icon: Clock, gruppe: "Externe Apps" },
 
   { id: "drive", label: "Google Drive", icon: Cloud, gruppe: "System" },
+  { id: "backend", label: "Backend-Verbindung", icon: Server, gruppe: "System" },
   { id: "backup", label: "Backup & Wiederherstellen", icon: Save, gruppe: "System" },
   { id: "system-update", label: "System & Updates", icon: Package, gruppe: "System" },
   { id: "sicherheit", label: "Sicherheit", icon: Shield, gruppe: "System" },
@@ -205,6 +208,7 @@ function Page() {
           {tab === "steuern" && <SteuerTab />}
           {tab === "stundenzettel" && <StundenzettelTab />}
           {tab === "drive" && <GoogleDriveTab />}
+          {tab === "backend" && <BackendVerbindungTab />}
           {tab === "backup" && <BackupTab />}
           {tab === "system-update" && <SystemUpdateTab />}
           {tab === "sicherheit" && <SicherheitTab />}

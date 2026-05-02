@@ -1,40 +1,109 @@
-## Warum „Einbettung blockiert" gerade erscheint
 
-Die Meldung ist **technisch korrekt, aber unspezifisch** und führt in die Irre. Es gibt drei mögliche Ursachen — und nur eine davon kannst du in der Stundenzettel-App selbst beheben:
+# Step 0 — Backend-Scaffold
 
-1. **Du bist gerade in der Lovable-Cloud-Vorschau** (`*.lovable.app`).
-   Eine LAN-Adresse wie `http://mycleancenter.local:4001` ist von dort **technisch nicht erreichbar** — sie liegt in deinem Heim-Netz, der Cloud-Browser sitzt im Internet. Das hat nichts mit iframes zu tun. **Sobald das CRM auf dem Pi läuft, ist diese Hürde automatisch weg.**
+Ziel: Ein lauffähiges Backend-Grundgerüst, das wir auf dem Pi 5 starten können und das bereits alle Sicherheits- und Datentrennungsregeln einhält. **Noch keine Geschäftslogik** — nur das Fundament, auf dem alle weiteren Steps aufbauen.
 
-2. **Mixed Content**: Die Vorschau läuft über `https://`, deine Stundenzettel-App über `http://`. Browser blockieren das. Auf dem Pi laufen später beide unter derselben `http://`-Origin — auch das löst sich von selbst.
+## Was am Ende von Step 0 funktioniert
 
-3. **Echte Header-Blockade**: Die Stundenzettel-App sendet `X-Frame-Options: DENY` oder eine restriktive CSP. **Nur das** muss in der Stundenzettel-App selbst gefixt werden.
+1. `npm start` im Backend-Ordner startet Fastify auf Port 8787.
+2. SQLite-Datei wird automatisch in `/var/lib/mycleancenter/db/mycleancenter.db` angelegt (WAL aktiv).
+3. Master-Key wird beim ersten Start einmalig in `/var/lib/mycleancenter/keys/master.key` erzeugt (chmod 600).
+4. `GET /health` liefert JSON mit DB-Status, WAL-Status, Key-Status, Version, Uptime.
+5. `GET /version` liefert App-Version + DB-Schema-Version.
+6. Schema-Migrationen laufen automatisch beim Start (idempotent).
+7. Backend ist im Frontend über Settings-konfigurierbare Backend-URL erreichbar — Frontend zeigt einen kleinen Verbindungsstatus-Indikator.
 
-Es gibt **keine Möglichkeit**, diese Browser-Sicherheitsregeln im CRM zu umgehen — das wäre eine Schwachstelle und Browser lassen es nicht zu.
+## Verzeichnis-Struktur (strikte Trennung)
 
-## Was ich ändere
+```text
+/opt/mycleancenter/current/        ← Code (read-only, austauschbar)
+  backend/
+    package.json
+    src/
+      server.ts             ← Fastify-Bootstrap
+      config.ts             ← liest ENV: DATA_DIR, PORT, NODE_ENV
+      db/
+        index.ts            ← better-sqlite3 + WAL + backup-API
+        migrate.ts          ← Migrations-Runner
+        migrations/
+          001_init.sql      ← nur schema_version-Tabelle
+      crypto/
+        masterkey.ts        ← Key erzeugen/laden (AES-256-GCM ready)
+      routes/
+        health.ts
+        version.ts
+      plugins/
+        cors.ts
+        errorHandler.ts
+        logger.ts
+    tsconfig.json
 
-**`src/routes/stundenzettel.tsx`** — komplette Neuschreibung der Hindernis-Logik:
+/var/lib/mycleancenter/             ← Daten (NIEMALS von Updates angefasst)
+  db/mycleancenter.db
+  db/mycleancenter.db-wal
+  db/mycleancenter.db-shm
+  keys/master.key             (chmod 600)
+  uploads/                    (leer, für spätere Steps)
+  backups/                    (leer, für Step 3)
+  logs/
+```
 
-- Vor dem Mount des iframes wird das Umfeld analysiert: aktuelle Origin (`https?:`, `*.lovable.app`?), Ziel-URL (LAN-Host? `http:`?).
-- Bei erkennbarer Hürde (Fall 1 oder 2) erscheint **sofort** die richtige Erklärung statt 6 s zu warten und „Einbettung blockiert" zu zeigen.
-- Bei Fall 1 („LAN aus Cloud") steht klar: „Funktioniert erst auf dem Pi — die Adresse bleibt gespeichert, sobald das CRM dort läuft, ist alles gut." Plus Button „In neuem Tab" für jetzt.
-- Bei Fall 2 („Mixed Content") wird die Lösung erklärt (HTTPS für die App oder beide über dieselbe Origin auf dem Pi).
-- Nur wenn das Umfeld ok ist, wird der iframe gemountet. Schlägt der Load fehl (Timeout 6 s ohne `onload`), zeigt die Seite Fall 3 mit konkretem Beispiel-Header für die Stundenzettel-App:
-  ```
-  Content-Security-Policy: frame-ancestors 'self' http://mycleancenter.local
-  ```
-  und dem Hinweis, kein `X-Frame-Options: DENY` zu setzen.
+`DATA_DIR` ist per ENV überschreibbar (Default: `/var/lib/mycleancenter`). Im Dev-Sandbox nutzen wir `./data/` damit wir es testen können, ohne Pi-Pfade zu brauchen.
 
-Damit weißt du **auf einen Blick**, ob es an deinem Setup liegt (jetzt, nicht behebbar bis zur Pi-Inbetriebnahme) oder an der Stundenzettel-App (jetzt fixbar mit einem Header).
+## Frontend-Anbindung in Step 0
 
-**Memory** `mem://features/stundenzettel-iframe.md` ergänze ich, damit ich diese drei Fälle nicht jedes Mal neu erkläre.
+Sehr minimal — wir bauen noch keine Features um:
 
-## Was sich nicht ändert
+- Neue Settings-Sektion **„Backend-Verbindung"**: Eingabefeld für Backend-URL (Default: `http://localhost:8787`, auf Pi später `http://mycleancenter.local:8787`).
+- Kleiner Status-Indikator unten rechts (analog Drive-Status): grün = verbunden, grau = nicht erreichbar. Pollt `/health` alle 30 s.
+- Backend-URL wird in `localStorage` gespeichert (das ist eine Geräte-Einstellung, nicht in DB).
+- Ein API-Client-Wrapper (`src/lib/api.ts`) wird angelegt, den alle späteren Steps nutzen.
 
-- Die URL bleibt in den Einstellungen gespeichert.
-- Der Button „In neuem Tab" bleibt überall verfügbar — das ist die saubere Notlösung in der Cloud-Preview.
-- Auf dem Pi später: keine UI-Änderung nötig, nur korrekter CSP-Header in der Stundenzettel-App und alles läuft eingebettet.
+## Sicherheits- & Robustheits-Regeln (ab Step 0 verankert)
 
-## Wenn du jetzt schon eine Lösung „eingebettet in der Cloud-Preview" willst
+- **WAL-Mode erzwungen**: `PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL; PRAGMA foreign_keys=ON;` beim Öffnen.
+- **Master-Key niemals loggen**, niemals in Response zurückgeben, niemals in Backups im Klartext (kommt in Step 3).
+- **Keine Schreiboperationen** auf `/var/lib/mycleancenter/` außerhalb der definierten Pfade.
+- **Graceful Shutdown**: SIGTERM/SIGINT → Fastify close → `db.close()` (sauberer WAL-Checkpoint).
+- **Fehler-Handler**: gibt nie Stacktraces an Client, loggt strukturiert in `logs/`.
+- **CORS**: nur erlaubte Origins (LAN-IPs + lovable preview).
 
-Das geht nur, wenn die Stundenzettel-App **öffentlich über HTTPS** erreichbar ist (z. B. via Cloudflare-Tunnel von deinem Pi nach außen) **und** sie `frame-ancestors` für die Lovable-Domain erlaubt. Sag Bescheid, dann ergänze ich eine Anleitung dafür — aber das ist Aufwand für eine reine Vorschau-Komfortfunktion. Auf dem produktiven Pi-Setup brauchst du das nicht.
+## Technische Details
+
+**Stack**: Node 20 LTS (arm64-kompatibel), Fastify 4, better-sqlite3 11 (kompiliert auf Pi automatisch via prebuilds), TypeScript, tsx (für Dev), pkg/esbuild für Pi-Build (kommt in Step 11).
+
+**Migrations-Runner**: Liest alle `migrations/*.sql` sortiert, vergleicht mit `schema_version`-Tabelle, führt fehlende in einer Transaktion aus. So können Steps 1–10 jeweils ihre eigenen `00X_*.sql` ergänzen.
+
+**Health-Endpoint Response**:
+```json
+{
+  "status": "ok",
+  "version": "0.1.0",
+  "schemaVersion": 1,
+  "db": { "ok": true, "wal": true, "path": "/var/lib/.../db/mycleancenter.db" },
+  "masterKey": { "present": true },
+  "uptimeSec": 123
+}
+```
+
+## Was Step 0 NICHT enthält (kommt später)
+
+- Auth/Login (Step 1)
+- Verschlüsselte Settings-Tabelle (Step 1)
+- Kunden, Rechnungen, Angebote (Steps 2, 4, 7)
+- Backups (Step 3)
+- PDF, Mail, Drive (Steps 5, 6)
+
+## Test-Plan (was du nach Umsetzung prüfst)
+
+1. `npm install && npm run dev` im Backend startet ohne Fehler.
+2. `curl http://localhost:8787/health` → 200 OK mit obigem JSON.
+3. `./data/db/mycleancenter.db` und `./data/keys/master.key` existieren.
+4. `master.key` hat Permissions 600.
+5. Server zweimal stoppen/starten → keine doppelten Migrationen, Key bleibt gleich.
+6. Im Frontend: Settings → Backend-URL eintragen → Indikator wird grün.
+7. Backend stoppen → Indikator wird grau innerhalb 30 s.
+
+## Nach Approval
+
+Ich setze Step 0 vollständig um (Backend-Ordner anlegen, alle Dateien, Frontend-Indikator, Settings-Sektion), teste lokal im Sandbox, und melde mich mit „Step 0 fertig — bitte testen". Erst nach deinem OK gehen wir zu **Step 1 (Settings & Auth + verschlüsselter Credential-Store)**.
