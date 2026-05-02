@@ -319,7 +319,14 @@ function Page() {
                   }}
                   className="cursor-pointer border-b border-border last:border-0 transition-colors hover:bg-muted/40 focus:bg-muted/40 focus:outline-none"
                 >
-                  <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{r.nummer}</td>
+                  <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
+                    <span className="inline-flex items-center gap-1.5">
+                      {r.nummer}
+                      {r.optionen?.wiederkehrend && (
+                        <Repeat className="h-3 w-3 text-primary" aria-label="Dauerauftrag" />
+                      )}
+                    </span>
+                  </td>
                   <td className="px-4 py-3 font-medium">{r.titel}</td>
                   <td className="px-4 py-3 text-muted-foreground">{formatDate(r.rechnungsdatum)}</td>
                   <td className="px-4 py-3 text-muted-foreground">{formatDate(r.faelligkeitsdatum)}</td>
