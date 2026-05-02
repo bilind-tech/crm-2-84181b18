@@ -548,16 +548,21 @@ function BackupGroupList({
   eintraege,
   onRestore,
   onDownload,
+  onDelete,
 }: {
   titel: string;
   eintraege: BackupEintrag[];
   onRestore: (b: BackupEintrag) => void;
   onDownload: (b: BackupEintrag) => void;
+  onDelete?: (b: BackupEintrag) => void;
 }) {
   if (eintraege.length === 0) return null;
   const sorted = [...eintraege].sort(
     (a, b) => (b.abgeschlossenAm ?? "").localeCompare(a.abgeschlossenAm ?? ""),
   );
+  const isDeletable = (b: BackupEintrag): boolean =>
+    b.kategorie === "manuell" || b.kategorie === "manual"
+      || b.kategorie === "pre-restore" || b.kategorie === "pre-update";
   return (
     <div className="mb-4 last:mb-0">
       <p className="mb-1 px-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
@@ -604,6 +609,17 @@ function BackupGroupList({
             >
               <RotateCcw className="h-4 w-4" />
             </Button>
+            {onDelete && isDeletable(b) && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 w-8 p-0 text-destructive hover:bg-destructive/10"
+                title="Löschen"
+                onClick={() => onDelete(b)}
+              >
+                <XCircle className="h-4 w-4" />
+              </Button>
+            )}
           </li>
         ))}
       </ul>
