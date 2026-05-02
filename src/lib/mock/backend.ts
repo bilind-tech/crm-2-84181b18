@@ -1628,6 +1628,13 @@ export async function mockBackend<T>(method: string, path: string, body?: unknow
     result = (d.backupHistorie ?? []).filter((b) => b.status === "in_arbeit");
   } else if (m === "POST" && (path.startsWith("/backup/") && path.endsWith("/restore"))) {
     // /backup/:id/restore — legt pre-restore-Backup an, simuliert Restore
+    // SICHERHEIT: Passwort-Pflicht. Das Live-Pi-Backend MUSS bcrypt-vergleichen
+    // und bei Fehler 401 zurückgeben. Daten-Verzeichnis wird beim Restore
+    // ausschließlich durch den kontrollierten Restore-Flow berührt — sonst nie.
+    const passwort = (body as { passwort?: string })?.passwort ?? "";
+    if (!passwort.trim()) {
+      throw new ApiError("Passwort erforderlich", 401);
+    }
     const id = path.split("/")[2];
     const target = (d.backupHistorie ?? []).find((b) => b.id === id);
     if (!target || target.status !== "erfolg") {
@@ -1653,7 +1660,11 @@ export async function mockBackend<T>(method: string, path: string, body?: unknow
       valide: /\.(sqlite|sqlite\.gz|db)$/i.test(fileName),
     };
   } else if (m === "POST" && (path.startsWith("/backup/upload/") && path.endsWith("/restore"))) {
-    // /backup/upload/:uploadId/restore
+    // /backup/upload/:uploadId/restore — Passwort-pflichtig
+    const passwort = (body as { passwort?: string })?.passwort ?? "";
+    if (!passwort.trim()) {
+      throw new ApiError("Passwort erforderlich", 401);
+    }
     startBackupMock(d, "vor-restore", "pre-restore");
     persist();
     result = { erfolg: true };
@@ -1694,7 +1705,15 @@ export async function mockBackend<T>(method: string, path: string, body?: unknow
     result = lauf;
   } else if (m === "POST" && (path.startsWith("/system/update/rollback/"))) {
     // /system/update/rollback/:version
+    // SICHERHEIT: Passwort-Pflicht (Re-Auth). Live-Backend MUSS bcrypt-vergleichen,
+    // bei Fehler 401. Vor dem Code-Swap wird ein pre-rollback-{ts}.sqlite.gz
+    // Sicherheitsbackup erstellt. Daten-Verzeichnis bleibt 100% unberührt.
+    const passwort = (body as { passwort?: string })?.passwort ?? "";
+    if (!passwort.trim()) {
+      throw new ApiError("Passwort erforderlich", 401);
+    }
     const version = decodeURIComponent(path.split("/")[4]);
+    startBackupMock(d, "vor-restore", "pre-update");
     const lauf = startRollbackMock(d, version);
     persist();
     result = lauf;

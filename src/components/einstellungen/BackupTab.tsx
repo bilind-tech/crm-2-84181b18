@@ -111,6 +111,17 @@ export function BackupTab() {
     return () => clearInterval(t);
   }, [hatLaufendes, qc]);
 
+  // WICHTIG: Alle Hooks müssen VOR dem ersten frühen Return stehen,
+  // sonst React-Error #310 (Rules of Hooks).
+  const letztes = useMemo(() => {
+    const erf = historie.filter((b) => b.status === "erfolg");
+    return (
+      [...erf].sort(
+        (a, b) => (b.abgeschlossenAm ?? "").localeCompare(a.abgeschlossenAm ?? ""),
+      )[0] ?? null
+    );
+  }, [historie]);
+
   if (isLoading || !form || !data) return <LoadingPlaceholder />;
 
   const dirty = JSON.stringify(form) !== JSON.stringify(data);
@@ -122,14 +133,6 @@ export function BackupTab() {
   const monthlies = erfolge.filter((b) => b.kategorie === "monthly");
   const sondern = erfolge.filter(
     (b) => b.kategorie === "manuell" || b.kategorie === "pre-restore" || b.kategorie === "pre-update",
-  );
-
-  const letztes = useMemo(
-    () =>
-      [...erfolge].sort(
-        (a, b) => (b.abgeschlossenAm ?? "").localeCompare(a.abgeschlossenAm ?? ""),
-      )[0] ?? null,
-    [erfolge],
   );
 
   const save = () =>
@@ -405,11 +408,11 @@ export function BackupTab() {
           open
           onClose={() => setRestoreTarget(null)}
           isUploadRestore={!!uploadPreview && restoreTarget.id === uploadPreview.uploadId}
-          onConfirm={(b) => {
+          onConfirm={(b, passwort) => {
             const isUpload = !!uploadPreview && b.id === uploadPreview.uploadId;
             const fn = isUpload
-              ? () => restoreUpload.mutateAsync(b.id)
-              : () => restore.mutateAsync(b.id);
+              ? () => restoreUpload.mutateAsync({ uploadId: b.id, passwort })
+              : () => restore.mutateAsync({ backupId: b.id, passwort });
             return fn().then(() => {
               toast.success(`Wiederhergestellt: Stand ${formatDateTime(b.zeitpunktStart)}`);
               setRestoreTarget(null);

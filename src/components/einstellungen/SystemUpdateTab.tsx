@@ -15,6 +15,15 @@
 //   6. Update-Endpunkt nur für authentifizierte Admin-User
 //   7. Datei-Upload max 200 MB, Zip-Bomb-Schutz beim Entpacken
 //   8. Migrations idempotent (schema_migrations-Tabelle prüft, was schon lief)
+//
+// ROLLBACK-VERTRAG (POST /system/update/rollback/:version):
+//   - Body: { passwort: string }  → bcrypt-Vergleich serverseitig (nie clientseitig)
+//   - Bei falschem Passwort: 401, Service unverändert weiter
+//   - Vor dem Code-Swap: pre-rollback-{ts}.sqlite.gz im Backup-Ordner anlegen
+//   - DATA_DIR (/var/lib/mycleancenter/) wird NIEMALS angefasst — auch nicht
+//     gelesen-mit-Lock. Nur /opt/mycleancenter/current/ wird via fs.rename
+//     getauscht (current → broken-{ts}, previous → current).
+//   - Bei Fehler: kein halb-getauschter Zustand, Service mit altem Code weiter.
 // =============================================================================
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -44,6 +53,7 @@ import {
 import { Section } from "./_shared";
 import { LoadingPlaceholder } from "@/components/layout/LoadingPlaceholder";
 import { UpdateUploadDropzone } from "./UpdateUploadDropzone";
+import { RollbackConfirmDialog } from "./RollbackConfirmDialog";
 import {
   useSystemInfo,
   useUpdateHistorie,
@@ -95,6 +105,8 @@ export function SystemUpdateTab() {
   const [pendingPackage, setPendingPackage] = useState<UpdatePackageInfo | null>(null);
   // Aktuell laufender Update-Lauf — getriggert wird Polling über useUpdateLauf
   const [activeLaufId, setActiveLaufId] = useState<string | null>(null);
+  // Pending Rollback-Anfrage (öffnet den Bestätigungs-Dialog)
+  const [pendingRollback, setPendingRollback] = useState<string | null>(null);
 
   const { data: lauf } = useUpdateLauf(activeLaufId);
 
@@ -127,12 +139,20 @@ export function SystemUpdateTab() {
     });
   };
 
-  const startRollback = (version: string) => {
-    rollback.mutate(version, {
-      onSuccess: (newLauf) => setActiveLaufId(newLauf.id),
-      onError: (e) => toast.error(`Rollback fehlgeschlagen: ${(e as Error).message}`),
+  const confirmRollback = (version: string, passwort: string) =>
+    new Promise<void>((resolve, reject) => {
+      rollback.mutate(
+        { version, passwort },
+        {
+          onSuccess: (newLauf) => {
+            setActiveLaufId(newLauf.id);
+            setPendingRollback(null);
+            resolve();
+          },
+          onError: (e) => reject(e),
+        },
+      );
     });
-  };
 
   return (
     <div className="space-y-5 pb-24">
@@ -194,12 +214,23 @@ export function SystemUpdateTab() {
             <VersionRow
               key={v.version}
               version={v}
-              onRollback={() => startRollback(v.version)}
-              rollbackPending={rollback.isPending}
+              onRollback={() => setPendingRollback(v.version)}
+              rollbackPending={rollback.isPending && pendingRollback === v.version}
             />
           ))}
         </ul>
       </Section>
+
+      {/* ─── Rollback-Bestätigungs-Dialog ───────────────────────────── */}
+      {pendingRollback && (
+        <RollbackConfirmDialog
+          zielVersion={pendingRollback}
+          aktiveVersion={system.version}
+          open
+          onClose={() => setPendingRollback(null)}
+          onConfirm={(passwort) => confirmRollback(pendingRollback, passwort)}
+        />
+      )}
 
       {/* ─── Live-Fortschritt-Modal ─────────────────────────────────── */}
       {activeLaufId && lauf && (
@@ -268,10 +299,20 @@ function UpdatePackagePreview({
         ))}
       </div>
 
-      <div className="mt-5 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-700 dark:text-amber-400">
-        <AlertTriangle className="mr-1 inline h-3.5 w-3.5" />
-        Vor dem Update wird automatisch ein Sicherheitsbackup erstellt. Bei Fehler wird automatisch
-        zurückgerollt.
+      <div className="mt-5 space-y-2">
+        <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3 text-xs text-emerald-700 dark:text-emerald-400">
+          <p className="font-medium">Deine Daten bleiben unberührt.</p>
+          <p className="mt-1 text-emerald-700/80 dark:text-emerald-400/80">
+            Kunden, Angebote, Rechnungen, Zahlungen, Anhänge und Einstellungen
+            werden bei diesem Update nicht verändert, gelöscht oder überschrieben.
+            Es wird ausschließlich der Programmcode getauscht.
+          </p>
+        </div>
+        <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-700 dark:text-amber-400">
+          <AlertTriangle className="mr-1 inline h-3.5 w-3.5" />
+          Vor dem Update wird automatisch ein Sicherheitsbackup erstellt. Bei
+          Fehler wird automatisch zurückgerollt.
+        </div>
       </div>
 
       <div className="mt-4 flex flex-wrap justify-end gap-2">

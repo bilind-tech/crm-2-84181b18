@@ -1,5 +1,6 @@
-// Sicherheits-Dialog für Backup-Wiederherstellung.
+// Sicherheits-Dialog für System-Rollback (Code-Version zurücksetzen).
 // Zwei Hürden: Bestätigungswort tippen + Admin-Passwort eingeben.
+// Daten bleiben absolut unberührt — nur der Programmcode wird getauscht.
 import { useState } from "react";
 import {
   Dialog,
@@ -12,37 +13,27 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AlertTriangle, Loader2, RotateCcw, Shield, ShieldCheck } from "lucide-react";
-import type { BackupEintrag } from "@/lib/api/types";
 
-const BESTAETIGUNG = "WIEDERHERSTELLEN";
+const BESTAETIGUNG = "ROLLBACK";
 
-function formatDateTime(iso: string): string {
-  return new Date(iso).toLocaleString("de-DE", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-export function RestoreBackupDialog({
-  backup,
+export function RollbackConfirmDialog({
+  zielVersion,
+  aktiveVersion,
   open,
-  isUploadRestore,
   onClose,
   onConfirm,
 }: {
-  backup: BackupEintrag;
+  zielVersion: string;
+  aktiveVersion: string;
   open: boolean;
-  isUploadRestore?: boolean;
   onClose: () => void;
-  onConfirm: (b: BackupEintrag, passwort: string) => Promise<void>;
+  onConfirm: (passwort: string) => Promise<void>;
 }) {
   const [eingabe, setEingabe] = useState("");
   const [passwort, setPasswort] = useState("");
   const [busy, setBusy] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
+
   const matches = eingabe.trim().toUpperCase() === BESTAETIGUNG;
   const passwortOk = passwort.trim().length >= 1;
   const canSubmit = matches && passwortOk;
@@ -51,11 +42,11 @@ export function RestoreBackupDialog({
     setBusy(true);
     setFehler(null);
     try {
-      await onConfirm(backup, passwort);
+      await onConfirm(passwort);
       setEingabe("");
       setPasswort("");
     } catch (e) {
-      const msg = (e as Error).message ?? "Fehler bei der Wiederherstellung";
+      const msg = (e as Error).message ?? "Rollback fehlgeschlagen";
       setFehler(msg.includes("Passwort") ? "Passwort ist falsch." : msg);
     } finally {
       setBusy(false);
@@ -68,24 +59,17 @@ export function RestoreBackupDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-amber-600">
             <AlertTriangle className="h-5 w-5" />
-            Backup wiederherstellen?
+            Rollback durchführen?
           </DialogTitle>
           <DialogDescription className="space-y-2 pt-2 text-sm text-foreground">
             <span className="block">
-              {isUploadRestore
-                ? "Du wirst alle Daten mit der hochgeladenen Datei überschreiben."
-                : "Du wirst alle Daten auf den Stand vom"}{" "}
-              {!isUploadRestore && (
-                <strong>{formatDateTime(backup.abgeschlossenAm ?? backup.zeitpunktStart)}</strong>
-              )}
-              {!isUploadRestore && " zurücksetzen."}
-            </span>
-            <span className="block text-destructive">
-              ALLE Änderungen seit diesem Backup gehen verloren.
+              Der Programmcode wird von Version{" "}
+              <strong className="font-mono">{aktiveVersion}</strong> zurück auf{" "}
+              <strong className="font-mono">{zielVersion}</strong> gesetzt.
             </span>
             <span className="block text-muted-foreground">
-              Es wird automatisch ein Sicherheitsbackup vor der Wiederherstellung erstellt.
-              Du kannst danach jederzeit dorthin zurück.
+              Die App wird kurz neu gestartet. Vor dem Rollback wird automatisch
+              ein Sicherheitsbackup deiner Daten erstellt.
             </span>
           </DialogDescription>
         </DialogHeader>
@@ -93,11 +77,12 @@ export function RestoreBackupDialog({
         <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3 text-xs text-emerald-700 dark:text-emerald-400">
           <p className="flex items-start gap-1.5 font-medium">
             <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-            Daten werden ausschließlich aus dem gewählten Backup geladen.
+            Deine Daten bleiben unberührt.
           </p>
           <p className="mt-1 pl-5 text-emerald-700/80 dark:text-emerald-400/80">
-            Außerhalb dieses Wiederherstellungs-Vorgangs wird im Datenverzeichnis
-            nichts verändert, gelöscht oder überschrieben.
+            Kunden, Angebote, Rechnungen, Zahlungen, Anhänge und Einstellungen
+            werden bei einem Rollback <strong>nicht</strong> verändert, gelöscht
+            oder überschrieben. Es wird ausschließlich der Programmcode getauscht.
           </p>
         </div>
 
@@ -154,7 +139,7 @@ export function RestoreBackupDialog({
             ) : (
               <RotateCcw className="mr-1.5 h-4 w-4" />
             )}
-            Ja, wiederherstellen
+            Rollback starten
           </Button>
         </DialogFooter>
       </DialogContent>
