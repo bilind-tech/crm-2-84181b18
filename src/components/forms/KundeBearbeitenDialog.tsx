@@ -114,23 +114,28 @@ export function KundeBearbeitenDialog({ kunde, open, onOpenChange }: Props) {
       toast.error(`Kürzel «${kuerzel}» ist bereits vergeben (${kuerzelKonflikt.nummer} • ${kuerzelKonflikt.name}).`);
       return;
     }
-    await update.mutateAsync({
-      firmenname: firmenname || undefined,
-      vorname: vorname || undefined,
-      nachname: nachname || undefined,
-      email: email || undefined,
-      telefon: telefon || undefined,
-      strasse: strasse || undefined,
-      plz: plz || undefined,
-      ort: ort || undefined,
-      status,
-      notizen: notizen || undefined,
-      kuerzel: kuerzel || undefined,
-      startZaehlerAktuellerMonat:
-        kuerzel && startNummerTouched ? Math.max(1, startNummer || 1) : undefined,
-    });
-    toast.success("Kunde aktualisiert");
-    onOpenChange(false);
+    try {
+      await update.mutateAsync({
+        firmenname: firmenname || undefined,
+        vorname: vorname || undefined,
+        nachname: nachname || undefined,
+        email: email || undefined,
+        telefon: telefon || undefined,
+        strasse: strasse || undefined,
+        plz: plz || undefined,
+        ort: ort || undefined,
+        status,
+        notizen: notizen || undefined,
+        kuerzel: kuerzel || undefined,
+        startZaehlerAktuellerMonat:
+          kuerzel && startNummerTouched ? Math.max(1, startNummer || 1) : undefined,
+      });
+      toast.success("Kunde aktualisiert");
+      onOpenChange(false);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Speichern fehlgeschlagen";
+      toast.error(msg);
+    }
   }
 
   return (
