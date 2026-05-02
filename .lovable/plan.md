@@ -1,194 +1,209 @@
-# Step 12 — Dokumente & Handy-Scan ans Backend
+# Step 13 — Mahn-Automatik & Steuern-Store ans Backend
 
-Dokumente, Belege und Handy-Scans leben aktuell **nur im Mock** (`url` = base64-DataURL). Auf dem Pi würde das die SQLite aufblähen und nach 100 Belegen unbenutzbar machen. Step 12 baut den letzten großen fehlenden Backend-Bereich: echte Datei-Persistenz auf der USB-SSD, Upload-Sessions für Handy-Scans, und ein Cron für Fristen-Benachrichtigungen.
+Nach Step 12 sind alle großen Daten-Bereiche (Belege, Dokumente, Email, Drive, Backups, System) auf dem Pi. **Zwei Lücken bleiben:**
 
-Danach ist **kein** Frontend-Bereich mehr ohne Backend-Gegenstück.
+1. **Mahnwesen läuft nur „auf Knopfdruck"** — `MahnSektion` zeigt zwar die nächste empfohlene Stufe, aber niemand drückt auf Pi-Seite den Knopf. Sobald der Pi 24/7 läuft, soll Mahnung **automatisch** rausgehen (oder zumindest als Vorschlag in der Benachrichtigung landen).
+2. **Steuer-Termine + Konfiguration leben noch in `localStorage`** (`src/lib/steuern/store.ts`) — gerätegebunden, nicht synchron, kein Backup. Muss in SQLite.
+
+Step 13 schließt beides ab.
 
 ---
 
-## Teil A — Datenmodell & Storage
+## Teil A — Mahn-Automatik im Backend
 
-**Migration `013_dokumente.sql`**
+### Datenmodell — Migration `014_mahn_automatik.sql`
 
 ```sql
-CREATE TABLE dokumente (
+CREATE TABLE mahn_laeufe (
   id TEXT PRIMARY KEY,
-  titel TEXT NOT NULL,
-  beschreibung TEXT,
-  typ TEXT NOT NULL CHECK (typ IN ('beleg','vertrag','angebot','rechnung','protokoll','bild','sonstiges')),
-  kunde_id TEXT REFERENCES kunden(id) ON DELETE SET NULL,
-  objekt_id TEXT REFERENCES objekte(id) ON DELETE SET NULL,
-  dateiname TEXT NOT NULL,
-  mime_type TEXT NOT NULL,
-  groesse_bytes INTEGER NOT NULL,
-  sha256 TEXT NOT NULL,            -- für Dedup + Integritätscheck
-  storage_path TEXT NOT NULL,      -- relativ zu DATA_DIR/uploads/dokumente/
-  dokumentdatum TEXT,
-  betrag REAL,
-  steuerrelevant INTEGER NOT NULL DEFAULT 0,
-  ust_satz REAL,
-  faellig_am TEXT,
-  erledigt_am TEXT,
-  quelle TEXT NOT NULL DEFAULT 'upload',
-  drive_status TEXT,               -- 'pending'|'uploaded'|'fehler'|null
-  drive_file_id TEXT,
-  drive_url TEXT,
-  drive_letzter_versuch TEXT,
-  drive_fehler TEXT,
-  hochgeladen_am TEXT NOT NULL DEFAULT (datetime('now')),
-  geloescht_am TEXT                -- soft delete (für Audit)
+  gestartet_am TEXT NOT NULL DEFAULT (datetime('now')),
+  beendet_am TEXT,
+  geprueft INTEGER NOT NULL DEFAULT 0,    -- Anzahl Rechnungen
+  vorschlaege INTEGER NOT NULL DEFAULT 0, -- nur als Hinweis erzeugt
+  versendet INTEGER NOT NULL DEFAULT 0,   -- automatisch verschickt
+  fehler INTEGER NOT NULL DEFAULT 0,
+  ausgeloest_durch TEXT NOT NULL CHECK (ausgeloest_durch IN ('cron','manuell'))
 );
-CREATE INDEX idx_dok_kunde ON dokumente(kunde_id) WHERE geloescht_am IS NULL;
-CREATE INDEX idx_dok_objekt ON dokumente(objekt_id) WHERE geloescht_am IS NULL;
-CREATE INDEX idx_dok_faellig ON dokumente(faellig_am) WHERE erledigt_am IS NULL AND geloescht_am IS NULL;
-CREATE INDEX idx_dok_sha ON dokumente(sha256);
 
-CREATE TABLE upload_sessions (
+CREATE TABLE mahn_lauf_eintraege (
   id TEXT PRIMARY KEY,
-  token TEXT NOT NULL UNIQUE,
-  kunde_id TEXT REFERENCES kunden(id) ON DELETE SET NULL,
-  objekt_id TEXT REFERENCES objekte(id) ON DELETE SET NULL,
+  lauf_id TEXT NOT NULL REFERENCES mahn_laeufe(id) ON DELETE CASCADE,
+  rechnung_id TEXT NOT NULL,
+  stufe INTEGER NOT NULL,
+  aktion TEXT NOT NULL CHECK (aktion IN ('vorschlag','versendet','uebersprungen','fehler')),
+  grund TEXT,
+  email_versand_id TEXT,
+  erstellt_am TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX idx_mahnlauf_rechnung ON mahn_lauf_eintraege(rechnung_id);
+```
+
+Plus Erweiterung der bestehenden `MahnEinstellungen` (settings-Tabelle, Key `mahnung`):
+
+```ts
+{
+  // bisher:
+  autoVorschlagAktiv: boolean,
+  stufen: MahnStufeConfig[],
+  // NEU:
+  modus: "aus" | "vorschlag" | "auto",        // auto = direkt versenden
+  cronZeit: string,                            // "08:30" Pi-Zeit
+  nurAnWerktagen: boolean,                     // Mo–Fr
+  pauseNachStufe1Tage: number,                 // Mindestabstand zwischen autoversendeten Stufen
+  benachrichtigungBeiVorschlag: boolean,       // Push-Notification + SSE
+  benachrichtigungBeiAutoversand: boolean,
+}
+```
+
+Default-Migration: bestehende User → `modus: "vorschlag"` (kein Überraschungs-Versand).
+
+### Logik — `backend/src/mahnung/`
+
+| Datei | Zweck |
+|---|---|
+| `regeln.ts` | 1:1-Port von `src/lib/mahnung/regeln.ts` (Frontend-Datei wird zur Anzeigelogik degradiert oder importiert via `useApi`-Hook ein Result vom Backend). |
+| `repo.ts` | `mahn_laeufe` + `mahn_lauf_eintraege` CRUD; `letzterLaufFuer(rechnungId)`. |
+| `automatik.ts` | Hauptjob: lädt offene Rechnungen, ruft `bestimmeMahnZustand`, entscheidet je `modus`. Bei `auto`: erzeugt `EmailVersand`-Eintrag (existierender Worker übernimmt Versand) + neuen `mahnungen[]`-Eintrag in der Rechnung + `aktivitaet`-Log + SSE `mahnung:erstellt`. Bei `vorschlag`: nur Benachrichtigung. |
+| `cron.ts` | `node-cron`-Schedule, Zeit aus Settings, Werktagsfilter. Defensive: `if (running) return`. |
+
+### Routen — `backend/src/routes/mahnung.ts`
+
+| Method | Pfad | Zweck |
+|---|---|---|
+| GET | `/mahnung/status` | nächster Cron-Lauf, letzter Lauf, aktuelle Vorschläge |
+| GET | `/mahnung/laeufe` | Liste der letzten 30 Läufe |
+| GET | `/mahnung/laeufe/:id` | Detail mit Einträgen |
+| POST | `/mahnung/jetzt-pruefen` | Lauf manuell triggern (mit `modus`-Override für Dry-Run) |
+| POST | `/rechnungen/:id/mahnung-versenden` | Stufe X manuell senden (ersetzt heutigen Frontend-Pfad — Email-Worker macht den Rest) |
+
+Letzteres ist die Backend-Variante des heutigen `MahnSektion → EmailVersandDialog`-Flows: Frontend baut Email zusammen, Backend speichert Versand + erzeugt sofort den `mahnungen`-Eintrag in der Rechnung (Stufe + Frist) **transaktional**.
+
+### Cron-Integration
+
+`backend/src/server.ts` startet den neuen Scheduler analog zu `startFristenScheduler`. Beim Speichern der Settings (`PUT /einstellungen/mahnung`) wird der Cron neu registriert (`reloadMahnCron(zeit, werktagsFilter)`).
+
+---
+
+## Teil B — Frontend-Anpassung Mahnwesen
+
+- **`src/lib/mahnung/regeln.ts`**: bleibt als reine Anzeige-Hilfsfunktion (zeigt im UI „Empfehlung Stufe 2 in 3 Tagen"), nutzt aber Backend-Daten für Historie.
+- **`src/components/mahnung/MahnwesenTab.tsx`**: neuer Bereich „Automatik-Status"
+  - aktueller Modus, nächster Cron-Lauf, letzter Lauf-Bericht
+  - Toggle Modus aus/vorschlag/auto, Zeit-Picker, Werktagsfilter
+  - „Jetzt prüfen"-Button → `POST /mahnung/jetzt-pruefen`
+  - Liste „Letzte 5 Läufe" mit Drill-Down
+- **`src/components/dashboard/NaechsteSchritteCard.tsx`**: zieht Mahnvorschläge aus `/mahnung/status` statt clientseitig zu rechnen.
+- **`src/components/mahnung/MahnSektion.tsx`**: „Senden"-Button ruft jetzt `POST /rechnungen/:id/mahnung-versenden` (Email-Worker übernimmt) statt direktem `EmailVersandDialog`-Submit.
+- **`src/lib/api/types.ts`**: neue Types `MahnLauf`, `MahnLaufEintrag`, erweiterte `MahnEinstellungen`.
+- **`src/hooks/useApi.ts`**: `useMahnStatus`, `useMahnLaeufe`, `useMahnJetztPruefen`, `useMahnungVersenden`.
+- **`src/hooks/useLiveEvents.ts`**: SSE `mahnung:lauf-fertig`, `mahnung:vorschlag` → Query-Invalidations + Toast.
+
+---
+
+## Teil C — Steuern-Store ans Backend
+
+### Migration `015_steuern_store.sql`
+
+```sql
+CREATE TABLE steuer_termine (
+  id TEXT PRIMARY KEY,
+  art TEXT NOT NULL,                -- 'umsatzsteuer'|'koerperschaftsteuer'|'gewerbesteuer'|'sonstige'
+  zeitraum TEXT NOT NULL,           -- 'YYYY-MM' oder 'YYYY-Qn' oder 'YYYY'
+  faellig_am TEXT NOT NULL,
+  betrag_eur REAL,
+  bezahlt_am TEXT,
+  notiz TEXT,
+  bezeichnung TEXT,                 -- für 'sonstige' (Mietsteuer, Lohnsteuer manuell etc.)
   erstellt_am TEXT NOT NULL DEFAULT (datetime('now')),
-  ablauf_am TEXT NOT NULL,
-  beendet INTEGER NOT NULL DEFAULT 0
+  geaendert_am TEXT NOT NULL DEFAULT (datetime('now'))
 );
-CREATE INDEX idx_upsess_token ON upload_sessions(token);
+CREATE INDEX idx_steuer_termine_faellig ON steuer_termine(faellig_am) WHERE bezahlt_am IS NULL;
 
--- Verknüpfung Session ↔ Dokumente (n:1)
-ALTER TABLE dokumente ADD COLUMN upload_session_id TEXT REFERENCES upload_sessions(id) ON DELETE SET NULL;
+CREATE TABLE steuer_ruecklagen (
+  id TEXT PRIMARY KEY,
+  monat TEXT NOT NULL UNIQUE,       -- 'YYYY-MM'
+  gewinn_eur REAL NOT NULL,
+  zurueckgelegt_eur REAL NOT NULL,
+  notiz TEXT,
+  erstellt_am TEXT NOT NULL DEFAULT (datetime('now'))
+);
 ```
 
-**Storage-Layout auf der SSD** (`/var/lib/mycleancenter/uploads/dokumente/`):
+Settings-Key `steuern.config` (Hebesatz, Standard-Rücklage-%, Disclaimer-Bestätigt, Firmenstammsitz) bekommt eine Default-Initialisierung beim ersten Start (Sankt Augustin GmbH-Werte aus dem Memory).
 
-```
-uploads/dokumente/
-  2026/05/{sha256[0:2]}/{sha256}.{ext}
-```
+### Backend — `backend/src/steuern/`
 
-Sharding nach Jahr/Monat + 2-Zeichen-Hash-Prefix → max ~256 Dateien pro Ordner, schnelles `ls`. Dedup über `sha256` UNIQUE-Check vor dem Schreiben (gleiche Datei → nur DB-Eintrag, kein zweites Speichern).
+`repo.ts`, `mappers.ts`, `validation.ts` (Skelett existiert) werden ausgebaut um:
+- Termine-CRUD
+- Rücklagen-CRUD
+- Berechnungs-Endpoint `POST /steuern/berechne` (1:1-Port von `src/lib/steuern/berechnung.ts`) — lokale Frontend-Datei bleibt für Live-Vorschau, Backend liefert die kanonische Berechnung.
 
----
+### Routen — `backend/src/routes/steuern.ts`
 
-## Teil B — Backend-Routen `backend/src/routes/dokumente.ts`
+| Method | Pfad | Zweck |
+|---|---|---|
+| GET | `/steuern/termine?jahr=` | Liste |
+| POST | `/steuern/termine` | neuen Termin |
+| PATCH | `/steuern/termine/:id` | bezahlt-Marker, Notiz |
+| DELETE | `/steuern/termine/:id` | löschen |
+| GET | `/steuern/ruecklagen?von=&bis=` | Liste |
+| POST | `/steuern/ruecklagen` | upsert per Monat |
+| POST | `/steuern/berechne` | Schätzung für gegebenen Gewinn |
+| POST | `/steuern/termine/auto-anlegen` | erzeugt USt-Voranmeldungen für Folgejahr (Idempotent) |
 
-| Method | Pfad | Auth | Zweck |
-|---|---|---|---|
-| GET | `/dokumente` | ja | Liste mit Filter `?kundeId&objektId&typ&jahr` |
-| GET | `/dokumente/:id` | ja | Einzeldokument (Metadaten) |
-| GET | `/dokumente/:id/datei` | ja | Binary-Stream (Content-Type, Content-Disposition) |
-| POST | `/dokumente` | ja | Multipart-Upload (eine Datei + Metadaten als JSON-Field `meta`) |
-| PATCH | `/dokumente/:id` | ja | Metadaten ändern (Titel, faelligAm, steuerrelevant…) |
-| POST | `/dokumente/:id/erledigt` | ja | Erledigt-Marker setzen/entfernen |
-| DELETE | `/dokumente/:id` | ja | Soft-Delete (`geloescht_am`), Datei bleibt für 30 Tage |
-| POST | `/dokumente/check-fristen` | ja (Cron) | Anstehende/überfällige Fristen → Benachrichtigungen |
+### Fristen-Cron Erweiterung
 
-**Upload-Sessions** (`backend/src/routes/upload-sessions.ts`):
+Existierender Dokument-Fristen-Cron prüft zusätzlich `steuer_termine.faellig_am` und erzeugt die gleichen „heute / 7 Tage / überfällig"-Benachrichtigungen.
 
-| Method | Pfad | Auth | Zweck |
-|---|---|---|---|
-| POST | `/upload-sessions` | ja | Session anlegen (60 min Gültigkeit), liefert Token + QR-URL |
-| GET | `/upload-sessions/:token` | nein (Token = Auth) | Session validieren (Frontend `/m/upload/:session`) |
-| POST | `/upload-sessions/:token/dokumente` | nein (Token) | Multipart-Upload via Handy |
-| POST | `/upload-sessions/:id/beenden` | ja | Session schließen |
+### Frontend
 
-Token = 32 Byte base64url, hat im Hash ausreichend Entropie. Rate-Limit auf Token-Endpoints (10 Uploads/min) gegen Missbrauch.
-
-**Multipart-Handling**: `@fastify/multipart` (bereits via `belege-pdf.ts` möglich, sonst neu installieren). Limit 20 MB pro Datei (entspricht aktuellem Frontend-`MAX_BYTES`). Server prüft MIME-Whitelist (`image/*`, `application/pdf`).
-
-**Validation** (`backend/src/dokumente/validation.ts`): Zod-Schemas für Patch/Filter/Sessions; Multipart-Body separat (Stream → Disk-Temp → SHA256 → finale Zielpfad-Move).
+- **`src/lib/steuern/store.ts`**: localStorage-Pfade entfernt, alle Funktionen zu Hooks (`useSteuerTermine`, `useSteuerRuecklagen`, `useSteuerConfig`).
+- **One-Time-Migration** beim ersten Mount der `/steuern`-Route: liest verbleibende localStorage-Daten und postet sie in die neuen Endpoints, setzt Marker `mcc_steuern_migrated_v2`.
+- **`src/routes/steuern.tsx`** + Komponenten in `src/components/steuern/*` rufen die neuen Hooks.
+- **`src/lib/steuern/berechnung.ts`**: bleibt für Live-Vorschau; bei „Speichern" wird Backend-Endpoint genutzt.
 
 ---
 
-## Teil C — Drive-Sync-Anbindung
+## Teil D — Tests
 
-`backend/src/drive/uploader.ts` (existiert seit Step 5) wird vom Dokumenten-Modul genutzt:
+- `backend/test/mahn-automatik.spec.ts` — Modus aus/vorschlag/auto, Werktagsfilter, Pause-Erkennung, Inkasso-Schwelle, Lauf-Idempotenz (zweiter Cron im selben Slot tut nichts).
+- `backend/test/mahn-routen.spec.ts` — Auth-Pflicht, Versand-Endpoint erzeugt Mahnungs-Eintrag + Email-Versand transaktional, Settings-Reload re-registriert Cron.
+- `backend/test/steuern-termine.spec.ts` — CRUD, Filter, Auto-Anlegen Idempotenz, Fristen-Cron-Trigger.
+- `backend/test/steuern-berechnung.spec.ts` — fixe Eingaben → erwartete USt/KSt/Soli/GewSt-Werte (Sankt-Augustin-Hebesatz 525 %, GmbH-Effektivsatz 34,2 %).
 
-- Nach erfolgreichem `POST /dokumente` (synchron geschrieben) → asynchroner Job-Push in bestehende Drive-Queue mit `kind: "dokument"`, `dokumentId`.
-- Drive-Ordnerstruktur: existierender Root `mycleancenter.cm` → Unterordner `Dokumente/{YYYY}/{MM}/`.
-- Dateiname: `{kundenname}_{titel}_{MM}_{YYYY}.{ext}` (Slug-normalisiert).
-- Status zurück in `dokumente.drive_*` Felder; SSE-Event `dokument:drive-aktualisiert`.
-
-Bestehende `DriveSyncBadge`-Komponente bleibt unverändert — sie liest `drive` aus dem Dokument.
-
----
-
-## Teil D — Fristen-Cron
-
-**`backend/src/dokumente/fristen-cron.ts`** läuft via `setInterval` täglich um 07:00 Uhr Pi-Zeit:
-
-1. Selektiert Dokumente mit `faellig_am IS NOT NULL AND erledigt_am IS NULL`.
-2. Berechnet Status (heute, in 7 Tagen, überfällig) — Logik aus `src/lib/dokument/frist.ts` 1:1 ins Backend portiert (`backend/src/dokumente/frist.ts`).
-3. Erzeugt Benachrichtigungen via existierendem `benachrichtigung`-Modul, dedupliziert per Tag (kein Spam bei wiederholten Läufen).
-4. Triggert SSE `benachrichtigung:neu`.
-
-Endpoint `POST /dokumente/check-fristen` ruft denselben Job manuell auf (für Tests + Frontend-Button „Jetzt prüfen").
-
----
-
-## Teil E — Frontend-Anpassungen
-
-**`src/lib/dokument/upload.ts`** — Refactor:
-
-- `fileToDokumentPayload` entfällt; neuer Helper `uploadDokument(file, meta)` baut `FormData` und postet an `/dokumente` (multipart).
-- Bildkompression bleibt **client-seitig** (Pi-CPU schonen, schneller Mobile-Upload), aber Resultat ist ein `Blob`, nicht mehr base64.
-
-**`src/hooks/useApi.ts`** — `useCreateDokument` Mutation auf multipart umstellen (eigener `apiUpload`-Helper in `src/lib/api/client.ts`, der `Authorization` setzt aber `Content-Type` der Browser bestimmen lässt).
-
-**`src/components/dokumente/*`**:
-- `DokumentUploader.tsx` + `HandyScanDialog.tsx` nutzen neuen Upload-Pfad.
-- `DokumentViewer.tsx`: `<img src=…>` und PDF-`<iframe src=…>` zeigen jetzt auf `/dokumente/:id/datei` (mit Auth-Header — für `<img>` Workaround: Blob-URL via `fetch + URL.createObjectURL`).
-
-**`src/routes/m.upload.$session.tsx`** (Handy-Upload-Seite):
-- Lädt Session via `GET /upload-sessions/:token` (kein Auth, Token reicht).
-- Upload an `POST /upload-sessions/:token/dokumente`.
-
-**`src/lib/mock/backend.ts`**: Mock-Implementierung für alle neuen Endpoints (in-memory `Map<id, Blob>` für Dateien), damit der Dev-Modus weiter ohne Pi läuft.
-
----
-
-## Teil F — Migration bestehender Mock-Daten
-
-Erstmal **nicht** nötig — das Mock ist Demo-Content, der beim ersten Pi-Start verschwindet. Falls der User produktiv schon Dokumente angelegt hat: kleiner Migrations-Hook, der beim ersten Mount alle `data:`-URLs in `localStorage` in einer Schleife per `POST /dokumente` hochlädt und dann den Eintrag entfernt. Marker `mcc_dokumente_migrated_v1`. Skip wenn keine vorhandenen Mock-Daten gefunden.
-
----
-
-## Tests
-
-- `backend/test/dokumente.spec.ts` — CRUD, Filter, Multipart-Upload (echtes PNG-Fixture), Dedup via SHA256, Auth-Pflicht, MIME-Whitelist, 20-MB-Limit, Soft-Delete.
-- `backend/test/upload-sessions.spec.ts` — Token-Validität, Ablaufzeit, Token-only-Upload, Rate-Limit, Session-Beenden setzt `beendet=1`.
-- `backend/test/dokumente-fristen.spec.ts` — Cron erzeugt korrekte Benachrichtigungen, dedupliziert pro Tag.
-- `backend/test/dokumente-drive.spec.ts` — Mock-Drive-Uploader wird angetriggert, `drive_status` aktualisiert.
+Ziel: alle 4 grün, Gesamtzahl Backend-Tests ≥ 110.
 
 ---
 
 ## Was bewusst NICHT in diesem Step ist
 
-- Volltext-Suche in PDFs (OCR) — separater Step, braucht Tesseract-WASM.
-- Versionierung von Dokumenten — aktuell unique per SHA256, neue Version = neues Dokument.
-- Verschlüsselung-at-rest der Dateien — SSD ist im Pi-Gehäuse, LAN-only; Step 13-Kandidat falls gewünscht.
+- Lohnsteuer-Voranmeldung — Mitarbeiter-Modul ist out-of-scope MVP.
+- Mehrjahres-Steuerbescheid-Import (PDF-Parsing) — separater Step.
+- Mahnung Stufe 4 / Inkasso-Übergabe-Brief-Generator — bleibt manuell.
 
 ---
 
 ## Geänderte / neue Dateien (Übersicht)
 
 **Neu:**
-- `backend/src/db/migrations/013_dokumente.sql`
-- `backend/src/dokumente/{repo,mappers,validation,types,storage,frist,fristen-cron}.ts`
-- `backend/src/routes/dokumente.ts`
-- `backend/src/routes/upload-sessions.ts`
-- `backend/test/dokumente.spec.ts`, `upload-sessions.spec.ts`, `dokumente-fristen.spec.ts`, `dokumente-drive.spec.ts`
-- `mem/features/dokumente.md`
+- `backend/src/db/migrations/014_mahn_automatik.sql`, `015_steuern_store.sql`
+- `backend/src/mahnung/{regeln,repo,automatik,cron}.ts`
+- `backend/src/routes/mahnung.ts`
+- `backend/src/steuern/{termine-repo,ruecklagen-repo,berechnung,cron-erweiterung}.ts`
+- `backend/test/mahn-automatik.spec.ts`, `mahn-routen.spec.ts`, `steuern-termine.spec.ts`, `steuern-berechnung.spec.ts`
+- `mem/features/mahn-automatik.md`, `mem/features/steuern-backend.md`
 
 **Editiert:**
-- `backend/src/server.ts` (Routen + Cron registrieren, Multipart-Plugin)
-- `backend/src/drive/uploader.ts` (kind=`dokument` ergänzen)
-- `src/lib/api/client.ts` (`apiUpload` für multipart)
-- `src/hooks/useApi.ts` (Dokument-Hooks)
-- `src/lib/dokument/upload.ts` (Blob statt DataURL)
-- `src/components/dokumente/{DokumentUploader,HandyScanDialog,DokumentViewer,DriveSyncBadge}.tsx`
-- `src/routes/{dokumente,m.upload.$session}.tsx`
-- `src/lib/mock/backend.ts` (Multipart-Mock + Sessions)
-- `src/hooks/useLiveEvents.ts` (`dokument:*` Invalidations)
+- `backend/src/server.ts` (Mahn-Cron + erweiterter Steuer-Termine-Cron)
+- `backend/src/routes/{steuern,einstellungen,belege}.ts` (Versand-Endpoint, Settings-Hot-Reload)
+- `backend/src/dokumente/fristen-cron.ts` (auch Steuertermine prüfen)
+- `src/lib/api/types.ts`, `src/hooks/useApi.ts`, `src/hooks/useLiveEvents.ts`
+- `src/lib/mahnung/regeln.ts` (Anzeige-only)
+- `src/lib/steuern/{store,berechnung}.ts` (Hooks statt localStorage)
+- `src/components/mahnung/{MahnwesenTab,MahnSektion}.tsx`
+- `src/components/dashboard/NaechsteSchritteCard.tsx`
+- `src/components/steuern/*` (auf Hooks umgestellt)
+- `src/routes/steuern.tsx`
 - `mem/index.md`
 
-**Sag „weiter", dann setze ich Step 12 um.**
+**Sag „weiter", dann setze ich Step 13 um.**
