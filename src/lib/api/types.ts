@@ -321,6 +321,22 @@ export interface MahnLauf {
   notiz?: string | null;
 }
 
+export interface MahnLaufEintrag {
+  id: ID;
+  laufId: ID;
+  rechnungId: ID;
+  rechnungNr?: string | null;
+  stufe: MahnStufe;
+  aktion: "vorschlag" | "versendet" | "uebersprungen" | "fehler";
+  grund?: string | null;
+  emailVersandId?: ID | null;
+  erstelltAm: ISODateTime;
+}
+
+export interface MahnLaufDetail extends MahnLauf {
+  eintraege: MahnLaufEintrag[];
+}
+
 export interface MahnStatus {
   einstellungen: MahnEinstellungen;
   letzterLauf: MahnLauf | null;
