@@ -13,6 +13,7 @@ const BEZAHLT_KEY = "mcc_steuer_bezahlt_v1";
 export interface BezahltMarkierung {
   bezahltAm: string;
   tatsaechlicherBetrag?: number;
+  notiz?: string;
 }
 
 function readJson<T>(key: string, fallback: T): T {

@@ -1,58 +1,79 @@
-# Steuer-Seite: vollautomatisch, keine manuellen Eingaben
+# Steuer-Seite: Polish + manuelle Bezahlt-Erfassung
 
-Alles, was nur durch Rechnungen/Belege berechenbar ist, läuft automatisch. Manuelle Eingaben (Termin anlegen, Bezahlt-Markierung, tatsächlicher Betrag) verschwinden komplett.
+## 1. Sparschwein-Karte aufräumen
 
-## Was rausfliegt
+- **Sparschwein-Icon raus** — komplett, kein Ersatz-Icon. Nur Text + Zahlen.
+- **Überschrift neutral**: „Was du zurücklegen solltest" → **„Empfohlene Rücklage"**
+- **Untertext neutral**: „Damit das Finanzamt jederzeit bedient werden kann." → **„Reicht aus, um alle aktuell offenen Steuerforderungen zu decken."**
+- Aufschlüsselungs-Zeilen mit „exakt"/„Schätzung"-Badges bleiben unverändert.
 
-- **Button „Steuer-Termin anlegen"** komplett raus (inkl. PrimaryAction-Header)
-- **„Bezahlt"-Button** an jeder Posten-Zeile raus
-- **„Widerrufen"-Button** raus
-- **„Löschen"-Button** raus
-- **SteuerBezahltDialog** + **ManuellerPostenDialog** als Komponenten + Imports raus
-- **„Bezahlt {jahr}" KPI-Kachel** raus (ohne manuelle Bezahlung gibt es keine bezahlten Posten zu zählen)
-- **„Bezahlte Posten"-Sektion** raus
-- **Section „Manuell"-Badge** raus
-- localStorage-Hooks `useManuellePosten` und `useBezahltMarkierungen` werden auf der Seite nicht mehr genutzt (Hooks selbst bleiben im Store für späteren Bedarf, aber ungenutzt)
+## 2. Rhythmus aus Überschrift entfernen
 
-## Was bleibt und stärker betont wird
+- „Umsatzsteuer · monatliche Voranmeldungen" → schlicht **„Umsatzsteuer"**
+- Rhythmus bleibt nur noch in den Einstellungen sichtbar.
 
-### KPI-Reihe (4 Kacheln, aussagekräftiger)
+## 3. Manuelle Bezahlt-Erfassung mit Eingabe
 
-1. **Umsatzsteuer-Schuld aktuell** — Summe aller offenen USt-Voranmeldungen (das, was du wirklich zahlen musst, sehr präzise berechenbar)
-2. **Nächste Fälligkeit** — Datum + Betrag des nächsten USt-Termins
-3. **Empfohlene Rücklage gesamt** — der "wenn Finanzamt kommt"-Betrag = USt-Schuld + projizierte Jahres-Ertragsteuern (KSt + Soli + GewSt) auf Basis YTD
-4. **Gewinn YTD** — Netto-Einnahmen minus Netto-Ausgaben, transparent
+Neuer dezenter Button **„Zahlung erfassen"** rechts oben im Header (statt des entfernten „Termin anlegen"). Klick öffnet einen Dialog im Stil des `ZahlungErfassenDialog` für Rechnungen.
 
-### Hauptbereich
+### Dialog „Steuerzahlung erfassen"
 
-**„Was du zurücklegen solltest"** — eine prominente Karte mit dem Gesamt-Rücklagen-Betrag groß, darunter aufgeschlüsselt:
-- USt-Schuld (präzise) — Betrag X €
-- KSt + Soli (Schätzung Jahr) — Betrag X €
-- GewSt (Schätzung Jahr, Hebesatz Sankt Augustin 525 %) — Betrag X €
-- = Gesamt-Rücklage X €
+Schritte (kompakt, alles in einem Dialog ohne mehrstufige Frage):
 
-Mit Hinweis: USt-Teil ist exakt, Ertragsteuer-Teil ist Hochrechnung aus YTD.
+**Eingabefelder:**
 
-### Posten-Liste (read-only)
+1. **Welche Steuer?** — Dropdown: Umsatzsteuer · Körperschaftsteuer · Solidaritätszuschlag · Gewerbesteuer
+2. **Welcher Zeitraum?** — abhängig von der Steuer:
+   - USt monatlich → Monat-Picker (Dropdown „Mai 2026" usw.)
+   - USt quartalsweise → Quartal-Picker („Q2 2026")
+   - USt jährlich → Jahr-Picker
+   - KSt/Soli/GewSt → Quartal-Picker („Q2 2026")
+   - Default-Vorauswahl: aktuell offener / nächst-fälliger Posten dieser Art
+3. **Bezahlter Betrag (€)** — vorausgefüllt mit dem geschätzten Betrag des passenden Postens, editierbar
+4. **Datum** — Default heute, editierbar (date-input)
+5. *(Optional)* **Notiz** — Textfeld, klein, kann leer bleiben
 
-- **Offene USt-Voranmeldungen** mit genauen Beträgen und Fälligkeitsdaten — sortiert nach Fälligkeit, überfällige rot
-- **Offene Quartals-Vorauszahlungen** KSt/Soli/GewSt — sortiert nach Fälligkeit
-- Klick auf Zeile → Detail-Dialog (zeigt verknüpfte Rechnungen/Belege wie bisher)
-- Keine Buttons an den Zeilen, nur Info
+**Aktionen:**
+- „Speichern" → Posten wird als bezahlt markiert (siehe unten)
+- „Abbrechen"
 
-### Disclaimer bleibt
+### Wie wird das gespeichert
 
-„Schätzung — keine Steuerberatung. USt-Beträge sind exakt aus deinen bezahlten Rechnungen berechnet, Ertragsteuern (KSt/Soli/GewSt) sind YTD-Hochrechnungen."
+Das **bestehende `useBezahltMarkierungen`-Store** aus dem letzten Durchgang wird wieder aktiv genutzt:
+- Bei Auswahl im Dialog wird die passende Posten-ID berechnet (`auto-ust-2026-M05`, `auto-kst-2026-Q2`, etc.)
+- Eintrag in den Store: `{ bezahltAm: datum, tatsaechlicherBetrag: betrag, notiz?: notiz }`
+- Die `BezahltMarkierung`-Schnittstelle wird um optionales `notiz` erweitert
 
-## Berechnungs-Engine: keine Änderung nötig
+In `steuern.tsx` wird wieder das Overlay aus `bezahltMap` über die generierten Posten gelegt (Logik aus dem Durchgang davor, war mit dem letzten Schritt rausgefallen).
 
-Die `generiereAutomatischePosten` und `berechneKennzahlen` aus dem letzten Durchgang funktionieren weiter — sie liefern bereits alles. Wir entfernen nur das Mergen mit `manuellePosten` und das `bezahltMap`-Overlay.
+### Was sich auf der Seite ändert
 
-## Zusammenfassung
+- **Posten-Liste**: bezahlte Posten verschwinden aus „Offene"-Listen und erscheinen in einer neuen Sektion **„Bereits bezahlt {jahr}"** unten — kleiner, dezenter, mit „Widerrufen"-Aktion (kleines X-Icon, kein großer Button)
+- **Empfohlene-Rücklage-Karte**: Aufschlüsselung zeigt nur noch **offene** Beträge (= das, was noch zurückgelegt werden muss). Bezahlte Posten fließen nicht mehr ein.
+- **Neue KPI „Bezahlt {jahr}"**: ersetzt eine der vier Kacheln. Vorschlag: KPIs in dieser Reihenfolge — *Empfohlene Rücklage · Nächste Fälligkeit · Bezahlt {jahr} · Gewinn YTD*
+- **Detail-Dialog**: zeigt für bezahlte Posten zusätzlich Datum + Betrag + Notiz (falls vorhanden)
 
-Die Seite zeigt nur noch das, was technisch sicher berechenbar ist:
-- USt: zu 100 % präzise (aus Brutto/Netto bezahlter Rechnungen + Vorsteuer aus Belegen)
-- KSt/Soli/GewSt: ehrliche YTD-Hochrechnung mit Hinweis
-- Rücklagen-Empfehlung als zentraler "Sicherheitspuffer"
+## 4. Zod-Validierung im Dialog
 
-Keine Klicks nötig, keine Eingaben, keine Verwirrung.
+- Steuerart: Pflicht
+- Zeitraum: Pflicht
+- Betrag: > 0, max 9 Stellen
+- Datum: gültiges ISO-Datum, nicht in ferner Zukunft (max heute + 30 Tage)
+- Notiz: optional, max 200 Zeichen
+
+## Technische Umsetzung — Dateien
+
+- **Neu** `src/components/steuern/SteuerZahlungDialog.tsx` — der oben beschriebene Dialog
+- **Geändert** `src/lib/steuern/store.ts` — `BezahltMarkierung` um optionales `notiz` erweitern
+- **Geändert** `src/routes/steuern.tsx`:
+  - Sparschwein + Texte aus Karte raus
+  - Überschrift „Umsatzsteuer" ohne Rhythmus
+  - Header-Action „Zahlung erfassen" wieder rein
+  - `useBezahltMarkierungen` wieder aktiv, Overlay über generierte Posten
+  - Bezahlte Posten in eigene Sektion + aus Rücklagen-Aufschlüsselung ausschließen
+  - Neue KPI-Kachel „Bezahlt {jahr}"
+- **Geändert** `src/components/steuern/SteuerDetailDialog.tsx` — bei `posten.bezahltAm` zusätzliche Info-Zeile mit Datum/Betrag/Notiz
+
+Manueller `useManuellePosten`-Store bleibt komplett raus (keine „Steuer-Termin anlegen"-Funktion), wir tracken nur **Zahlungen** zu **automatisch generierten** Posten.
+
+Bestätige, dann setze ich das in einem Rutsch um.

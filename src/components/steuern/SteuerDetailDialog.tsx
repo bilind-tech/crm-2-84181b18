@@ -50,7 +50,7 @@ export function SteuerDetailDialog({ posten, onOpenChange }: Props) {
           {/* Betrag-Block */}
           <div className="rounded-xl border border-border bg-card p-4">
             <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              {posten.tatsaechlicherBetrag != null ? "Tatsächlicher Betrag" : "Geschätzter Betrag"}
+              {posten.tatsaechlicherBetrag != null ? "Tatsächlich bezahlt" : "Geschätzter Betrag"}
             </p>
             <p className="mt-1 text-3xl font-bold tracking-tight">
               {formatEUR(posten.tatsaechlicherBetrag ?? posten.geschaetzterBetrag)}
@@ -59,6 +59,21 @@ export function SteuerDetailDialog({ posten, onOpenChange }: Props) {
               <p className="mt-2 text-sm text-muted-foreground">{posten.notiz}</p>
             )}
           </div>
+
+          {/* Bezahlt-Info */}
+          {posten.status === "bezahlt" && posten.bezahltAm && (
+            <div className="rounded-xl border border-success/30 bg-success/5 p-4">
+              <p className="text-xs font-medium uppercase tracking-wider text-success">
+                Zahlung erfasst
+              </p>
+              <p className="mt-1 text-sm">
+                Am {formatDate(posten.bezahltAm)} ans Finanzamt überwiesen
+                {posten.tatsaechlicherBetrag != null && posten.tatsaechlicherBetrag !== posten.geschaetzterBetrag && (
+                  <> · Schätzung war {formatEUR(posten.geschaetzterBetrag)}</>
+                )}
+              </p>
+            </div>
+          )}
 
           {/* Berechnungsgrundlage */}
           {grundlage && posten.automatisch && (
