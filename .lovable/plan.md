@@ -1,158 +1,208 @@
 
-# Step 15 — Release-Bundle, Build-Pipeline & Pi-Erstinstallation
+# Step 16 — Setup-Wizard, Login-UI, Recovery & Multi-User
 
-Step 13/14 sind fertig: Backend-Mahn-Automatik läuft, Frontend zeigt sie korrekt an.
-Was jetzt fehlt, damit das CRM tatsächlich auf dem Pi 5 läuft: ein reproduzierbarer
-**Release-Bundler**, der ein signiertes ZIP baut (Backend kompiliert, Frontend gebaut,
-Manifest signiert), plus ein **Bootstrap-Pfad für die Erstinstallation** (Frontend
-wird vom Backend mit ausgeliefert, nicht aus separatem Webserver).
-
-Step 15 schließt den Loop: lokal `bun run release` → fertiges `mycleancenter-vX.Y.Z.zip`
-→ auf den Pi kopieren → `install.sh` → läuft.
+Das Backend kann seit Step 1 anmelden (`/auth/setup`, `/auth/login`, `/auth/me`,
+`/auth/logout`, `/auth/passwort-aendern`), Sessions verwalten, Lockouts und Audit
+schreiben. Frontend hat dafür **bislang keine UI** — alle Routen sind ungeschützt
+und der Setup-Token muss bisher von Hand aus `/var/lib/mycleancenter/keys/setup.token`
+gelesen werden. Step 16 schließt diese Lücke und macht das CRM für nicht-technische
+Nutzer erstinstallierbar und alltagstauglich.
 
 ## Ziele
 
-1. **Ein einziges Artefakt** (`mycleancenter-vX.Y.Z.zip`) enthält Backend (kompiliert), Frontend (gebaut), Migrationen, Manifest, signiert mit `master.key`.
-2. **Backend serviert das Frontend** statisch (kein zweiter Webserver auf dem Pi nötig).
-3. **Reproduzierbarer Build** über `scripts/build-release.ts` — funktioniert lokal und in CI.
-4. **Update-Pfad konsistent**: dasselbe ZIP, das man frisch installiert, kann über die System-Update-UI (Step Backend bereits vorhanden) eingespielt werden.
-5. **Erstinstallation 1-Befehl-Erlebnis** auf dem Pi.
+1. **Erstinbetriebnahme im Browser**: Setup-Wizard statt Login-Screen, wenn `/auth/me` mit `needs-setup` antwortet.
+2. **Recovery-Code**: einmalig beim Setup angezeigt, ermöglicht Passwort-Reset ohne Pi-SSH.
+3. **Login + Auth-Guard**: alle CRM-Routen geschützt, schöner Login mit Lockout-Anzeige.
+4. **Session-Sichtbarkeit**: aktive Sessions in Topbar + Einstellungen, „Auf allen Geräten abmelden".
+5. **Mehrbenutzer + Rollen**: Owner kann weitere Mitarbeiter anlegen (Rolle `owner` / `mitarbeiter`), Mitarbeiter sehen Stammdaten/Belege, aber keine Steuern/Backups/System-Updates.
+6. **Disclaimer respektieren**: Auth-State ist Single-Source-of-Truth = Backend; clientseitiger State ist nur Cache.
 
 ## Umfang
 
-### A — Release-Builder (`scripts/build-release.ts`)
+### A — Backend-Erweiterungen
 
-Neues Script im Repo-Root unter `scripts/`. Verwendet `bun`/`tsx` und nutzt vorhandenes
-`signManifest` aus `backend/src/system/manifest.ts`.
+`backend/src/db/migrations/016_recovery_und_rollen.sql`:
+- `app_user` bekommt Spalten:
+  - `rolle TEXT NOT NULL DEFAULT 'mitarbeiter' CHECK(rolle IN ('owner','mitarbeiter'))`
+  - `recovery_hash TEXT` (Argon2-Hash des einmaligen Recovery-Codes)
+  - `recovery_used_at TEXT` (NULL = noch gültig)
+  - `aktiv INTEGER NOT NULL DEFAULT 1`
+  - `letzte_aktivitaet TEXT`
+- Ersten User aus dem Setup automatisch auf `rolle='owner'` setzen.
+- Constraint: mindestens 1 aktiver Owner muss bleiben (Trigger oder Repo-Check).
 
-Ablauf:
-1. Liest `version` aus `package.json` und `backend/package.json` (müssen synchron sein, sonst Abbruch).
-2. Liest aktuelle `schemaVersion` aus `backend/src/db/migrations/` (höchste Migrations-Nummer).
-3. Baut Frontend: `bun run build` → Output nach `dist/` (TanStack/Vite SSR).
-4. Baut Backend: `cd backend && bun run build` → `backend/dist/`.
-5. Kopiert in `tmp/release-bundle/`:
-   - `backend/dist/` → `backend/dist/`
-   - `backend/package.json`, `backend/package-lock.json`
-   - `backend/src/db/migrations/` → `backend/src/db/migrations/` (SQL-Dateien werden zur Laufzeit gelesen)
-   - `backend/deploy/` (install.sh, systemd, sudoers, logrotate)
-   - `dist/` (Frontend-Output, vom Backend statisch ausgeliefert)
-   - `node_modules/` für Backend nicht — wird auf Pi via `npm ci --omit=dev` neu installiert (Native-Module wie `better-sqlite3`/`@node-rs/argon2` müssen für Pi-Architektur gebaut werden).
-6. Generiert Manifest:
-   - `appVersion`, `schemaVersion`, `createdAt = ISO now`, `minBackendVersion` (aus Konfig-Konstante in script), `hinweise` (aus `RELEASE_NOTES.md` falls vorhanden).
-   - Signiert mit `master.key` (Pfad via Flag `--key=<path>`, default `~/.mycleancenter/master.key`).
-   - Schreibt `manifest.json` ins Bundle-Root.
-7. Zip-Stream → `dist-release/mycleancenter-vX.Y.Z.zip`.
-8. Berechnet SHA256 → schreibt `dist-release/mycleancenter-vX.Y.Z.zip.sha256`.
-9. Logging: jeder Schritt mit Zeitstempel, Größenangabe.
+`backend/src/auth/recovery.ts` (neu):
+- `generateRecoveryCode()`: 24 Zeichen, Format `XXXX-XXXX-XXXX-XXXX-XXXX-XXXX` aus `crypto.randomBytes` (Base32 ohne mehrdeutige Zeichen).
+- `hashRecovery(code)`, `verifyRecovery(hash, code)` via Argon2.
+- `consumeRecovery(userId, code, neuesPasswort)`: prüft + setzt neues Passwort + invalidiert.
 
-CLI-Flags:
-- `--out=<dir>` (default `dist-release/`)
-- `--key=<path>` (default `~/.mycleancenter/master.key`)
-- `--allow-same-version` (für Test-Builds)
-- `--skip-frontend` / `--skip-backend` (Schnell-Iteration)
+`backend/src/auth/users-repo.ts` (neu): CRUD für app_user mit Rollen-Logik (Owner-Schutz, Self-Lock-Out-Schutz).
 
-Neuer npm-Script in Root-`package.json`: `"release": "tsx scripts/build-release.ts"`.
+Routen-Erweiterung in `backend/src/routes/auth.ts`:
+- `POST /auth/setup` Response: `{ user, recoveryCode }` (einmalig im Klartext).
+- `POST /auth/recovery/anfordern` (rate-limited 3/min/IP): `{ username }` → falls vorhanden, kein Hinweis (timing-konstant), gibt nur `{ ok: true }` zurück (Code muss ja schon beim Setup notiert worden sein — kein E-Mail-Versand).
+- `POST /auth/recovery/verwenden`: `{ username, recoveryCode, neuesPasswort }` → setzt neues Passwort, beendet alle bestehenden Sessions, gibt neuen Recovery-Code aus.
+- `GET /auth/sessions` (auth required): aktive Sessions des aktuellen Users (id, userAgent, ip, createdAt, expiresAt, currentSession=true für die eigene).
+- `DELETE /auth/sessions` (alle außer aktuelle) und `DELETE /auth/sessions/:id`.
+- `POST /auth/recovery/regenerieren` (auth required): neuen Recovery-Code für eigenen Account erzeugen.
 
-### B — Backend serviert Frontend statisch
+Neuer Routen-Block `backend/src/routes/benutzer.ts` (Owner-only via Middleware):
+- `GET /benutzer` — Liste aktiver/inaktiver Mitarbeiter.
+- `POST /benutzer` — neuen anlegen, generiert Initial-Passwort + Recovery-Code → einmalige Anzeige.
+- `PATCH /benutzer/:id` — Rolle / aktiv-Flag ändern (nicht sich selbst auf inaktiv).
+- `POST /benutzer/:id/passwort-zuruecksetzen` — Owner-Override, neues Initial-Passwort.
+- `DELETE /benutzer/:id` — soft-delete via `aktiv=0` (echtes DELETE nur wenn keine Audit-Refs).
 
-`backend/src/server.ts`:
-- Neue Registrierung `@fastify/static` (Plugin hinzufügen) — Root `dist/` (relativ zu `process.cwd()` bzw. `APP_DIR/current/dist`).
-- Konfig: `config.frontendDir = path.resolve(process.cwd(), "../dist")` mit Override via `FRONTEND_DIR`.
-- Reihenfolge: API-Routen zuerst (`/api/*`, `/auth/*`, `/health`, etc. — alles, was das Backend bereits anbietet bleibt unter denselben Pfaden), danach SPA-Fallback: alle nicht-API-Pfade liefern `index.html` (HTML5-History-Routing).
-- Wenn `FRONTEND_DIR` nicht existiert (Dev-Modus), kein Static-Plugin laden, nur Log-Hinweis. Frontend läuft dann wie bisher über Vite-Dev-Server.
+Middleware `requireOwner` ergänzen (nutzt vorhandene `requireAuth`).
 
-`backend/package.json`: `@fastify/static` als Dependency.
+### B — Frontend Auth-Layer
 
-### C — Frontend → Backend-API-Konfiguration
+`src/lib/auth/AuthContext.tsx` (neu):
+- React-Context `AuthProvider` mit `useAuth()`.
+- Lädt `/auth/me` beim Mount, verwaltet `status: "loading" | "needs-setup" | "anonymous" | "authenticated"`.
+- Methoden: `login`, `logout`, `setup`, `recovery`, `refresh`.
+- 401 von beliebigem API-Call → setzt `status="anonymous"` (zentral via `apiClient` Interceptor).
+- TanStack Query: `qk.auth = { me, sessions, benutzer }`.
 
-Aktuelles Frontend nutzt vermutlich relative Pfade gegen Backend (siehe `src/lib/api/`).
-Step 15 stellt sicher:
-- Production-Build verwendet `window.location.origin` als API-Basis (kein hardcoded `localhost:8787`).
-- Falls aktuell `VITE_API_URL` o.ä. gesetzt ist: in Production-Build leer lassen, im
-  Dev-Build auf `http://localhost:8787`.
-- Kontroll-Lesen: `src/lib/api/client.ts` (oder Pendant) anpassen.
+`src/router.tsx`: Auth-State in `RouterContext` (laut TanStack-Pattern aus Useful-Context).
 
-### D — Pi-Erstinstallations-Erlebnis verbessern
+`src/routes/__root.tsx`: rendert je nach `auth.status`:
+- `loading` → Splash mit Spinner.
+- `needs-setup` → erzwingt `/setup` (redirect via `useEffect` + `Navigate`, kein Outlet).
+- `anonymous` → erzwingt `/login` (außer Pfade `/login`, `/setup`, `/recovery`).
+- `authenticated` → normaler Outlet.
 
-`backend/deploy/install.sh`:
-- Nach `ensure_node` neue Funktion `install_backend_deps`: wenn `$APP_DIR/current/backend/package.json` existiert und `node_modules` fehlt → `cd $APP_DIR/current/backend && sudo -u $APP_USER npm ci --omit=dev`.
-- Nach erfolgreichem Service-Start: Healthcheck (`curl -fsS http://localhost:8787/health`) mit 30s Retry-Loop, Ausgabe der Setup-URL.
-- Neuer `--bootstrap=<zip>` Flag: nimmt direkt ein Release-ZIP entgegen und entpackt es nach `releases/initial/`, setzt `current`-Symlink, danach normaler Setup-Flow. Spart die manuellen `tar`/`ln`-Schritte aus dem README.
+### C — Setup-Wizard `/src/routes/setup.tsx`
 
-`backend/deploy/README.md`:
-- Erstinstallation auf 2 Befehle reduziert:
-  ```bash
-  scp mycleancenter-v0.2.0.zip pi@mycleancenter.local:~/
-  ssh pi@mycleancenter.local 'sudo bash <(unzip -p mycleancenter-v0.2.0.zip backend/deploy/install.sh) --bootstrap=mycleancenter-v0.2.0.zip'
-  ```
-  (Erläutert + alternative manuelle Variante belassen.)
+4 Schritte (Stepper-UI mit `FlowBar`-Mini-Variante), Backend-Token wird per **3 Methoden** erkannt:
+1. `?token=…` URL-Param (kommt aus install.sh-Output → wird im Healthcheck-Erfolgs-Banner als anklickbarer Link gezeigt; install.sh schreibt zusätzlich `setup.token` ins Pi-Terminal).
+2. Manuelle Eingabe (Textfeld, mit „Token aus Datei kopieren"-Hinweis: Pfad `/var/lib/mycleancenter/keys/setup.token`).
+3. *Nicht* automatisch übernommen (Sicherheit).
 
-`backend/deploy/systemd/mycleancenter.service`:
-- `WorkingDirectory=/opt/mycleancenter/current/backend` bleibt.
-- `Environment=FRONTEND_DIR=/opt/mycleancenter/current/dist` neu.
-- `ExecStart` bleibt `node dist/server.js`.
+Schritte:
+1. **Willkommen + Setup-Token-Eingabe** → Token-Vorab-Validierung über `/auth/me` Status.
+2. **Owner-Account anlegen**: Username + Passwort (mit Live-Policy-Check) + Bestätigung. Submit ruft `/auth/setup`. Antwort enthält `recoveryCode`.
+3. **Recovery-Code anzeigen** (einmalig, dick, Monospace, „Drucken"-Button öffnet `window.print()` mit Print-CSS, „Bestätigen, dass ich den Code gespeichert habe"-Checkbox als Submit-Voraussetzung).
+4. **Firmenstammdaten** (Pflicht: Firmenname, Anschrift, USt-ID/Steuernummer, Bankverbindung). Speichert via existierendes `/einstellungen/firma`. Optional übersprungen → Hinweis-Banner im Dashboard.
 
-### E — Master-Key-Bootstrap für Builder
+Nach Abschluss: redirect `/`.
 
-Problem: Builder braucht `master.key`, der erst beim ersten Pi-Start generiert wird.
-Lösung:
-- Erstinstallations-Skript zeigt nach erstem Boot den Pfad zum `master.key` und einen
-  Befehl, mit dem man ihn auf die Build-Maschine kopiert (`scp pi@…:/var/lib/mycleancenter/keys/master.key ~/.mycleancenter/master.key`).
-- README ergänzt um Abschnitt „Build-Maschine einrichten" (Master-Key kopieren, Berechtigungen 0600).
-- `scripts/build-release.ts` gibt klare Fehlermeldung mit Anleitung, wenn Key fehlt.
+SMTP + Drive-Connect bewusst **NICHT** im Wizard — bleiben in Einstellungen, Dashboard zeigt Banner „Diese Schritte fehlen noch".
 
-### F — Release-Notes-Workflow
+### D — Login `/src/routes/login.tsx`
 
-- Neue Datei `RELEASE_NOTES.md` (Root, optional) — wird vom Builder ins Manifest-Feld `hinweise` kopiert (max. 4000 Zeichen, sonst Abbruch).
-- Anzeige im Frontend: System-Update-Dialog zeigt `manifest.hinweise` bereits (vorhanden checken — sonst kleine UI-Ergänzung in `EinstellungenSystemTab` bzw. Update-Komponente).
+- Username + Passwort.
+- Bei 423 Lockout: zeigt Countdown bis `lockedUntil`.
+- Bei 401: zeigt generischen Fehler („Anmeldung fehlgeschlagen"), kein Hinweis, was falsch war.
+- Footer-Link: „Passwort vergessen → Recovery-Code verwenden" → `/recovery`.
 
-### G — Tests
+### E — Recovery `/src/routes/recovery.tsx`
 
-`backend/test/release-bundle.spec.ts` (neu):
-- Erzeugt Test-Master-Key.
-- Ruft `build-release` mit `--skip-frontend --skip-backend` und Mock-Bundle-Verzeichnis auf.
-- Prüft: ZIP enthält `manifest.json`, Manifest validiert via `validateManifest` gegen denselben Key, SHA256-Datei korrekt.
-- Optional Smoke: entpacke ZIP → starte Update-Runner gegen Test-DB → Roll-forward + Rollback funktioniert.
+- Username + Recovery-Code-Eingabe (mit Auto-Format der Bindestriche) + neues Passwort + Bestätigung.
+- Submit `/auth/recovery/verwenden`. Erfolg: zeigt **neuen** Recovery-Code (alter ist verbraucht), Pflicht-Bestätigungs-Checkbox, dann redirect `/login`.
 
-### H — CI-Hinweis (optional, nur Doku)
+### F — Topbar + Einstellungen
 
-Kurzer Abschnitt in `backend/deploy/README.md`: wenn später CI gewünscht, Master-Key als Secret hinterlegen, `bun run release` ausführen, ZIP als Artefakt veröffentlichen. Keine Konfiguration in diesem Step — nur Hinweis.
+`src/components/layout/Topbar.tsx`:
+- User-Menu (Avatar mit Initialen) → Dropdown:
+  - „Eingeloggt als <username> (owner|mitarbeiter)"
+  - „Passwort ändern" → Dialog
+  - „Recovery-Code neu erzeugen" → Dialog mit Bestätigung (alter wird ungültig!)
+  - „Aktive Sessions verwalten" → Dialog mit Liste
+  - „Abmelden" / „Auf allen Geräten abmelden"
 
-## Was NICHT in Step 15
+`src/components/einstellungen/SicherheitTab.tsx` (neu, eigener Tab in `/einstellungen`):
+- Sektion „Mein Konto": Passwort, Recovery, Sessions (gleiche Aktionen wie Topbar, ausführlicher).
+- Sektion „Benutzer & Rollen" (nur Owner sichtbar): Tabelle aller Mitarbeiter, Anlegen/Deaktivieren/Rolle ändern/Passwort zurücksetzen.
 
-- Auto-Update-Polling (Pi pullt sich selbst neue Releases) — bleibt manueller Upload.
-- Multi-Tenant / Mehr-Pi-Sync.
-- Frontend-Setup-Wizard für Erst-Admin-Erstellung (separater Step, falls noch nicht vorhanden).
-- Prometheus / Monitoring-Endpoints.
+### G — Rollen-Schutz im Frontend
+
+`src/lib/auth/permissions.ts`:
+- `kann(action, user)`: `"backup.verwalten"`, `"system.update"`, `"steuern.verwalten"`, `"benutzer.verwalten"` → `owner`-only.
+- Helper `<NurFuerOwner>` Component.
+- Tabs in `/einstellungen` (Backup, System, Steuern, Sicherheit/Benutzer) für Mitarbeiter ausgeblendet.
+- Backend setzt zusätzlich Hard-Block via `requireOwner` Middleware in betroffenen Routen — Frontend-Schutz ist nur UI-Komfort.
+
+### H — Tests
+
+`backend/test/auth-recovery.spec.ts` (neu):
+- Setup gibt Recovery-Code zurück, der mit `/auth/recovery/verwenden` einmalig nutzbar ist.
+- Verbrauchter Code wird abgelehnt.
+- `recovery/regenerieren` invalidiert alten.
+- Rate-Limit greift bei `recovery/verwenden`.
+
+`backend/test/auth-rollen.spec.ts` (neu):
+- Mitarbeiter kann nicht `/system/*`, `/backup/*`, `/steuern/*`, `/benutzer/*` aufrufen → 403.
+- Letzten aktiven Owner kann man nicht deaktivieren → 409.
+- Owner kann Mitarbeiter anlegen, deaktivieren, Passwort resetten.
+
+### I — install.sh Integration
+
+`backend/deploy/install.sh` Healthcheck-Erfolgsausgabe ergänzen:
+```
+Setup-URL: http://<hostname>:8787/setup?token=<aus setup.token>
+```
+- Liest Token aus `$DATA_DIR/keys/setup.token` (falls vorhanden).
+- Druckt zusätzlich Pfad und Hinweis.
+
+## Was NICHT in Step 16
+
+- E-Mail-basierter Passwort-Reset (Pi hat oft keinen MX, Recovery-Code ist sicherer).
+- 2FA / TOTP — späterer Step, falls gewünscht.
+- LDAP/SSO — Single-User-Pi-Szenario ist anders.
+- Granulare Permissions pro Modul über `mitarbeiter` hinaus.
 
 ## Akzeptanzkriterien
 
-1. `bun run release` auf der Build-Maschine erzeugt ein gültiges, signiertes ZIP plus SHA256, ohne manuelle Nacharbeit.
-2. Das gleiche ZIP, hochgeladen über System-Update-UI, durchläuft den bestehenden Update-Runner ohne Fehler.
-3. Frisch geflashter Pi: nach `install.sh --bootstrap=…` läuft `http://mycleancenter.local:8787` und liefert die SPA aus, API-Calls treffen denselben Origin.
-4. Daten unter `/var/lib/mycleancenter/` werden nie angefasst (Update + Erstinstallation).
-5. `release-bundle.spec.ts` grün.
-6. Build schlägt sauber fehl, wenn `master.key` fehlt oder Versionen nicht synchron sind.
+1. Frischer Pi nach Bootstrap → Browser-Aufruf landet automatisch im Setup-Wizard.
+2. Setup-Token wird einmal verwendet, danach gelöscht (Backend-Verhalten besteht).
+3. Recovery-Code wird beim Setup einmalig angezeigt, kann gedruckt werden, ist 24-Zeichen-Format mit Bindestrichen.
+4. Mit Recovery-Code kann ohne SSH ein neues Passwort gesetzt werden, alter Code wird ungültig.
+5. Alle CRM-Routen sind hinter Login-Guard, anonymer Zugriff → `/login`.
+6. Lockout (5 Fehlversuche) zeigt Countdown im UI.
+7. Owner sieht Tabs „Backup, System, Steuern, Sicherheit/Benutzer", Mitarbeiter nicht.
+8. Letzter aktiver Owner kann nicht deaktiviert oder degradiert werden.
+9. „Auf allen Geräten abmelden" beendet alle anderen Sessions sofort, eigene bleibt.
+10. Tests `auth-recovery.spec.ts` + `auth-rollen.spec.ts` grün.
 
 ## Geänderte / neue Dateien
 
-**Neu:**
-- `scripts/build-release.ts`
-- `dist-release/.gitignore` (`*` außer `.gitignore`)
-- `RELEASE_NOTES.md` (Template/Stub)
-- `backend/test/release-bundle.spec.ts`
+**Backend neu:**
+- `backend/src/db/migrations/016_recovery_und_rollen.sql`
+- `backend/src/auth/recovery.ts`
+- `backend/src/auth/users-repo.ts`
+- `backend/src/routes/benutzer.ts`
+- `backend/test/auth-recovery.spec.ts`
+- `backend/test/auth-rollen.spec.ts`
 
-**Editiert:**
-- `package.json` (root: `release`-Script, ggf. `tsx`/`archiver` als devDep)
-- `backend/package.json` (`@fastify/static` als dep)
-- `backend/src/server.ts` (Static-Serving + SPA-Fallback)
-- `backend/src/config.ts` (`frontendDir`)
-- `backend/deploy/install.sh` (`--bootstrap`, `install_backend_deps`, Healthcheck-Loop)
-- `backend/deploy/README.md` (Erstinstallation 1-Befehl, Build-Maschine, Master-Key-Bootstrap)
-- `backend/deploy/systemd/mycleancenter.service` (`FRONTEND_DIR` env)
-- `src/lib/api/client.ts` (oder vergleichbarer Einstiegspunkt) — Origin-basierte API-URL in Production
-- ggf. `EinstellungenSystemTab` / Update-Dialog: `hinweise` anzeigen, falls noch nicht
+**Backend editiert:**
+- `backend/src/routes/auth.ts` (neue Endpoints, Setup-Antwort mit Recovery)
+- `backend/src/auth/middleware.ts` (`requireOwner`)
+- `backend/src/auth/sessions.ts` (List + Delete-by-id)
+- `backend/src/server.ts` (benutzerRoutes registrieren)
+- `backend/deploy/install.sh` (Setup-URL-Ausgabe)
+
+**Frontend neu:**
+- `src/lib/auth/AuthContext.tsx`
+- `src/lib/auth/permissions.ts`
+- `src/lib/auth/api.ts` (typed wrappers)
+- `src/routes/login.tsx`
+- `src/routes/setup.tsx`
+- `src/routes/recovery.tsx`
+- `src/components/auth/PasswortAendernDialog.tsx`
+- `src/components/auth/SessionsDialog.tsx`
+- `src/components/auth/RecoveryNeuDialog.tsx`
+- `src/components/einstellungen/SicherheitTab.tsx`
+- `src/components/benutzer/BenutzerListe.tsx`
+- `src/components/benutzer/BenutzerAnlegenDialog.tsx`
+
+**Frontend editiert:**
+- `src/router.tsx` (Auth-Context im RouterContext)
+- `src/routes/__root.tsx` (Auth-Gate)
+- `src/lib/api/client.ts` (401-Interceptor → AuthContext informieren)
+- `src/components/layout/Topbar.tsx` (User-Menu)
+- `src/routes/einstellungen.tsx` (neuer Tab Sicherheit + Owner-only Tabs filtern)
 
 ---
 
-**Sag „los Step 15", dann setze ich um.**
+**Sag „los Step 16", dann setze ich um.**
