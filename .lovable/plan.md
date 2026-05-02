@@ -1,112 +1,121 @@
-# Step 1 — Settings-Store + Auth + Crypto
+# Step 1 — Hardening & Bugfixes vor Step 2
 
-Ziel: Pi-Backend kann ab sofort Einstellungen persistent speichern, sensible Werte verschlüsseln, einen User authentifizieren und Sessions verwalten. Frontend benutzt für alle Einstellungs-Tabs das echte Backend statt des Mock.
+Vor dem Backup-/Restore-Step (Step 2) räumen wir Step 1 auf. Alle Punkte stammen aus einem direkten Code-Review der eingecheckten Dateien.
 
-## Backend — neue Module
+## Sicherheits-Bugs (müssen weg)
 
-### 1. Crypto-Lib (`backend/src/crypto/aes.ts`)
-- AES-256-GCM mit IV (12 Byte) pro Wert.
-- API: `encrypt(plain: string): string` → Format `v1:base64(iv|tag|ciphertext)`.
-- `decrypt(token: string): string` mit Versions-Check.
-- Master-Key kommt aus `crypto/masterkey.ts` (Step 0 ✅).
-- Helper `redact(value)` → `{ isSet: boolean, updatedAt: ISO }` für GET-Responses.
+### 1. Username-Enumeration & weiche Lockout-Antwort
+`/auth/login` liefert bei falschem Login `failCount`/`locked`/`lockedUntil` zurück. Damit kann ein Angreifer per IP-Rotation:
+- gültige Usernames erkennen (Lockout zählt nur wenn User existiert? aktuell unabhängig — gut, aber Antwort verrät trotzdem Status)
+- Lockout-Zustand abfragen ohne Try.
 
-### 2. Auth-Modul (`backend/src/auth/`)
-- `password.ts` — argon2id (memory 64 MB, time 3, parallelism 1) via `argon2`-npm.
-- `sessions.ts` — Token = 32 Random Bytes base64url, Tabelle `auth_session(token, user_id, created_at, last_seen_at, expires_at, user_agent, ip)`. Sliding-Expiry 14 Tage, Hard-Cap 90 Tage.
-- `middleware.ts` — Fastify `preHandler` `requireAuth`. Liest `Authorization: Bearer <token>` → setzt `req.user`. Aktualisiert `last_seen_at` throttled (max 1×/Min).
-- Lockout: 5 Fehlversuche pro IP+User → 15 Min Sperre (Tabelle `auth_lockout`).
-- Rate-Limit auf `/auth/*` via `@fastify/rate-limit` (10 req / 60 s pro IP).
+**Fix:** Antwort auf `{ error: "invalid-credentials" }` reduzieren. Lockout-Status NUR bei `423` zurückgeben. Argon2-Verify auch laufen lassen wenn User nicht existiert (Dummy-Hash) → konstante Antwortzeit gegen Timing-Enumeration.
 
-### 3. Settings-Store (`backend/src/settings/store.ts`)
-- Tabelle `setting(key TEXT PRIMARY KEY, value TEXT, encrypted INT, updated_at TEXT)`.
-- API: `get(key)`, `getJSON(key)`, `set(key, value, { encrypt })`, `setJSON(...)`, `delete(key)`, `list(prefix)`.
-- Sensible Keys (`smtp.password`, `googleDrive.refreshToken`, …) immer `encrypt: true`.
-- Cache (Map) mit Invalidation bei Writes.
+### 2. Setup-Token rotiert nicht bei Restart vor Setup
+Wenn der Pi läuft, kein User existiert und der Token in `setup.token` liegt, bleibt er beliebig lang gültig. Wer einmal Filesystem-Zugriff hatte, hat ewig den Token.
 
-### 4. Migration `002_auth_settings.sql`
-```
-CREATE TABLE app_user(id TEXT PK, username TEXT UNIQUE, password_hash TEXT, created_at, updated_at);
-CREATE TABLE auth_session(token TEXT PK, user_id, created_at, last_seen_at, expires_at, user_agent, ip);
-CREATE TABLE auth_lockout(id INTEGER PK, ip, username, until, fail_count);
-CREATE TABLE setting(key TEXT PK, value, encrypted INTEGER, updated_at);
-CREATE INDEX idx_session_user ON auth_session(user_id);
-```
-Seed: bei leerer `app_user` einmaligen Setup-Token in `data/keys/setup.token` (chmod 600) erzeugen, in Server-Log ausgeben.
+**Fix:** Token bekommt Ablauf (24 h). Datei-Format `{token, createdAt}`. `ensureSetupToken` regeneriert wenn abgelaufen. Beim Boot zusätzlich in Logs warnen wenn Token > 1 h alt.
 
-### 5. Routen (`backend/src/routes/`)
-**Auth (`auth.ts`)**
-- `POST /auth/setup` (nur erlaubt solange kein User existiert ODER mit Setup-Token) → legt Admin an.
-- `POST /auth/login` `{ username, password }` → `{ token, expiresAt, user }`.
-- `POST /auth/logout` → invalidiert aktuellen Token.
-- `POST /auth/passwort-aendern` `{ alt, neu }`.
-- `GET /auth/me`.
+### 3. Cookie-Maxage ≠ Server-Sliding-Expiry
+`setSessionCookie` setzt `maxAge: 14d` einmalig beim Login. Nach 14 Tagen löscht der Browser das Cookie, obwohl die Server-Session per Sliding-Expiry noch gültig sein könnte. Schlimmer: Cookie wird bei jedem Request NICHT erneuert.
 
-**Einstellungen (`einstellungen.ts`)** — alle hinter `requireAuth`:
-- Firma: `GET/PATCH /einstellungen/firma`
-- SMTP: `GET/PATCH /einstellungen/smtp` (Passwort verschlüsselt, GET liefert `passwordIsSet`), `POST /einstellungen/smtp/test`
-- Nummernkreise: `GET/PATCH /einstellungen/nummernkreise`
-- Sicherheit: `GET/PATCH /einstellungen/sicherheit` (Auto-Lock-Minuten, 2FA-Flag-Stub)
-- Erscheinungsbild: `GET/PATCH /einstellungen/erscheinung`
-- Backup-Plan: `GET/PATCH /einstellungen/backup` (nur Plan-Settings; Ausführung in Step 2)
-- Google-Drive Settings (Felder, kein OAuth-Flow): `GET/PATCH /einstellungen/google-drive` (verschlüsselt: clientSecret, refreshToken)
-- Mahnung: `GET/PATCH /einstellungen/mahnung`
-- Dauerauftrag: `GET/PATCH /einstellungen/dauerauftrag`
-- Steuer: `GET/PATCH /einstellungen/steuer`
-- Stundenzettel: `GET/PATCH /einstellungen/stundenzettel`
-- Sitzungen: `GET /einstellungen/sitzungen`, `POST /einstellungen/sitzungen/alle-beenden`, `DELETE /einstellungen/sitzungen/:token`
+**Fix:** Bei jedem authentifizierten Request, wenn Sliding-Update getriggert hat, auch `setCookie` mit neuem `maxAge` aufrufen. Helfer `refreshSessionCookie(reply, expiresAt)`.
 
-Validation: jedes Patch-Body via `zod`-Schema in `backend/src/settings/schemas.ts`. Ungültige Felder → 422.
+### 4. CORS `*` mit `credentials: true`
+`config.corsOrigins` Default ist `"*"`. Mit `credentials: true` lehnen Browser das eigentlich ab — aber Fastify-CORS sendet bei `origin: true` den Request-Origin zurück, was effektiv „alle Origins mit Credentials erlaubt" bedeutet. Im LAN okay, in Prod NICHT.
 
-### 6. Server-Updates (`server.ts`)
-- `@fastify/rate-limit`, `@fastify/cors` (nur Dev), `@fastify/helmet` registrieren.
-- Routen registrieren. `/health` bleibt offen, alles andere via `requireAuth` außer `/auth/login|setup` und `/version`.
+**Fix:** In Production muss `CORS_ORIGINS` explizit gesetzt sein (Liste). Ohne Wert → Bootfehler. Im Dev bleibt `*` mit Warnung im Log.
 
-## Frontend
+### 5. Audit-Log-Detail enthält Username im Klartext, aber kein IP-Hash
+Aktuell loggt `auth.login.fail` `{username}`. Bei Brute-Force entstehen pro IP viele Zeilen. Kein Limit, keine Rotation → Tabelle wächst unbegrenzt.
 
-### 1. Auth-Context (`src/lib/auth/`)
-- `AuthProvider` mit `login/logout/me/changePassword`. Token in `localStorage` (`mcc.authToken`), bei 401 globalem Logout.
-- `apiClient.ts` (neu, ersetzt schrittweise Mock-Calls für die in Step 1 migrierten Endpoints): nutzt `getBackendUrl()` aus Step 0, hängt `Authorization: Bearer …` an. Falls Backend nicht erreichbar → konfigurierbarer Fallback-Toast „Offline-Modus" (kein Mock-Fallback für Auth/Einstellungen — die müssen am Pi sein).
+**Fix:** Audit-Log mit Retention (z. B. 180 Tage) im Sweep-Job. Index auf `(action, at)`.
 
-### 2. Login-/Setup-Screens
-- `src/routes/login.tsx` (öffentlich) — Username/Passwort, Redirect-Back.
-- `src/routes/setup.tsx` — nur sichtbar wenn `GET /auth/me` mit `409 needs-setup` antwortet. Felder: Username, Passwort (zod min 12 Zeichen, 1 Zahl, 1 Sonderzeichen), Setup-Token (steht im Pi-Log).
-- `_authenticated`-Layoutroute (Pathless) schützt alle bisherigen Routen via `beforeLoad`.
+## Funktionale Bugs
 
-### 3. Einstellungs-Tabs auf echtes Backend
-- Alle bestehenden Tabs (`Firma` (in Erscheinungsbild oder eigener Tab — nutzt vorhandene Komponente), `SMTP` aus `EmailEinstellungen`, `Nummernkreise`, `Sicherheit`, `Erscheinungsbild`, `Backup`-Plan, `GoogleDrive`-Felder, `Mahnung`, `Dauerauftrag`, `Steuer`, `Stundenzettel`) erhalten `useQuery`/`useMutation` gegen `apiClient`.
-- Sensible Felder zeigen `isSet=true` als „●●●●● gespeichert" mit „Ändern"-Button (Replace-Flow).
-- Tab `Sitzungen` (neu, klein in `SicherheitTab`): Liste aktiver Sessions mit „beenden".
+### 6. PATCH mit `null` löscht Felder NICHT, sondern überschreibt sie
+`patchArea` macht flachen `{...current, ...body}`. Wer absichtlich einen String leert (`iban: null`), bekommt nach Schema-Parse den Default zurück → silent revert.
 
-### 4. Backend-Status erweitern
-- `BackendStatusIndicator` zeigt zusätzlich `auth: ok|locked|offline`.
+**Fix:** Input erst gegen `Schema.partial()` validieren, dann mergen, dann gegen Vollschema validieren. Explizit unterstützte „Feld löschen"-Semantik (leerer String = leer behalten).
 
-## Sicherheit / Härtung
-- Passwörter: argon2id, niemals als Klartext loggen.
-- Sensible Settings: AES-GCM, GET liefert nie Klartext.
-- Rate-Limit + Lockout auf `/auth/*`.
-- Helmet (Standard-Header), keine CORS in Prod (gleicher Origin per Reverse-Proxy später).
-- Session-Tokens nicht in URL, nur Header.
-- Audit-Log-Eintrag (in-memory bis Step 8) für `login`, `logout`, `password-change`, `settings-change`.
+### 7. SmtpSchema: Body-Felder werden nicht type-validiert
+PATCH-Body wird als `Record<string, unknown>` ins `patchArea` gereicht. Wenn Frontend versehentlich `port: "465"` (String) schickt, scheitert die Validation hart mit 422. UX leidet.
 
-## Tests / Akzeptanzkriterien
-1. Frischer Start → `/auth/me` → 409. Setup mit Token funktioniert. Token-Datei wird nach Setup gelöscht.
-2. Login → Token wird gespeichert. Reload behält Session. Logout entfernt Token.
-3. SMTP-Passwort speichern → DB enthält `v1:…`, GET liefert `{ passwordIsSet:true }`.
-4. 5× falsches Passwort → 6. Versuch wird mit 423 für 15 Min blockiert.
-5. **Pflichttest:** Backup vor Migration → Migration 002 → Restore altes Backup → Migrations-Runner läuft → Settings + User wieder lesbar.
-6. Update-Simulation: `current/`-Symlink auf neue Version → Datenverzeichnis unverändert, Login klappt weiterhin.
+**Fix:** `z.coerce.number()` für alle numerischen Settings (port, hue, tage, sätze).
 
-## Mock-Parität
-Mock-Endpoints aus Liste oben werden mit Feature-Flag `useRealAuthSettings=true` (default an, sobald Backend-URL gesetzt) deaktiviert. Andere Module (Kunden/Rechnungen) laufen weiter über Mock bis Step 3+.
+### 8. `userCount() === 0` bei jedem `/auth/me`-Call
+SQL `COUNT(*)` ist zwar billig, aber bei jedem Polling (Frontend pollt bei Status-Wechsel + Tab-Focus) unnötig.
 
-## Out of Scope (kommt später)
-- Backup-Erstellung & Restore-Flow → Step 2
-- Google-Drive OAuth-Verbindung → Step 6
-- SMTP-Test gegen echten Server → Step 6 (Step 1 stubt `/smtp/test` mit Connect-Probe)
-- 2FA → späterer Schliff
+**Fix:** In-Memory-Flag `setupComplete` cachen, beim erfolgreichen `/auth/setup` setzen.
 
-## Memory-Update am Ende
-Neue Datei `mem/features/backend-step1-auth-settings.md` mit Endpoint-Liste, Schema, Setup-Flow, Test-Protokoll. `mem/index.md` ergänzt um Verweis.
+### 9. Touch-Throttle In-Memory wird beim Restart resettet
+Nach Backend-Restart wird ALLE aktive Sessions beim ersten Request „touched" → unnötiger DB-Write-Sturm.
 
-Sag „approved" und ich setze um.
+**Fix:** `lastTouchedAt` mit Fastify-Hook beim Boot warm aus DB-`last_seen_at` laden (alle Sessions). Bei < 100 Sessions vernachlässigbar.
+
+### 10. `/einstellungen/sitzungen/:token` erlaubt Revoke fremder Sessions
+Aktuell wird `deleteSession(token)` aufgerufen ohne Owner-Check. Ein eingeloggter User könnte mit einem fremden Token (z. B. aus Audit-Log abgegriffen, oder erraten) andere Sessions killen.
+
+**Fix:** `DELETE auth_session WHERE token = ? AND user_id = ?` mit `req.user.id`. Bei 0 Changes → 404.
+
+### 11. Settings-Cache wird bei `setSetting` nur für genau einen Key invalidiert
+Beim `PATCH /smtp` wird `smtp` (Bereich) UND `smtp.password` (sensitive) geschrieben. `loadArea("smtp")` nutzt aber `getSetting("smtp")` — Cache ist konsistent, ABER: anderer Prozess (späterer Backup-Worker, Step 2) sieht alten Wert. Cache muss bei jedem Write komplett oder mit Versionsnummer invalidiert werden.
+
+**Fix:** Pro Request frischer Cache (Per-Request-Dictionary) ODER Versions-Stempel pro Key. Empfehlung: Cache komplett raus — SQLite-Read ist mit WAL+Index < 0.1 ms. KISS.
+
+## Frontend-Schwächen
+
+### 12. `auth.tsx` — `mock-lock` als Fallback ist verwirrend wenn Pi-URL gesetzt ist
+Wenn der User absichtlich mit Pi arbeitet und das Backend kurz weg ist, springt die App in `mock-lock` und zeigt Demo-Login. Risiko: User glaubt eingeloggt, schreibt Daten ins Mock, verliert sie.
+
+**Fix:** Wenn `backendUrl` konfiguriert ist und `status === 0`, nicht `mock-lock` zeigen, sondern eigener `backend-offline`-Modus mit „Verbindung zum Pi verloren — Retry"-Screen. Mock-Modus nur wenn KEINE Backend-URL gespeichert ist.
+
+### 13. Login-Form keine Lockout-Anzeige, kein Caps-Lock-Hinweis
+Aktuell zeigt `LockScreen` nur „Falsches Passwort". Nach 5 Versuchen kommt 423 → User sieht nichts Spezifisches.
+
+**Fix:** 423 → eigene UI „Konto gesperrt bis HH:MM". Caps-Lock-Detector. Passwort-Sichtbarkeits-Toggle.
+
+### 14. `PI_SETTINGS_PATHS` Whitelist ist fehleranfällig
+Jeder neue Endpoint muss in zwei Listen + Subpath-Check eingetragen werden. Vergisst man's, geht's still ans Mock.
+
+**Fix:** Routing per Prefix-Liste: `["/auth/", "/einstellungen/"]` → wenn Backend-URL gesetzt UND erreichbar → Pi, sonst Mock. Whitelist entfällt. Sub-Bereiche, die noch nicht im Backend sind (z. B. `/einstellungen/vorlagen`), kriegen explizite Mock-Markierung.
+
+## Zusätzliche Verbesserungen
+
+### 15. Fehlende DB-Indexe
+- `app_user(username COLLATE NOCASE)` — Login-Lookup
+- `setting(key)` ist PK, ok
+- `audit_log(action, at)` — für Retention-Sweep & spätere UI
+
+### 16. Health-Endpoint zu dünn
+`/health` liefert nur `{ok}`. Frontend braucht aber Schema-Version, masterKey-OK, DB-OK, ggf. Disk-Free für Step 2.
+
+**Fix:** `/health` erweitern (öffentlich) + `/health/detail` (auth-only) mit Schema-Version, freier Speicher in DataDir, Anzahl User, Anzahl Sessions, Uptime.
+
+### 17. Keine Integrationstests
+Aktuell „Smoke-Test bestätigt" laut Memo, aber kein automatisierter Test.
+
+**Fix:** Kleine `vitest`-Suite (`backend/test/auth.spec.ts`) gegen In-Memory-DB: Setup-Flow, Login, Lockout, Cookie-Refresh, Cross-User-Session-Revoke verboten, PATCH-Merge-Verhalten.
+
+## Reihenfolge der Umsetzung
+
+1. **Sicherheit** (1, 2, 3, 4, 10) — gefährlichste zuerst
+2. **Funktional** (6, 7, 8, 9, 11)
+3. **Frontend** (12, 13, 14)
+4. **Cleanup** (5, 15, 16)
+5. **Tests** (17) — sichert alles ab
+
+## Out of Scope (bleibt für Step 2+)
+- Echte 2FA (TOTP) — kommt später
+- Audit-Log-UI — wenn Step 11 (Logs/Monitoring) drankommt
+- Multi-User mit Rollen — vorerst nur ein Owner-User
+
+## Akzeptanzkriterien
+- `npm run test` im backend grün
+- Login-Antwort enthält keine Lockout-Daten bei 401
+- CORS mit `*` in Prod verweigert Boot
+- Cross-User-Session-Revoke gibt 404
+- Frontend: Backend offline mit gesetzter URL → kein Mock-Lock-Switch
+- PATCH `firma {iban: ""}` setzt iban auf leer (statt Default zurück)
+
+Sag „approved" und ich setze die 17 Punkte in der genannten Reihenfolge um, danach starten wir mit Step 2 (Backup & Restore).
