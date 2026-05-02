@@ -71,6 +71,7 @@ export const qk = {
     backupHistorie: ["einstellungen", "backup", "historie"] as const,
     googleDrive: ["einstellungen", "googleDrive"] as const,
     sitzungen: ["einstellungen", "sitzungen"] as const,
+    benutzer: ["einstellungen", "benutzer"] as const,
     positionsvorlagen: ["einstellungen", "positionsvorlagen"] as const,
     textvorlagen: ["einstellungen", "textvorlagen"] as const,
     systemInfo: ["system", "info"] as const,
