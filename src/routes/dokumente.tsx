@@ -217,7 +217,7 @@ function Page() {
           {/* Mobil: Karten-Liste */}
           <div className="grid gap-3 sm:hidden">
             {filtered.map((d) => (
-              <DokumentCard key={d.id} d={d} onClick={() => setEditing(d)} />
+              <DokumentCard key={d.id} d={d} kundeName={d.kundeId ? kundeMap.get(d.kundeId) : undefined} onClick={() => setViewing(d)} />
             ))}
           </div>
 
@@ -228,6 +228,7 @@ function Page() {
                 <tr className="border-b border-border bg-muted/30 text-left text-xs uppercase tracking-wider text-muted-foreground">
                   <th className="px-4 py-3 font-medium">Titel</th>
                   <th className="px-4 py-3 font-medium">Typ</th>
+                  <th className="px-4 py-3 font-medium">Kunde</th>
                   <th className="px-4 py-3 font-medium">Frist</th>
                   <th className="px-4 py-3 font-medium">Status</th>
                   <th className="px-4 py-3 text-right font-medium">Betrag</th>
@@ -236,10 +237,11 @@ function Page() {
               <tbody>
                 {filtered.map((d) => {
                   const status = fristStatus(d);
+                  const kundenName = d.kundeId ? kundeMap.get(d.kundeId) : undefined;
                   return (
                     <tr
                       key={d.id}
-                      onClick={() => setEditing(d)}
+                      onClick={() => setViewing(d)}
                       className="cursor-pointer border-b border-border last:border-0 hover:bg-muted/30"
                     >
                       <td className="px-4 py-3">
@@ -252,12 +254,18 @@ function Page() {
                             </div>
                           )}
                           <div className="min-w-0">
-                            <p className="truncate font-medium">{d.titel}</p>
+                            <div className="flex items-center gap-1.5">
+                              <p className="truncate font-medium">{d.titel}</p>
+                              <DriveSyncBadge dokument={d} />
+                            </div>
                             <p className="truncate text-xs text-muted-foreground">{d.dateiname}</p>
                           </div>
                         </div>
                       </td>
                       <td className="px-4 py-3 capitalize text-muted-foreground">{d.typ}</td>
+                      <td className="px-4 py-3 text-muted-foreground">
+                        {kundenName ?? <span className="text-xs italic">—</span>}
+                      </td>
                       <td className="px-4 py-3 text-muted-foreground">
                         {d.faelligAm ? formatDate(d.faelligAm) : "—"}
                       </td>
