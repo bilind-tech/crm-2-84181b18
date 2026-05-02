@@ -1,148 +1,163 @@
-## Step 10 — Steuer-Modul: Persistenz auf dem Pi
+## Step 11 — Stundenzettel-Persistenz + Pi-Deployment-Feinschliff
 
-Das Steuer-Modul ist im Frontend komplett (Übersicht, Berechnung, Dialoge, KPIs). Die Berechnungslogik (`src/lib/steuern/berechnung.ts`) bleibt **bewusst im Frontend** — sie operiert auf Rechnungen + Dokumenten, die ohnehin via React Query geladen werden. Was fehlt: alle drei `localStorage`-Stores wandern auf den Pi, damit Einstellungen, manuelle Posten und Bezahlt-Markierungen geräteübergreifend (Desktop, Handy, jeder Browser im LAN) konsistent sind und Backups sie mitnehmen.
+Letzter Frontend-Store, der noch in `localStorage` lebt (Stundenzettel-URL), wandert ans Backend — analog zu Step 10. Danach: Alles, was nötig ist, damit das CRM **als systemd-Dienst auf dem Pi** sauber startet, sich selbst aktualisiert, Logs schreibt und nach einem Stromausfall garantiert wieder hochkommt.
 
-### Was geändert wird
+---
 
-**1. Datenbank — Migration `012_steuern.sql`**
+### Teil A — Stundenzettel-URL aufs Backend (klein, abgeschlossen)
 
-Drei Tabellen, additiv:
+Backend-Schema `stundenzettel.externeUrl` existiert bereits in `backend/src/settings/schemas.ts` und ist via `/einstellungen/bereich/stundenzettel` les-/schreibbar. Frontend nutzt aktuell aber `localStorage` (`src/lib/stundenzettel/config.ts`).
 
-```sql
-CREATE TABLE steuer_einstellungen (
-  id                INTEGER PRIMARY KEY CHECK (id = 1),  -- Singleton
-  kst_satz          REAL    NOT NULL DEFAULT 15,
-  soli_satz         REAL    NOT NULL DEFAULT 5.5,
-  gewst_messzahl    REAL    NOT NULL DEFAULT 3.5,
-  gewst_hebesatz    REAL    NOT NULL DEFAULT 525,
-  ust_rhythmus      TEXT    NOT NULL DEFAULT 'monatlich'
-                    CHECK (ust_rhythmus IN ('monatlich','quartalsweise','jaehrlich')),
-  ruecklage_satz    REAL    NOT NULL DEFAULT 35,
-  ust_puffer_satz   REAL    NOT NULL DEFAULT 10,
-  updated_at        TEXT    NOT NULL DEFAULT (datetime('now'))
-);
-INSERT INTO steuer_einstellungen (id) VALUES (1);
+**Änderungen:**
 
-CREATE TABLE steuer_manueller_posten (
-  id                  TEXT PRIMARY KEY,
-  art                 TEXT NOT NULL CHECK (art IN ('ust','kst','soli','gewst','manuell')),
-  titel               TEXT NOT NULL,
-  zeitraum_jahr       INTEGER NOT NULL,
-  zeitraum_monat      INTEGER,
-  zeitraum_quartal    INTEGER CHECK (zeitraum_quartal BETWEEN 1 AND 4),
-  faellig_am          TEXT NOT NULL,
-  geschaetzter_betrag REAL NOT NULL,
-  notiz               TEXT,
-  erstellt_am         TEXT NOT NULL DEFAULT (datetime('now'))
-);
+1. **`src/lib/stundenzettel/config.ts`** wird zum dünnen Adapter:
+   - `useStundenzettelUrl()` Hook → React Query auf `/einstellungen/bereich/stundenzettel`.
+   - `useSetStundenzettelUrl()` Mutation → PATCH gleicher Endpoint, invalidiert Query.
+   - Idempotente Migration: wenn `localStorage["mcc.stundenzettel.url"]` gesetzt UND Backend-Wert leer → einmalig pushen, dann `localStorage.removeItem` + Marker `mcc_stundenzettel_migrated_v1`.
+   - Alte synchronen Funktionen `getStundenzettelUrl/setStundenzettelUrl` bleiben als Deprecated-Wrapper für SSR/Lazy-Reads — geben Cache-Wert zurück.
+2. **`src/routes/stundenzettel.tsx`** + **`src/components/einstellungen/StundenzettelTab.tsx`** auf neue Hooks umstellen. Custom-Event `"stundenzettel-url-changed"` entfällt — React Query macht das automatisch via SSE-Invalidation (`einstellungen:geaendert` triggert bereits `["einstellungen"]`).
+3. **Mock-Backend** (`src/lib/mock/backend.ts`): Stundenzettel-Bereich in Settings-Mock-Map ergänzen (falls noch nicht drin).
 
-CREATE TABLE steuer_bezahlt_markierung (
-  posten_id            TEXT PRIMARY KEY,        -- ID des Auto- oder Manuell-Postens
-  bezahlt_am           TEXT NOT NULL,
-  tatsaechlicher_betrag REAL,
-  notiz                TEXT,
-  erstellt_am          TEXT NOT NULL DEFAULT (datetime('now'))
-);
+Damit ist **kein** projektrelevanter Wert mehr in `localStorage` — alle Geräte im LAN sehen denselben Stand.
+
+---
+
+### Teil B — Pi-Deployment-Härtung
+
+Damit das Backend produktiv auf dem Pi läuft, kommen jetzt Deployment-Artefakte ins Repo. Sie liegen unter `backend/deploy/` und werden per System-Update-ZIP (Step 8) mit ausgerollt.
+
+**1. systemd-Unit `backend/deploy/systemd/mycleancenter.service`**
+
+```ini
+[Unit]
+Description=MyCleanCenter CRM Backend
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=mycleancenter
+Group=mycleancenter
+WorkingDirectory=/opt/mycleancenter/current/backend
+Environment=NODE_ENV=production
+Environment=DATA_DIR=/var/lib/mycleancenter
+Environment=PORT=8787
+Environment=HOST=0.0.0.0
+ExecStart=/usr/bin/node dist/server.js
+Restart=on-failure
+RestartSec=3
+# Hardening
+ProtectSystem=strict
+ReadWritePaths=/var/lib/mycleancenter
+PrivateTmp=true
+NoNewPrivileges=true
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target
 ```
 
-Auto-Posten-IDs sind im Frontend deterministisch (`ust-2026-Q1`, `kst-2026`, …). Das ist die Brücke zur Bezahlt-Tabelle — sie braucht keine Foreign Key, weil Auto-Posten in keiner Tabelle existieren.
+Wichtig: `/opt/mycleancenter/current` ist **Symlink** auf den aktiven Release-Ordner — System-Update (Step 8) tauscht atomar.
 
-**2. Backend — neues Modul `backend/src/steuern/`**
+**2. Install-Skript `backend/deploy/install.sh`** (idempotent, einmalig auf einem nackten Pi-OS-Lite ausgeführt):
 
-- `repo.ts` — typisiertes `better-sqlite3`-Repo: `getEinstellungen()`, `updateEinstellungen(patch)`, `listManuellePosten()`, `addManueller(...)`, `updateManueller(id, patch)`, `removeManueller(id)`, `listBezahlt()`, `setBezahlt(id, eintrag)`, `removeBezahlt(id)`.
-- `mappers.ts` — `snake_case` ↔ `camelCase` zwischen DB und API-Shape. Validierung der `ust_rhythmus`-Enum.
-- `validation.ts` — Zod-Schemas für Patch-Bodies (Min/Max für Sätze: KSt 0–50, Soli 0–20, GewSt-Messzahl 0–20, Hebesatz 200–1000, Rücklage 0–100, USt-Puffer 0–50).
+- Legt User `mycleancenter` an (Systemuser, kein Login-Shell).
+- Erstellt `/opt/mycleancenter/`, `/var/lib/mycleancenter/{db,keys,uploads,backups/{daily,weekly,monthly,safety,tmp},logs}` mit korrekten Rechten (`mycleancenter:mycleancenter`, `keys/` als `0700`).
+- Installiert Node 20 LTS via NodeSource falls fehlt.
+- Kopiert systemd-Unit nach `/etc/systemd/system/`, `daemon-reload`, `enable --now`.
+- Setzt logrotate-Config nach `/etc/logrotate.d/mycleancenter` (rotiert `/var/lib/mycleancenter/logs/*.log` daily, keep 14, compress).
+- Erkennt erneuten Aufruf (Idempotenz) und überspringt vorhandene Schritte.
 
-**3. Backend — Routen `backend/src/routes/steuern.ts`**
+**3. Update-Skript `backend/deploy/update-symlink.sh`** wird vom System-Update-Runner (Step 8) aufgerufen statt direkter `fs.rename`-Logik:
 
-Acht Endpoints, alle hinter `requireAuth`:
+- Argumente: `<release-dir>` (frisch entpackter Ordner unter `/opt/mycleancenter/releases/<timestamp>`).
+- Validiert Release: `dist/server.js` vorhanden, `package.json` vorhanden, smoke-test `node -e "require('./dist/server.js')"` mit Timeout.
+- Speichert vorherigen Symlink-Ziel in `/opt/mycleancenter/previous` (Rollback-Pfad).
+- Atomar `ln -sfn <release-dir> /opt/mycleancenter/current` + `systemctl restart mycleancenter`.
+- Healthcheck: pollt `http://127.0.0.1:8787/system/health` (siehe Punkt 5) bis 200 oder 30s Timeout. Bei Fehler → Symlink zurück auf `previous`, Restart, Exit-Code ≠ 0.
 
-| Methode | Pfad | Zweck |
-|---|---|---|
-| GET    | `/steuern/einstellungen`                | Singleton lesen |
-| PATCH  | `/steuern/einstellungen`                | Sätze/Rhythmus ändern |
-| POST   | `/steuern/einstellungen/reset`          | auf Defaults zurücksetzen |
-| GET    | `/steuern/manuelle-posten`              | Liste |
-| POST   | `/steuern/manuelle-posten`              | Anlegen |
-| PATCH  | `/steuern/manuelle-posten/:id`          | Ändern |
-| DELETE | `/steuern/manuelle-posten/:id`          | Löschen |
-| GET    | `/steuern/bezahlt`                      | Map `{ postenId → eintrag }` |
-| PUT    | `/steuern/bezahlt/:postenId`            | Eintrag setzen/überschreiben |
-| DELETE | `/steuern/bezahlt/:postenId`            | Eintrag löschen |
+`backend/src/system/runner.ts` (Step 8) wird so angepasst, dass es im `production`-Modus dieses Skript aufruft (via `child_process.spawn` mit `sudo -n`), im Dev/Test weiterhin in-process bleibt.
 
-Jede Mutation sendet einen `aktivitaet:steuer:*`-Event über den bestehenden SSE-Bus, damit andere Tabs live aktualisieren. Audit-Eintrag bei jeder Änderung von `steuer_einstellungen`.
+**4. Dev-Mode bleibt unverändert.** Im Dev startet `bun run dev` aus dem Repo direkt — keine Symlink-Logik, keine systemd-Calls. Erkennung via `process.env.NODE_ENV === "production"` bzw. `config.nodeEnv`.
 
-**4. Frontend — React-Query-Hooks**
+**5. Health-Endpoint `GET /system/health`** (neu, ohne Auth):
 
-`src/hooks/useApi.ts` bekommt:
+- Antwortet 200 mit `{ status: "ok", version, uptimeSec, dbReachable: true, maintenanceMode: false }` wenn alles läuft.
+- Antwortet 503 wenn `maintenance.flag` existiert (Step 2 — Restore läuft) oder DB-Ping (`SELECT 1`) fehlschlägt.
+- Genutzt von: Update-Skript-Healthcheck (Punkt 3), externes Monitoring, Frontend-Statusbalken (siehe Punkt 7).
 
-```ts
-useSteuerEinstellungen()           // GET  + cache
-useUpdateSteuerEinstellungen()     // PATCH
-useResetSteuerEinstellungen()      // POST .../reset
-useManuellePosten()                // GET liste
-useAddManuellerPosten()            // POST
-useUpdateManuellerPosten()         // PATCH
-useRemoveManuellerPosten()         // DELETE
-useBezahltMarkierungen()           // GET
-useSetBezahlt()                    // PUT
-useRemoveBezahlt()                 // DELETE
-```
+**6. Strukturiertes Logging**
 
-Konvention identisch zu bestehenden Hooks (Backup, System-Update). SSE-Events `steuer:*` invalidieren die jeweiligen QueryKeys via `useLiveEvents.ts`.
+- `backend/src/logging.ts` neu: dünner Wrapper um `console`, schreibt JSON-Lines parallel nach `${DATA_DIR}/logs/app-YYYY-MM-DD.log` (rolling per Tag, älter als 14 Tage löscht der Logrotate aus Punkt 2).
+- Schreibt: `ts`, `level`, `msg`, optionale Felder (`requestId`, `userId`, `route`, `durationMs`).
+- Fastify-Hook (`onRequest`/`onResponse`) loggt jeden Request strukturiert. Bestehende `console.log`-Aufrufe in Backend-Modulen werden auf den Wrapper umgestellt (in größerem Sweep, aber inkrementell — keine Verhaltensänderung).
+- **Geheimnisse niemals loggen** — Auth-Header, Cookies und Bodies von `/auth/*`, `/einstellungen/*` werden im Hook explizit redacted.
 
-**5. Frontend — Stores umbauen**
+**7. Frontend „Pi-Status"-Indikator**
 
-`src/lib/steuern/store.ts` wird zu einem **dünnen Adapter**, der dieselbe API behält wie heute (`useSteuerEinstellungen`, `useManuellePosten`, `useBezahltMarkierungen`), intern aber die neuen React-Query-Hooks nutzt. So bleibt `src/routes/steuern.tsx`, `SteuerTab.tsx` und `ManuellerPostenDialog.tsx` **unverändert**.
+Kleine, dezente Komponente im AppSidebar-Footer (oder in Einstellungen → System):
 
-Migrationspfad bei vorhandenem `localStorage`:
-- Beim ersten Laden, wenn Backend-Einstellungen `updated_at` noch der Default ist UND `localStorage` Werte hat → einmaliger PATCH mit lokalen Werten, danach `localStorage.removeItem(...)`. Gilt analog für manuelle Posten und Bezahlt-Map.
-- Migration läuft `idempotent`, mit Marker `mcc_steuern_migrated_v1` in localStorage.
+- `useSystemHealth()` pollt alle 30s `/system/health`.
+- Zeigt grüner Punkt + „Online · v0.2.0" / oranger Punkt + „Wartung läuft" / roter Punkt + „Pi nicht erreichbar".
+- Click öffnet Tooltip mit `uptimeSec` (formatiert) und Pi-IP/Hostname.
 
-**6. Mock-Backend**
+**8. Doku `backend/deploy/README.md`**
 
-`src/lib/mock/backend.ts` bekommt Handler für die 10 neuen Endpoints, In-Memory-Map. Damit läuft die Demo ohne Pi weiter.
+Schritt-für-Schritt für den User (nicht-technisch wo möglich):
 
-**7. Backup**
+1. Pi-OS-Lite flashen (Verweis auf `mem://reference/hardware`).
+2. SSH rein, `curl -fsSL <projekt-url>/install.sh | sudo bash` (oder ZIP runterladen + entpacken + `sudo ./install.sh`).
+3. Browser auf `http://mycleancenter.local:8787` → Setup-Wizard (existiert seit Step 1) → fertig.
+4. Updates: ZIP in der CRM-UI hochladen → Rest läuft automatisch.
+5. Backup-Strategie kurz erklärt + Verweis auf Backup-Tab.
+6. Troubleshooting: `journalctl -u mycleancenter -f`, `systemctl status mycleancenter`, Logs unter `/var/lib/mycleancenter/logs/`.
 
-Migration `012` taucht in der bestehenden `db.backup()`-Pipeline (Step 2) automatisch auf. Restore-Test im Step bestätigt, dass eine Backup-Datei aus „vor Step 10" sauber via Migration-Runner auf das neue Schema gehoben wird.
+---
 
-**8. Tests**
+### Tests
 
-`backend/test/steuern.spec.ts`:
-- Singleton-Garantie (zweite Insert-Versuch schlägt am CHECK fehl).
-- PATCH validiert Grenzen (negative Hebesatz → 400, Rhythmus-Enum-Verletzung → 400).
-- Reset stellt Defaults her und behält `updated_at` aktuell.
-- Manuelle Posten CRUD inkl. 404 bei unbekannter ID.
-- Bezahlt-PUT idempotent (zweimal mit gleichem Body → identische Zeile, keine Duplicate).
-- Restore eines Pre-Step-10-Backups + Migration-Runner → Defaults werden korrekt eingefügt, kein Datenverlust an anderen Tabellen.
-- SSE-Event wird bei jeder Mutation gefeuert (über bestehenden Test-Hilfs-Listener).
+- **`backend/test/health.spec.ts`** — `/system/health` ohne Auth erreichbar, antwortet im Maintenance-Modus 503, im Normalbetrieb 200 mit korrekten Feldern.
+- **`backend/test/logging.spec.ts`** — Logger schreibt JSON-Lines, Sensitive-Header werden redacted, Datei-Rotation per Tag.
+- **`backend/test/deploy-scripts.spec.ts`** — Shell-Skripte werden mit `bash -n` syntax-geprüft + Smoke-Test gegen Mock-Pfade in `/tmp` (Idempotenz: zweimal install → kein Fehler, keine Doppel-User).
+- Bestehende Tests bleiben grün; insbesondere System-Update-Tests (Step 8) brauchen einen Mock für das neue Update-Skript.
 
-### Technische Details
+---
 
-**Singleton-Pattern für Einstellungen:**
-`CHECK (id = 1)` + initialer `INSERT (id) VALUES (1)` in der Migration. Das Repo hat nur `get()` und `update(patch)` — kein `create`, kein `delete`. Frontend muss nie eine ID kennen.
+### Akzeptanzkriterien
 
-**Bezahlt-Markierung ohne FK:**
-Auto-Posten existieren nur als Berechnungs-Output im Frontend. Ihre IDs sind deterministisch (`ust-{jahr}-Q{q}` / `ust-{jahr}-{mm}` / `kst-{jahr}` / `soli-{jahr}` / `gewst-{jahr}`). Wenn der User später die Periodik wechselt (monatlich → quartalsweise), ändert sich die ID-Struktur. Deshalb: beim Wechsel von `ust_rhythmus` werden alle `steuer_bezahlt_markierung`-Einträge mit Präfix `ust-` der laufenden Jahre gelöscht (Backend-Side-Effect im PATCH-Handler) und der User bekommt einen Hinweis-Toast „USt-Bezahlt-Historie zurückgesetzt". Manuelle Posten und Ertragsteuer-Markierungen bleiben.
+1. Stundenzettel-URL ist nach Login aus jedem Browser im LAN identisch sichtbar.
+2. Frisch geflashter Pi → `install.sh` einmal → Backend läuft unter `http://mycleancenter.local:8787`, überlebt `sudo reboot`.
+3. ZIP-Update via CRM-UI → Symlink wechselt atomar, bei Healthcheck-Fail automatischer Rollback ohne User-Eingriff, vorhandene Daten unangetastet.
+4. `/system/health` antwortet ohne Auth, eignet sich für externes Uptime-Monitoring.
+5. Logs liegen rotierend unter `/var/lib/mycleancenter/logs/`, enthalten **keine** Passwörter/Tokens.
+6. Sidebar zeigt grünen Status-Indikator wenn alles läuft, ändert sich live bei Wartungsmodus.
 
-**Migration aus localStorage:**
-Frontend führt beim Mount eine Idempotenz-Prüfung durch. Wenn Backend-Einstellungen `updated_at` älter ist als localStorage-Daten und Marker fehlt → Push-Migration in einer Transaktion. Der Marker `mcc_steuern_migrated_v1=true` verhindert wiederholte Pushs, auch nach Logout/Login.
+---
 
 ### Dateien
 
-- created `backend/src/db/migrations/012_steuern.sql`
-- created `backend/src/steuern/repo.ts`
-- created `backend/src/steuern/mappers.ts`
-- created `backend/src/steuern/validation.ts`
-- created `backend/src/routes/steuern.ts`
-- created `backend/test/steuern.spec.ts`
-- edited  `backend/src/server.ts` — Route registrieren
-- edited  `backend/src/events/bus.ts` — `steuer:*`-Events
-- edited  `src/hooks/useApi.ts` — 10 neue Hooks
-- edited  `src/lib/steuern/store.ts` — Adapter auf React Query, localStorage-Migration
-- edited  `src/lib/mock/backend.ts` — Mock-Handler
-- edited  `src/hooks/useLiveEvents.ts` — `steuer:*`-Invalidations
-- edited  `mem/features/steuern.md` — Status „Backend-persistent, geräteübergreifend"
+**Neu:**
+- `backend/deploy/systemd/mycleancenter.service`
+- `backend/deploy/install.sh`
+- `backend/deploy/update-symlink.sh`
+- `backend/deploy/logrotate.conf`
+- `backend/deploy/README.md`
+- `backend/src/logging.ts`
+- `backend/src/routes/health.ts`
+- `backend/test/health.spec.ts`
+- `backend/test/logging.spec.ts`
+- `backend/test/deploy-scripts.spec.ts`
+- `mem/features/pi-deployment.md`
 
-Sag „weiter", dann setze ich Step 10 um.
+**Geändert:**
+- `src/lib/stundenzettel/config.ts` — Adapter auf React Query + localStorage-Migration
+- `src/routes/stundenzettel.tsx` — Hooks statt Custom-Event
+- `src/components/einstellungen/StundenzettelTab.tsx` — Hooks statt direkter Calls
+- `src/lib/mock/backend.ts` — stundenzettel-Bereich falls fehlt + `/system/health`-Mock
+- `src/components/layout/AppSidebar.tsx` — kleiner Status-Indikator im Footer
+- `src/hooks/useApi.ts` — `useSystemHealth()`, `useStundenzettelUrl()`, `useSetStundenzettelUrl()`
+- `backend/src/server.ts` — Health-Route registrieren, Logging-Hook
+- `backend/src/system/runner.ts` — Production-Branch ruft `update-symlink.sh` statt In-Process-Switch
+- `mem/index.md` — neuer Eintrag „Pi-Deployment"
+
+Sag „weiter", dann setze ich Step 11 um.
