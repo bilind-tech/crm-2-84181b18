@@ -5,7 +5,12 @@ import { useState } from "react";
 import { ArrowLeft, Download, Eye, Pencil, RotateCcw, Save, Loader2 } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
-import { Group as ResizablePanelGroup, Panel as ResizablePanel, PanelResizeHandle } from "react-resizable-panels";
+import { Group, Panel, Separator } from "react-resizable-panels";
+// react-resizable-panels v4 hat ungenaue Typings — Group nimmt `direction` zur Laufzeit.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const ResizablePanelGroup = Group as any;
+const ResizablePanel = Panel;
+const PanelResizeHandle = Separator;
 import { LivePdfPreview } from "./LivePdfPreview";
 import { EditorPanel, type EditorTab } from "./EditorPanel";
 import { useBelegEditor } from "@/hooks/useBelegEditor";
