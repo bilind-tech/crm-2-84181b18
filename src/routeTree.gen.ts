@@ -28,7 +28,9 @@ import { Route as DauerauftraegePosteingangRouteImport } from './routes/dauerauf
 import { Route as DauerauftraegeIdRouteImport } from './routes/dauerauftraege.$id'
 import { Route as AngeboteNeuRouteImport } from './routes/angebote.neu'
 import { Route as AngeboteIdRouteImport } from './routes/angebote.$id'
+import { Route as RechnungenIdBearbeitenRouteImport } from './routes/rechnungen.$id.bearbeiten'
 import { Route as MUploadSessionRouteImport } from './routes/m.upload.$session'
+import { Route as AngeboteIdBearbeitenRouteImport } from './routes/angebote.$id.bearbeiten'
 
 const RechnungenRoute = RechnungenRouteImport.update({
   id: '/rechnungen',
@@ -126,10 +128,20 @@ const AngeboteIdRoute = AngeboteIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => AngeboteRoute,
 } as any)
+const RechnungenIdBearbeitenRoute = RechnungenIdBearbeitenRouteImport.update({
+  id: '/bearbeiten',
+  path: '/bearbeiten',
+  getParentRoute: () => RechnungenIdRoute,
+} as any)
 const MUploadSessionRoute = MUploadSessionRouteImport.update({
   id: '/m/upload/$session',
   path: '/m/upload/$session',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AngeboteIdBearbeitenRoute = AngeboteIdBearbeitenRouteImport.update({
+  id: '/bearbeiten',
+  path: '/bearbeiten',
+  getParentRoute: () => AngeboteIdRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
@@ -142,7 +154,7 @@ export interface FileRoutesByFullPath {
   '/kunden': typeof KundenRouteWithChildren
   '/objekte': typeof ObjekteRouteWithChildren
   '/rechnungen': typeof RechnungenRouteWithChildren
-  '/angebote/$id': typeof AngeboteIdRoute
+  '/angebote/$id': typeof AngeboteIdRouteWithChildren
   '/angebote/neu': typeof AngeboteNeuRoute
   '/dauerauftraege/$id': typeof DauerauftraegeIdRoute
   '/dauerauftraege/posteingang': typeof DauerauftraegePosteingangRoute
@@ -150,9 +162,11 @@ export interface FileRoutesByFullPath {
   '/kunden/neu': typeof KundenNeuRoute
   '/objekte/$id': typeof ObjekteIdRoute
   '/objekte/neu': typeof ObjekteNeuRoute
-  '/rechnungen/$id': typeof RechnungenIdRoute
+  '/rechnungen/$id': typeof RechnungenIdRouteWithChildren
   '/rechnungen/neu': typeof RechnungenNeuRoute
+  '/angebote/$id/bearbeiten': typeof AngeboteIdBearbeitenRoute
   '/m/upload/$session': typeof MUploadSessionRoute
+  '/rechnungen/$id/bearbeiten': typeof RechnungenIdBearbeitenRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -164,7 +178,7 @@ export interface FileRoutesByTo {
   '/kunden': typeof KundenRouteWithChildren
   '/objekte': typeof ObjekteRouteWithChildren
   '/rechnungen': typeof RechnungenRouteWithChildren
-  '/angebote/$id': typeof AngeboteIdRoute
+  '/angebote/$id': typeof AngeboteIdRouteWithChildren
   '/angebote/neu': typeof AngeboteNeuRoute
   '/dauerauftraege/$id': typeof DauerauftraegeIdRoute
   '/dauerauftraege/posteingang': typeof DauerauftraegePosteingangRoute
@@ -172,9 +186,11 @@ export interface FileRoutesByTo {
   '/kunden/neu': typeof KundenNeuRoute
   '/objekte/$id': typeof ObjekteIdRoute
   '/objekte/neu': typeof ObjekteNeuRoute
-  '/rechnungen/$id': typeof RechnungenIdRoute
+  '/rechnungen/$id': typeof RechnungenIdRouteWithChildren
   '/rechnungen/neu': typeof RechnungenNeuRoute
+  '/angebote/$id/bearbeiten': typeof AngeboteIdBearbeitenRoute
   '/m/upload/$session': typeof MUploadSessionRoute
+  '/rechnungen/$id/bearbeiten': typeof RechnungenIdBearbeitenRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -187,7 +203,7 @@ export interface FileRoutesById {
   '/kunden': typeof KundenRouteWithChildren
   '/objekte': typeof ObjekteRouteWithChildren
   '/rechnungen': typeof RechnungenRouteWithChildren
-  '/angebote/$id': typeof AngeboteIdRoute
+  '/angebote/$id': typeof AngeboteIdRouteWithChildren
   '/angebote/neu': typeof AngeboteNeuRoute
   '/dauerauftraege/$id': typeof DauerauftraegeIdRoute
   '/dauerauftraege/posteingang': typeof DauerauftraegePosteingangRoute
@@ -195,9 +211,11 @@ export interface FileRoutesById {
   '/kunden/neu': typeof KundenNeuRoute
   '/objekte/$id': typeof ObjekteIdRoute
   '/objekte/neu': typeof ObjekteNeuRoute
-  '/rechnungen/$id': typeof RechnungenIdRoute
+  '/rechnungen/$id': typeof RechnungenIdRouteWithChildren
   '/rechnungen/neu': typeof RechnungenNeuRoute
+  '/angebote/$id/bearbeiten': typeof AngeboteIdBearbeitenRoute
   '/m/upload/$session': typeof MUploadSessionRoute
+  '/rechnungen/$id/bearbeiten': typeof RechnungenIdBearbeitenRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -221,7 +239,9 @@ export interface FileRouteTypes {
     | '/objekte/neu'
     | '/rechnungen/$id'
     | '/rechnungen/neu'
+    | '/angebote/$id/bearbeiten'
     | '/m/upload/$session'
+    | '/rechnungen/$id/bearbeiten'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -243,7 +263,9 @@ export interface FileRouteTypes {
     | '/objekte/neu'
     | '/rechnungen/$id'
     | '/rechnungen/neu'
+    | '/angebote/$id/bearbeiten'
     | '/m/upload/$session'
+    | '/rechnungen/$id/bearbeiten'
   id:
     | '__root__'
     | '/'
@@ -265,7 +287,9 @@ export interface FileRouteTypes {
     | '/objekte/neu'
     | '/rechnungen/$id'
     | '/rechnungen/neu'
+    | '/angebote/$id/bearbeiten'
     | '/m/upload/$session'
+    | '/rechnungen/$id/bearbeiten'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -416,6 +440,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AngeboteIdRouteImport
       parentRoute: typeof AngeboteRoute
     }
+    '/rechnungen/$id/bearbeiten': {
+      id: '/rechnungen/$id/bearbeiten'
+      path: '/bearbeiten'
+      fullPath: '/rechnungen/$id/bearbeiten'
+      preLoaderRoute: typeof RechnungenIdBearbeitenRouteImport
+      parentRoute: typeof RechnungenIdRoute
+    }
     '/m/upload/$session': {
       id: '/m/upload/$session'
       path: '/m/upload/$session'
@@ -423,16 +454,35 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MUploadSessionRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/angebote/$id/bearbeiten': {
+      id: '/angebote/$id/bearbeiten'
+      path: '/bearbeiten'
+      fullPath: '/angebote/$id/bearbeiten'
+      preLoaderRoute: typeof AngeboteIdBearbeitenRouteImport
+      parentRoute: typeof AngeboteIdRoute
+    }
   }
 }
 
+interface AngeboteIdRouteChildren {
+  AngeboteIdBearbeitenRoute: typeof AngeboteIdBearbeitenRoute
+}
+
+const AngeboteIdRouteChildren: AngeboteIdRouteChildren = {
+  AngeboteIdBearbeitenRoute: AngeboteIdBearbeitenRoute,
+}
+
+const AngeboteIdRouteWithChildren = AngeboteIdRoute._addFileChildren(
+  AngeboteIdRouteChildren,
+)
+
 interface AngeboteRouteChildren {
-  AngeboteIdRoute: typeof AngeboteIdRoute
+  AngeboteIdRoute: typeof AngeboteIdRouteWithChildren
   AngeboteNeuRoute: typeof AngeboteNeuRoute
 }
 
 const AngeboteRouteChildren: AngeboteRouteChildren = {
-  AngeboteIdRoute: AngeboteIdRoute,
+  AngeboteIdRoute: AngeboteIdRouteWithChildren,
   AngeboteNeuRoute: AngeboteNeuRoute,
 }
 
@@ -480,13 +530,25 @@ const ObjekteRouteChildren: ObjekteRouteChildren = {
 const ObjekteRouteWithChildren =
   ObjekteRoute._addFileChildren(ObjekteRouteChildren)
 
+interface RechnungenIdRouteChildren {
+  RechnungenIdBearbeitenRoute: typeof RechnungenIdBearbeitenRoute
+}
+
+const RechnungenIdRouteChildren: RechnungenIdRouteChildren = {
+  RechnungenIdBearbeitenRoute: RechnungenIdBearbeitenRoute,
+}
+
+const RechnungenIdRouteWithChildren = RechnungenIdRoute._addFileChildren(
+  RechnungenIdRouteChildren,
+)
+
 interface RechnungenRouteChildren {
-  RechnungenIdRoute: typeof RechnungenIdRoute
+  RechnungenIdRoute: typeof RechnungenIdRouteWithChildren
   RechnungenNeuRoute: typeof RechnungenNeuRoute
 }
 
 const RechnungenRouteChildren: RechnungenRouteChildren = {
-  RechnungenIdRoute: RechnungenIdRoute,
+  RechnungenIdRoute: RechnungenIdRouteWithChildren,
   RechnungenNeuRoute: RechnungenNeuRoute,
 }
 
