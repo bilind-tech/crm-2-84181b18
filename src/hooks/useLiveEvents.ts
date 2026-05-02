@@ -68,6 +68,22 @@ export function useLiveEvents(enabled: boolean): void {
           qc.invalidateQueries({ queryKey: ["backups"] });
           break;
 
+        case "mahnung:lauf-fertig": {
+          const d = data as { versendet?: number; modus?: string };
+          qc.invalidateQueries({ queryKey: ["mahnung"] });
+          qc.invalidateQueries({ queryKey: ["rechnungen"] });
+          qc.invalidateQueries({ queryKey: ["email"] });
+          if (d?.modus === "auto" && (d.versendet ?? 0) > 0) {
+            toast.success(`${d.versendet} Mahnung(en) automatisch versendet`);
+          }
+          break;
+        }
+        case "mahnung:vorschlag":
+        case "mahnung:erstellt":
+          qc.invalidateQueries({ queryKey: ["mahnung"] });
+          qc.invalidateQueries({ queryKey: ["rechnungen"] });
+          break;
+
         case "einstellung:geaendert": {
           qc.invalidateQueries({ queryKey: ["einstellungen"] });
           const d = data as { key?: string };
