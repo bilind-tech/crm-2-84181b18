@@ -232,7 +232,25 @@ start_service() {
   local i
   for i in $(seq 1 15); do
     if curl -fsS "http://localhost:8787/health" >/dev/null 2>&1; then
-      ok "Service läuft — http://$(hostname).local:8787"
+      local hostn="$(hostname).local"
+      ok "Service läuft — http://${hostn}:8787"
+      # Setup-URL ausgeben, falls Setup-Token noch existiert (Erstinstallation)
+      local token_file="$DATA_DIR/keys/setup.token"
+      if [[ -f "$token_file" ]]; then
+        local token
+        token="$(cat "$token_file" 2>/dev/null || true)"
+        if [[ -n "$token" ]]; then
+          echo ""
+          echo "  ╭─────────────────────────────────────────────────────────────╮"
+          echo "  │  ERSTEINRICHTUNG — diesen Link im Browser öffnen:           │"
+          echo "  │                                                             │"
+          echo "  │  http://${hostn}:8787/setup?token=${token}"
+          echo "  │                                                             │"
+          echo "  │  Token-Datei: $token_file"
+          echo "  ╰─────────────────────────────────────────────────────────────╯"
+          echo ""
+        fi
+      fi
       return
     fi
     sleep 2
