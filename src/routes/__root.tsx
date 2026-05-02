@@ -12,6 +12,7 @@ import { SidebarProvider } from "@/components/ui/sidebar";
 import { Toaster } from "@/components/ui/sonner";
 import { startScheduler } from "@/lib/mock/scheduler";
 import { UeberfaelligPopup } from "@/components/notifications/UeberfaelligPopup";
+import { BackendStatusIndicator } from "@/components/layout/BackendStatusIndicator";
 
 export const Route = createRootRoute({
   head: () => ({
@@ -119,6 +120,7 @@ function Shell() {
         </div>
       </div>
       <UeberfaelligPopup />
+      <BackendStatusIndicator />
     </SidebarProvider>
   );
 }
