@@ -1011,10 +1011,19 @@ export const useAlleSitzungenBeenden = () => {
 
 
 // ---------- System & Updates ----------
+
+/** Backend liefert installedAt evtl. als SQLite-Format "YYYY-MM-DD HH:MM:SS". */
+function adaptSystemInfo(s: SystemInfo): SystemInfo {
+  const iso = s.installedAt && !s.installedAt.includes("T")
+    ? s.installedAt.replace(" ", "T") + "Z"
+    : s.installedAt;
+  return { ...s, installedAt: iso };
+}
+
 export const useSystemInfo = () =>
   useQuery({
     queryKey: qk.einstellungen.systemInfo,
-    queryFn: () => api.get<SystemInfo>("/system/info"),
+    queryFn: async () => adaptSystemInfo(await api.get<SystemInfo>("/system/info")),
   });
 
 export const useUpdateHistorie = () =>
@@ -1023,13 +1032,33 @@ export const useUpdateHistorie = () =>
     queryFn: () => api.get<InstallierteVersion[]>("/system/update/historie"),
   });
 
+/**
+ * Validiert ein hochgeladenes Update-Paket via Multipart-Upload.
+ * Backend: POST /system/update/validate, field=paket (file).
+ * Mock akzeptiert sowohl FormData (Pi-konform) als auch JSON-Fallback.
+ */
 export const useValidateUpdate = () =>
   useMutation({
-    mutationFn: (file: File) =>
-      api.post<UpdatePackageInfo>("/system/update/validate", {
-        fileName: file.name,
-        sizeBytes: file.size,
-      }),
+    mutationFn: async (file: File) => {
+      const fd = new FormData();
+      fd.append("paket", file, file.name);
+      // Direkt über piApi, weil Multipart vom Mock-Pfad nicht serialisiert wird.
+      // api.post leitet bei /system/* ohnehin auf piApi weiter; wir nutzen piApi
+      // direkt, damit der Mock-Fallback (offline + keine Backend-URL) klappt.
+      try {
+        return await piApi.post<UpdatePackageInfo>("/system/update/validate", fd);
+      } catch (e) {
+        // Mock-Fallback nur wenn Backend offline (status 0). In allen anderen
+        // Fällen Fehler unverändert weiterreichen, damit die UI ihn anzeigen kann.
+        if (e instanceof PiApiError && e.status === 0) {
+          return api.post<UpdatePackageInfo>("/system/update/validate", {
+            fileName: file.name,
+            sizeBytes: file.size,
+          });
+        }
+        throw e;
+      }
+    },
   });
 
 export const useInstallUpdate = () => {
@@ -1045,7 +1074,7 @@ export const useInstallUpdate = () => {
 };
 
 /** Lauf-Query: SSE treibt Updates (system:update:phase). Polling nur als
- *  Sicherheitsnetz alle 3 s, solange der Lauf "laeuft" — beim Pi-Backend
+ *  Sicherheitsnetz alle 10 s, solange der Lauf "laeuft" — beim Pi-Backend
  *  reicht oft das erste Refetch nach Connect. Im Mock-Modus bleibt es als
  *  Fallback erhalten. */
 export const useUpdateLauf = (id: string | null) =>
@@ -1055,9 +1084,26 @@ export const useUpdateLauf = (id: string | null) =>
     enabled: !!id,
     refetchInterval: (q) => {
       const data = q.state.data as UpdateLauf | undefined;
-      if (!data) return 1000;
-      return data.status === "laeuft" || data.status === "rollback" ? 3000 : false;
+      if (!data) return 1500;
+      return data.status === "laeuft" || data.status === "rollback" ? 10_000 : false;
     },
+  });
+
+/** Holt den ggf. laufenden Update-Lauf beim Tab-Mount. 204 → null. */
+export const useAktuellerUpdateLauf = (enabled: boolean) =>
+  useQuery({
+    queryKey: ["system", "update", "lauf", "aktuell"],
+    queryFn: async () => {
+      try {
+        return await api.get<UpdateLauf | null>("/system/update/lauf/aktuell");
+      } catch {
+        return null;
+      }
+    },
+    enabled,
+    staleTime: 0,
+    refetchOnMount: "always",
+    retry: false,
   });
 
 export const useRollbackUpdate = () => {

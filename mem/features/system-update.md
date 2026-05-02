@@ -34,7 +34,15 @@ type: feature
 ## SSE / Bus-Events
 - `system:update:phase` `{laufId, stepId, status, label, detail?}` — pro Step.
 - `system:update:lauf` `{laufId, status: laeuft|erfolg|fehler|rollback}` — Gesamtstatus.
-- Frontend `useLiveEvents`: invalidiert `["system","update","historie"]` + `["system","update","lauf",laufId]`, Toast bei Erfolg/Fehler/Rollback.
+- Frontend `useLiveEvents`: invalidiert `["system","update","historie"]` + `["system","update","lauf",laufId]`, Toast nur bei Erfolg/Fehler/Rollback (Phase löst keinen Toast aus).
+- Frontend `useUpdateLauf` Polling-Fallback alle 10 s solange `status==laeuft|rollback`, Live-Indikator im Dialog liest `onSseStatus()`.
+
+## Frontend-Anbindung (Step 9)
+- `useValidateUpdate` schickt `multipart/form-data` mit Field `paket` direkt über `piApi.post`. Mock-Backend akzeptiert sowohl FormData als auch JSON-Fallback.
+- `useAktuellerUpdateLauf` lädt beim Tab-Mount `GET /system/update/lauf/aktuell` und öffnet bei laufendem Lauf den Fortschritts-Dialog automatisch (Page-Reload-Reconnect).
+- `useSystemInfo` adaptiert SQLite-Datumsformat (`YYYY-MM-DD HH:MM:SS`) zu ISO.
+- `RollbackConfirmDialog` zählt 401 lokal (1/3, 2/3, 3/3), bei 429 Countdown bis Sperrzeit aus Fehlertext (Fallback 15 min).
+- Install-Mutation mappt 409 (läuft bereits), 404 (Upload abgelaufen), 413 (zu groß) auf freundliche Toasts.
 
 ## Endpoints
 - `GET /system/info`

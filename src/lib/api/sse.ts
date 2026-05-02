@@ -9,11 +9,19 @@ import { getBackendUrl } from "./backendUrl";
 export type SseListener = (ev: { type: string; data: unknown; id?: number }) => void;
 
 const listeners = new Set<SseListener>();
+const stateListeners = new Set<(connected: boolean) => void>();
 let es: EventSource | null = null;
 let active = false;
+let connected = false;
 let lastEventId: number | null = null;
 let backoffMs = 1000;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+
+function notifyState(): void {
+  for (const l of stateListeners) {
+    try { l(connected); } catch { /* ignore */ }
+  }
+}
 
 function dispatch(type: string, data: unknown, id?: number): void {
   for (const l of listeners) {
@@ -60,12 +68,16 @@ function open(): void {
 
   es.onopen = () => {
     backoffMs = 1000;
+    connected = true;
+    notifyState();
   };
 
   es.onerror = () => {
     // Auto-reconnect über Browser hat unklare Garantien — wir machen es selbst.
     if (es) { try { es.close(); } catch { /* noop */ } }
     es = null;
+    connected = false;
+    notifyState();
     scheduleReconnect();
   };
 }
@@ -90,6 +102,8 @@ export function stopSse(): void {
   active = false;
   if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
   if (es) { try { es.close(); } catch { /* noop */ } es = null; }
+  connected = false;
+  notifyState();
 }
 
 export function onSse(listener: SseListener): () => void {
@@ -98,3 +112,12 @@ export function onSse(listener: SseListener): () => void {
 }
 
 export function getLastEventId(): number | null { return lastEventId; }
+
+export function isSseConnected(): boolean { return connected; }
+
+/** Subscribe auf Verbindungsstatus. Liefert sofort den aktuellen Wert. */
+export function onSseStatus(cb: (connected: boolean) => void): () => void {
+  stateListeners.add(cb);
+  cb(connected);
+  return () => { stateListeners.delete(cb); };
+}

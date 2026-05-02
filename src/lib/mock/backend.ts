@@ -1804,13 +1804,21 @@ export async function mockBackend<T>(method: string, path: string, body?: unknow
   } else if (m === "GET" && match(path, "/system/update/historie")) {
     result = ensureVersionen(d);
   } else if (m === "POST" && match(path, "/system/update/validate")) {
-    // FRONTEND-MOCK — im Pi-Backend wird hier:
-    //   1. ZIP in /tmp/update-{id}/ entpackt (mit Zip-Bomb-Schutz)
-    //   2. package.json gelesen, Version + name validiert
-    //   3. db/migrations/ gegen schema_migrations-Tabelle abgeglichen
-    //   4. PackageInfo zurückgegeben — INSTALLATION passiert noch NICHT
-    const fileName = (body as { fileName?: string })?.fileName ?? "update.zip";
-    const sizeBytes = (body as { sizeBytes?: number })?.sizeBytes ?? 0;
+    // FRONTEND-MOCK — akzeptiert jetzt sowohl Multipart (file=paket) als auch
+    // den alten JSON-Pfad ({ fileName, sizeBytes }) als Fallback.
+    let fileName = "update.zip";
+    let sizeBytes = 0;
+    if (typeof FormData !== "undefined" && body instanceof FormData) {
+      const f = body.get("paket");
+      if (f instanceof File) {
+        fileName = f.name;
+        sizeBytes = f.size;
+      }
+    } else if (body && typeof body === "object") {
+      const b = body as { fileName?: string; sizeBytes?: number };
+      fileName = b.fileName ?? fileName;
+      sizeBytes = b.sizeBytes ?? sizeBytes;
+    }
     const info = mockValidateUpdate(fileName, sizeBytes, d);
     if (!d.updateUploads) d.updateUploads = {};
     d.updateUploads[info.uploadId] = info;
@@ -1825,6 +1833,10 @@ export async function mockBackend<T>(method: string, path: string, body?: unknow
     }
     const lauf = startUpdateLaufMock(d, info);
     persist();
+    result = lauf;
+  } else if (m === "GET" && match(path, "/system/update/lauf/aktuell")) {
+    const lauf = d.updateLaeufe?.find((l) => l.status === "laeuft" || l.status === "rollback");
+    if (!lauf) return null as T;
     result = lauf;
   } else if (m === "GET" && (path.startsWith("/system/update/lauf/"))) {
     const id = path.split("/")[4];

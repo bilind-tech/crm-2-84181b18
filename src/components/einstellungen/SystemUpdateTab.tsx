@@ -1,30 +1,8 @@
-// =============================================================================
 // Tab "System & Updates"
-// =============================================================================
-// FRONTEND-STUB-HINWEIS:
-// Aktuell wird KEIN echtes Update installiert. Die Steps und der Fortschritt
-// sind reine UI-Simulation (Mock-Backend in src/lib/mock/backend.ts).
-//
-// Das spätere Pi-Backend (POST /system/update/install/:uploadId) MUSS:
-//   1. Code/Daten-Trennung respektieren — DATA_DIR niemals anfassen
-//   2. Vor jedem Schritt logging in update_runs-Tabelle
-//   3. Sicherheits-Backup VOR npm install (nicht erst danach)
-//   4. Atomar umschalten via fs.rename (kein cp -r mid-flight)
-//   5. Bei JEDEM Fehler: alten Code zurück-rename, Service starten,
-//      Fehler an Frontend zurückgeben
-//   6. Update-Endpunkt nur für authentifizierte Admin-User
-//   7. Datei-Upload max 200 MB, Zip-Bomb-Schutz beim Entpacken
-//   8. Migrations idempotent (schema_migrations-Tabelle prüft, was schon lief)
-//
-// ROLLBACK-VERTRAG (POST /system/update/rollback/:version):
-//   - Body: { passwort: string }  → bcrypt-Vergleich serverseitig (nie clientseitig)
-//   - Bei falschem Passwort: 401, Service unverändert weiter
-//   - Vor dem Code-Swap: pre-rollback-{ts}.sqlite.gz im Backup-Ordner anlegen
-//   - DATA_DIR (/var/lib/mycleancenter/) wird NIEMALS angefasst — auch nicht
-//     gelesen-mit-Lock. Nur /opt/mycleancenter/current/ wird via fs.rename
-//     getauscht (current → broken-{ts}, previous → current).
-//   - Bei Fehler: kein halb-getauschter Zustand, Service mit altem Code weiter.
-// =============================================================================
+// Zeigt aktuelle Version + Update-Upload + Versionshistorie + Live-Lauf-Dialog.
+// Backend (Step 8) ist angebunden: Multipart-Upload, SSE-getriebener Fortschritt,
+// 401-Lockout für Rollback. Wenn beim Tab-Mount ein Lauf bereits läuft, öffnet
+// sich der Fortschritts-Dialog automatisch.
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
@@ -40,6 +18,7 @@ import {
   Cpu,
   Database,
   ChevronRight,
+  Radio,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -60,6 +39,7 @@ import {
   useValidateUpdate,
   useInstallUpdate,
   useUpdateLauf,
+  useAktuellerUpdateLauf,
   useRollbackUpdate,
 } from "@/hooks/useApi";
 import type {
@@ -68,6 +48,7 @@ import type {
   UpdateStepStatus,
   InstallierteVersion,
 } from "@/lib/api/types";
+import { onSseStatus } from "@/lib/api/sse";
 import { cn } from "@/lib/utils";
 
 function formatDateTime(iso: string): string {
@@ -110,8 +91,13 @@ export function SystemUpdateTab() {
 
   const { data: lauf } = useUpdateLauf(activeLaufId);
 
-  // Beim Erfolg: nach 2s Modal nicht automatisch schließen — User muss bestätigen
-  // Beim Fehler: Modal bleibt offen mit Fehler-State
+  // Beim Mount: gibt es einen aktuell laufenden Update-Lauf? Dann Dialog öffnen,
+  // damit ein User, der die Seite während eines Updates neu lädt, weiter den
+  // Fortschritt sieht.
+  const { data: aktuellerLauf } = useAktuellerUpdateLauf(!activeLaufId);
+  useEffect(() => {
+    if (aktuellerLauf?.id && !activeLaufId) setActiveLaufId(aktuellerLauf.id);
+  }, [aktuellerLauf, activeLaufId]);
 
   if (sysLoading || !system) return <LoadingPlaceholder />;
 
@@ -124,7 +110,19 @@ export function SystemUpdateTab() {
         }
         setPendingPackage(info);
       },
-      onError: (e) => toast.error(`Validierung fehlgeschlagen: ${(e as Error).message}`),
+      onError: (e) => {
+        const err = e as { status?: number; message?: string };
+        const msg = err.message ?? "Unbekannter Fehler";
+        if (err.status === 413) {
+          toast.error("Paket zu groß (max. 200 MB).");
+        } else if (err.status === 400) {
+          toast.error(`Update-Paket ungültig: ${msg}`);
+        } else if (err.status === 401) {
+          toast.error("Bitte erneut anmelden.");
+        } else {
+          toast.error(`Validierung fehlgeschlagen: ${msg}`);
+        }
+      },
     });
   };
 
@@ -135,7 +133,17 @@ export function SystemUpdateTab() {
         setActiveLaufId(newLauf.id);
         setPendingPackage(null);
       },
-      onError: (e) => toast.error(`Installation konnte nicht starten: ${(e as Error).message}`),
+      onError: (e) => {
+        const err = e as { status?: number; message?: string };
+        if (err.status === 409) {
+          toast.error("Es läuft bereits ein Update.");
+        } else if (err.status === 404) {
+          toast.error("Upload abgelaufen — bitte Paket erneut hochladen.");
+          setPendingPackage(null);
+        } else {
+          toast.error(`Installation konnte nicht starten: ${err.message ?? "Fehler"}`);
+        }
+      },
     });
   };
 
@@ -417,6 +425,10 @@ function UpdateProgressDialog({
     return () => clearInterval(t);
   }, [isRunning]);
 
+  // SSE-Verbindungsstatus für „● Live"-Indikator
+  const [sseConnected, setSseConnected] = useState(false);
+  useEffect(() => onSseStatus(setSseConnected), []);
+
   return (
     <Dialog open onOpenChange={(o) => !o && !isRunning && onClose()}>
       <DialogContent className="bg-background sm:max-w-md">
@@ -447,6 +459,20 @@ function UpdateProgressDialog({
               <Clock className="mr-1 inline h-3 w-3" />
               {formatDuration(lauf.startetAm, lauf.beendetAm)}
             </span>
+            {isRunning && (
+              <span
+                className={cn(
+                  "ml-2 inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-medium",
+                  sseConnected
+                    ? "border-emerald-500/30 bg-emerald-500/5 text-emerald-600 dark:text-emerald-400"
+                    : "border-muted-foreground/20 bg-muted/40 text-muted-foreground",
+                )}
+                title={sseConnected ? "Live-Aktualisierung aktiv" : "Aktualisierung in Kürze"}
+              >
+                <Radio className={cn("h-2.5 w-2.5", sseConnected && "animate-pulse")} />
+                {sseConnected ? "Live" : "—"}
+              </span>
+            )}
           </DialogDescription>
         </DialogHeader>
 
