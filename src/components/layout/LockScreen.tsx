@@ -285,7 +285,6 @@ function RecoveryAnzeige({
 
 function SetupForm() {
   const { setup, loading } = useAuth();
-  const [username, setUsername] = useState("admin");
   const [password, setPassword] = useState("");
   const [setupToken, setSetupToken] = useState(() => {
     if (typeof window === "undefined") return "";
@@ -299,7 +298,7 @@ function SetupForm() {
     e.preventDefault();
     setFehler(null);
     try {
-      const res = await setup({ username, password, setupToken });
+      const res = await setup({ password, setupToken });
       setRecoveryCode(res.recoveryCode);
     } catch (err) {
       if (err instanceof PiApiError) {
@@ -320,11 +319,10 @@ function SetupForm() {
     return (
       <RecoveryAnzeige
         code={recoveryCode}
-        titel="Account angelegt"
+        titel="Passwort gesetzt"
         hinweis="Mit diesem Code kannst du dein Passwort zurücksetzen, falls du es vergisst."
         onWeiter={() => {
           setRecoveryCode(null);
-          // Reload damit URL-Token-Param weg ist und App im logged-in-Modus startet
           window.location.assign("/");
         }}
       />
@@ -332,7 +330,7 @@ function SetupForm() {
   }
 
   return (
-    <Wrapper sub="Ersteinrichtung des Pi-Backends — Owner-Account anlegen.">
+    <Wrapper sub="Ersteinrichtung — Passwort festlegen.">
       <form onSubmit={submit} className="space-y-4">
         <div className="rounded-md border border-amber-300/60 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-700/40 dark:bg-amber-900/20 dark:text-amber-200">
           <div className="mb-1 flex items-center gap-1.5 font-semibold">
@@ -341,16 +339,6 @@ function SetupForm() {
           </div>
           Steht im Backend-Log beim ersten Start oder in
           <code className="mx-1">data/keys/setup.token</code>.
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="setup-user">Benutzername</Label>
-          <Input
-            id="setup-user"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            autoComplete="username"
-            required
-          />
         </div>
         <div className="space-y-2">
           <Label htmlFor="setup-pw">Passwort (min. 12 Zeichen)</Label>
@@ -371,7 +359,7 @@ function SetupForm() {
         )}
         <Button type="submit" className="w-full" disabled={loading}>
           <UserPlus className="mr-2 h-4 w-4" />
-          {loading ? "Einrichten …" : "Account einrichten"}
+          {loading ? "Einrichten …" : "Passwort festlegen"}
         </Button>
       </form>
     </Wrapper>
