@@ -109,6 +109,14 @@ interface DB {
   zaehler: { kunde: number; objekt: number; angebot: number; rechnung: number; dauerauftrag: number };
   /** Pro Kunde + "YYYY-MM" laufende Nummer für Rechnungen/Angebote mit eigenem Kürzel. */
   zaehlerProKunde?: Record<string, Record<string, number>>;
+  /** System-Info (CRM-Version, Stack, Hardware). */
+  systemInfo?: SystemInfo;
+  /** Versionshistorie — die aktive Version steht oben. */
+  installedVersionen?: InstallierteVersion[];
+  /** Laufende & abgeschlossene Update-Läufe. */
+  updateLaeufe?: UpdateLauf[];
+  /** Frisch validierte Update-Pakete, die auf Install-Bestätigung warten. */
+  updateUploads?: Record<string, UpdatePackageInfo>;
 }
 
 let db: DB | null = null;
