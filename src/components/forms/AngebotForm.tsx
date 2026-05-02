@@ -180,13 +180,12 @@ export function AngebotForm({ onClose, defaultKundeId, defaultObjektId }: Props)
 
       <OptionenBlock value={optionen} onChange={setOptionen} />
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div>
         <Field label="Gültig bis">
           <Input type="date" value={gueltigBis} onChange={(e) => setGueltigBis(e.target.value)} />
         </Field>
-        <Field label="MwSt-Satz (%)">
-          <Input type="number" value={steuersatz} onChange={(e) => setSteuersatz(Number(e.target.value) || 0)} />
-        </Field>
+      </div>
+      <div>
         <Field label="Gesamtrabatt (%)">
           <Input type="number" value={rabattGesamt} onChange={(e) => setRabattGesamt(Number(e.target.value) || 0)} />
         </Field>
