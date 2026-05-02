@@ -19,7 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { useKundenZaehler, useUpdateKunde } from "@/hooks/useApi";
+import { useKundenZaehler, useUpdateKunde, useKuerzelFrei } from "@/hooks/useApi";
 import type { Kunde } from "@/lib/api/types";
 
 function sanitizeKuerzel(v: string): string {
