@@ -21,6 +21,7 @@ import {
   listSessions,
 } from "../auth/sessions.js";
 import { createConnection } from "node:net";
+import { resetTransport } from "../email/transport.js";
 
 function loadArea(name: keyof typeof AREAS): unknown {
   const a = AREAS[name];
@@ -107,6 +108,7 @@ export async function einstellungenRoutes(app: FastifyInstance): Promise<void> {
         return { error: "validation", issues: pw.error.issues };
       }
       setSetting(SENSITIVE_KEYS.smtpPassword, pw.data.password, { encrypt: true });
+      resetTransport();
     }
     delete body.password;
     delete body.passwordIsSet;
@@ -116,6 +118,7 @@ export async function einstellungenRoutes(app: FastifyInstance): Promise<void> {
       reply.status(r.status);
       return { error: r.error, issues: r.issues };
     }
+    resetTransport();
     audit({ userId: req.user?.id, action: "settings.smtp.patch", ip: req.ip });
     const meta = getSettingMeta(SENSITIVE_KEYS.smtpPassword);
     return { ...(r.value as object), passwordIsSet: meta.exists, passwordUpdatedAt: meta.updatedAt };

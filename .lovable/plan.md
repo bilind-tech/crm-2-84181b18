@@ -1,91 +1,126 @@
+## Step 6 — Mail (Strato) + Google Drive
 
-# Step 5 — PDF-Rendering im Pi-Backend
+Ziel: Rechnungs-/Angebots-PDFs per E-Mail verschicken (manuell + Daueraufträge) **und** automatisch nach Google Drive hochladen. Beides läuft als Queue mit Retry, idempotent, geräteübergreifend, Tokens verschlüsselt.
 
-## Ziel
-Server-seitige, deterministische PDF-Generierung für Angebote und Rechnungen direkt auf dem Pi. Gleiche Optik wie das bestehende `src/lib/pdf/belegPdf.ts` (pdfmake-Layout, Mustervorlage MyCleanCenter), aber:
-- erzeugt im Backend, damit derselbe Bytestrom später per E-Mail versendet, in Drive abgelegt und im Frontend angezeigt wird
-- mit Cache, ETag, Konsistenz-Hash und Vorbereitung für den Auto-Drive-Upload aus Step 6
-- Bestand bleibt: Frontend-Generator weiter verfügbar, nutzt aber bevorzugt das Backend, wenn online
+---
 
-Mock-Modus bleibt: Wenn kein Pi konfiguriert ist, fällt die UI weiterhin auf den Browser-Generator zurück.
+### 1. E-Mail-Versand (SMTP, Strato)
 
-## Backend
+**Datenmodell** (Migration `009_email.sql`):
+- `email_vorlagen`: id, name, betreff, body_html, kontext (`rechnung`/`angebot`/`mahnung`/`allgemein`), ist_standard, created_at, updated_at
+- `email_signaturen`: id, name, html, ist_standard, created_at, updated_at
+- `email_versand`: id, an, cc, bcc, betreff, body_html, anhaenge_json, status (`pending`/`sending`/`gesendet`/`fehler`), beleg_id?, beleg_art?, vorlage_id?, idempotenz_key UNIQUE, fehler_text?, versendet_am?, naechster_versuch_at?, versuche, created_at
+- Indexe: `idempotenz_key`, `(status, naechster_versuch_at)`, `beleg_id`
 
-### 1. Library
-- `pdfmake` serverseitig in Node 20 (LTS) — funktioniert, weil das Backend auf dem Pi (echtes Node) läuft, nicht im Worker. (Lovable Cloud / Worker-Runtime ist hier irrelevant — der Pi-Backend-Stack ist standalone Fastify.)
-- Schriften: Roboto (Standard von pdfmake) als VFS, gebündelt aus `pdfmake/build/vfs_fonts.js`.
-- Logo: aus Datei (`/var/lib/mycleancenter/branding/logo.png`) wenn vorhanden, sonst aus `firmendaten`-Override (Base64 in DB, identisch zur bestehenden `optionen.logoOverride`-Logik).
+**Backend-Module** (`backend/src/email/`):
+- `transport.ts` — nodemailer-Singleton, baut Transport aus `setting.smtp` + `SENSITIVE_KEYS.smtpPassword` (entschlüsselt). Lazy + Reload bei Settings-Änderung.
+- `templates.ts` — CRUD, Default-Vorlagen seeden (Rechnung, Angebot, Mahnung 1/2/3), Platzhalter-Engine (`{{kunde.name}}`, `{{beleg.nummer}}`, `{{firma.name}}`, …). Render via simpler Token-Replace, HTML-escape pro Wert, Whitelist statt eval.
+- `signaturen.ts` — CRUD, ist_standard-Switch.
+- `versand-repo.ts` — enqueue, list, byId, markRunning, markErfolg, markFehler (Backoff: 1m/5m/15m/1h/4h/24h, danach manuell).
+- `attachments.ts` — holt Beleg-PDF via `renderAngebotPdf`/`renderRechnungPdf` aus Step 5 als Buffer, baut `nodemailer.Attachment`.
+- `worker.ts` — `node-cron` alle 30 s: nimmt fällige Rows (`status=pending` AND `naechster_versuch_at<=now`), `LIMIT 5`, `FOR UPDATE`-Ersatz via SQLite `BEGIN IMMEDIATE` + Statusflip auf `sending`. Sendet, schreibt zurück. Doppel-Worker-Schutz via Prozess-Lock.
+- `events.ts` — emittiert `email-versand-changed` für SSE (Step 8 später).
 
-### 2. Module unter `backend/src/pdf/`
-- `pdfmake.ts` — initialisiert pdfmake-Printer einmalig (VFS + Fonts). Gibt einen `Printer` aus, der `createPdfKitDocument(definition)` liefert (Stream-API).
-- `layout.ts` — portiert die reinen Layout-Bauer aus `src/lib/pdf/belegPdf.ts` (header/footer/leistungstabelle/summenBlock/anrede/intro/outro). Identische Funktionsnamen, gleiche Strukturen, damit Frontend- und Backend-Output Pixel-/Layout-gleich bleiben.
-- `belegPdf.server.ts` — `renderAngebotPdf(angebot, kunde, firma, ansprechpartner)` und `renderRechnungPdf(...)`, geben `Buffer` zurück. Liest Optionen-Overrides (Intro/Outro/Logo/Firma) genauso wie der Client.
-- `cache.ts` — Datei-Cache unter `${dataDir}/pdf-cache/{angebot|rechnung}/{id}-{hash}.pdf`.
-  - `hash = sha256(JSON({nummer, geaendertAm, brutto, positionenHash, optionenHash, firmaHash}))`
-  - Lookup: wenn Datei existiert → direkt zurück. Sonst rendern + atomar `rename` reinschreiben.
-  - Garbage-Collection: bei Belegänderung alte Dateien zu derselben `id` löschen.
-- `streams.ts` — Helfer `pdfKitToBuffer(stream)` (sammelt chunks zu Buffer), `etag(buffer)` (sha256-prefix).
+**Routes** (`backend/src/routes/email.ts`, requireAuth):
+- `GET/POST/PATCH/DELETE /email/vorlagen[/:id]`
+- `GET/POST/PATCH/DELETE /email/signaturen[/:id]`
+- `GET /email/versand` (Filter: status, beleg_id, q, paginiert)
+- `GET /email/versand/:id`
+- `POST /email/versand` — body: `{ an, cc?, bcc?, betreff, bodyHtml, vorlageId?, signaturId?, belegArt?, belegId?, idempotenzKey }`. Bei `belegArt+belegId`: PDF wird beim Senden frisch geholt (immer aktuell).
+- `POST /email/versand/:id/retry` — setzt `naechster_versuch_at=now`, Versuche bleiben.
+- `POST /email/versand/:id/abbrechen`
+- `POST /email/test` — Body `{ an }`, sendet Test-Mail synchron mit aktuellen SMTP-Settings, gibt Fehler 1:1 zurück.
+- `PUT /einstellungen/smtp` (existiert) erweitert um Password-Setter (verschlüsselt) + Reset-Hook für Transport-Singleton.
 
-### 3. Belege-Repos integrieren
-- `belegnummer.ts`/`updateRechnung`/`updateAngebot`/`addZahlung` etc. werden NICHT verändert. Aber:
-  - Status-Engine triggert `pdfCache.invalidate(belegId)` bei jeder relevanten Mutation (über kleine Events in `belege/events.ts`).
-  - Mutationen sind `cacheBust=true` für die nächste GET-Anfrage des PDFs.
+**Sicherheit / Härtung**:
+- SMTP-Passwort nie im GET zurückgeben (`isSet` reicht).
+- Anti-Loop: gleicher `idempotenzKey` → 409.
+- Rate-Limit auf `/email/test` (5/min).
+- Body-HTML nur sanitized rendern (kein eval, keine externen Skripte).
 
-### 4. Routes unter `backend/src/routes/belege-pdf.ts`
-- `GET /angebote/:id/pdf` und `GET /rechnungen/:id/pdf`
-  - Auth: bestehende `requireAuth`-Middleware.
-  - Liest Beleg + Kunde + Firmendaten + ggf. Ansprechpartner.
-  - Berechnet Hash, prüft Cache, rendert wenn nötig.
-  - Antwort: `application/pdf`, `Content-Disposition: inline; filename="{Nummer} {Kundenname}.pdf"`, `ETag: "<hash>"`, `Cache-Control: private, max-age=0, must-revalidate`.
-  - Unterstützt `If-None-Match` → `304` ohne Body.
-- `GET /angebote/:id/pdf/meta` und `GET /rechnungen/:id/pdf/meta`
-  - Liefert `{ etag, groesseBytes, erzeugtAm, dateiname }` ohne Bytestrom — fürs Frontend, um Cache-Status anzuzeigen.
-- `POST /angebote/:id/pdf/regenerieren` (gated, nur bei Bedarf) — invalidiert Cache und rendert sofort neu.
+---
 
-Routes werden in `server.ts` registriert.
+### 2. Google Drive — OAuth + Upload-Queue
 
-### 5. Drive-Vorbereitung (kein vollständiger Upload — der kommt in Step 6)
-- `belege/events.ts` exportiert `onBelegVersendet(belegId, art)`. Step 6 hängt sich dort ein. In Step 5 nur Stub + Logger.
-- Bei `POST /angebote/:id/senden` / `POST /rechnungen/:id/senden`: nach Status-Update `events.onBelegVersendet(id, art)` rufen — der Event-Handler (für Drive) wird in Step 6 implementiert.
+**Migration ergänzt 009**: `drive_upload_queue`: id, beleg_art, beleg_id, datei_name, idempotenz_key UNIQUE (`{belegnummer}-{sha256pdf}`), status, drive_file_id?, drive_web_link?, fehler_text?, versuche, naechster_versuch_at?, abgeschlossen_am?, created_at.
 
-### 6. Tests `backend/test/pdf.spec.ts` (Vitest)
-- `renderAngebotPdf` liefert nicht-leeren Buffer mit `%PDF-`-Header.
-- Cache: zweiter Aufruf liefert exakt dieselben Bytes (Buffer-Equality).
-- Mutation an einer Position invalidiert Cache (zweiter Render = neue Bytes, neuer ETag).
-- HTTP-Smoke-Test via Fastify `inject`: `GET /rechnungen/:id/pdf` → `200`, `application/pdf`, `ETag` gesetzt; `If-None-Match` → `304`.
-- Layout-Sanitäts-Check: `pdftotext` Aufruf optional skippen, wenn binary fehlt; sonst prüfen, dass Belegnummer + Kundenname im Text vorkommen. (Skip-fähig — Tests laufen auch ohne Poppler.)
+**Backend-Module** (`backend/src/drive/`):
+- `oauth.ts` — `googleapis`-Client. `buildAuthUrl()` mit `scope=drive.file`, `access_type=offline`, `prompt=consent`. `exchangeCode(code)` → speichert Refresh-Token verschlüsselt unter `googleDrive.refreshToken`, Klartext-Email als `googleDrive.kontoEmail` in DB.
+- `client.ts` — liefert authentisierten `drive_v3.Drive`-Client; refresht Access-Token automatisch. Bei `invalid_grant` → Status `disconnected` + Notiz im Log.
+- `folders.ts` — `ensureRootFolder()`, `ensureMonthFolder(art, jahr, monat)`. Cached Folder-IDs im Setting `googleDrive.folderCache` (JSON: { rootId, "Rechnungen/2026/05": id, … }).
+- `upload-repo.ts` — enqueue, fällige holen, status-flips, Backoff identisch zu Mail.
+- `upload-worker.ts` — node-cron alle 60 s, parallel max 2. Holt PDF via Step-5-Renderer → `drive.files.create` (multipart, mit `parents`-Folder-ID + `name`). Schreibt `drive_file_id`/`webViewLink` zurück, emittiert `drive-upload-changed`.
+- `events.ts` (für Step 8 SSE).
 
-## Frontend
+**Routes** (`backend/src/routes/drive.ts`, requireAuth außer Callback):
+- `GET /einstellungen/google-drive` → `{ verbunden, kontoEmail?, rootOrdnerId?, letzteSynchronisation?, letzterFehler? }` (KEIN Refresh-Token).
+- `POST /einstellungen/google-drive/connect` → `{ authorizeUrl }` (state = HMAC-signierter CSRF-Token aus Server-Secret).
+- `GET /einstellungen/google-drive/callback?code&state` (PUBLIC, validiert state, tauscht Code, speichert Token, redirected zu `/einstellungen?tab=drive&status=ok|err`).
+- `POST /einstellungen/google-drive/disconnect` → löscht Tokens + Folder-Cache, setzt Status.
+- `POST /einstellungen/google-drive/test` → erstellt/aktualisiert Test-Datei `verbindungstest.txt` im Root.
+- `GET /drive/uploads` (Filter: status, beleg_id), `POST /drive/uploads/:id/retry`.
 
-### 1. Neuer Hook-Pfad
-- `src/lib/pdf/belegPdfBackend.ts`:
-  - `fetchAngebotPdf(id): Promise<Blob>` und `fetchRechnungPdf(id)` — über `piApi.get` als ArrayBuffer.
-  - `fetchAngebotPdfMeta(id)` / `fetchRechnungPdfMeta(id)`.
-- `useBelegPdf.ts` umstellen:
-  - Wenn Backend-URL konfiguriert (`isBackendUrlExplicit()`), Backend-PDF nutzen.
-  - Sonst auf den bestehenden Browser-Generator (`generateAngebotPdf`/`generateRechnungPdf`) fallen — Demo-/Offline-Modus bleibt erhalten.
-  - Public Surface (`{ url, status, error }`) bleibt unverändert. Konsumenten (`PdfPreviewCard`, `PdfViewerDialog`, `LivePdfPreview`, `EmailVersandDialog`, `MahnSektion`) müssen nicht angefasst werden.
+**Auto-Enqueue-Hook**:
+- In `belege/events.ts`: bei `mutated` mit `status === "versendet"` (Rechnung) bzw. `status === "akzeptiert"` (Angebot) → `enqueueDriveUpload(art, id)` (idempotent über UNIQUE-Key).
+- Konfigurierbar via `setting.backup.driveUploadEnabled` (existiert bereits) — wenn `false`, Queue nicht befüllen.
 
-### 2. API-Client
-- `src/lib/api/client.ts`: `PI_PREFIXES` deckt `/angebote/` und `/rechnungen/` schon ab. Pdf-Subpfade matchen also automatisch.
-- `piClient` muss ArrayBuffer/Blob unterstützen — falls nicht, dort kleine `getBlob(path)`-Methode ergänzen.
+**Sicherheit**:
+- `client_id` + `client_secret` kommen aus DB (User trägt sie in Einstellungen ein, Secret verschlüsselt).
+- Refresh-Token niemals loggen, nicht über GET zurückgeben.
+- State-Token CSRF-geschützt + 10 min TTL.
+- Scope minimal: `drive.file` (nur eigene Dateien).
 
-### 3. ETag-Caching im Browser
-- Im Hook: letztes ETag pro Beleg-ID in Memory-Map. Bei reload conditionally-GET; bei `304` weiter den vorhandenen Blob/URL nutzen, sonst neuen Blob bauen.
+---
 
-## Out-of-Scope (kommt in Step 6)
-- Echte Drive-Uploads, Mailversand mit PDF-Anhang, Mahnungs-PDF-Varianten, Wasserzeichen für Entwürfe. Step 5 liefert nur den deterministischen Renderer + Endpoints + Cache + Hooks/Events.
+### 3. Frontend-Anpassungen
 
-## Risiken & Mitigation
-- **pdfmake-Output kann auf Server vs. Browser leicht differieren** (Font-Hinting). Mitigation: identische Roboto-VFS auf beiden Seiten; Tests vergleichen nicht Pixel, sondern strukturelle Inhalte (Belegnummer/Beträge im extrahierten Text).
-- **Speicherverbrauch bei großen Belegen**: pdfmake puffert. Akzeptabel auf Pi 5 (8 GB) bei realistischen Belegen (≤ 50 Positionen). Cache verhindert Mehrfach-Renderings.
-- **Cache-Konsistenz**: Hash bezieht alle ausgabe-relevanten Felder ein (inkl. `geaendertAm` aus Repo-Triggern). Kein TTL nötig.
+- `src/lib/api/client.ts`: Pi-Prefixes ergänzen (`/email/`, `/drive/`).
+- `src/components/email/EmailEinstellungen.tsx`: SMTP-Test-Button verdrahten, Passwort-Feld als „•••• gesetzt"/Edit.
+- `src/components/einstellungen/GoogleDriveTab.tsx`: Connect/Disconnect/Test, Status-Pille, letzter Fehler, Upload-Queue-Liste mit Retry.
+- `src/components/dokumente/DriveSyncBadge.tsx` + `src/components/pdf/DriveStatusBadge.tsx`: an `/drive/uploads?beleg_id=...` koppeln, dezenter Status (pending/erfolg/fehler).
+- Neue Hook-Datei `src/hooks/useDrive.ts` (TanStack Query) — refetch alle 5 s wenn pending.
+- Im Beleg-Detail: Button „Per E-Mail senden" öffnet Dialog mit Vorlagen-Auswahl + Empfänger (vorbelegt aus Kunde) + Vorschau; submit → `POST /email/versand` mit `belegArt+belegId+idempotenzKey=email-{belegnummer}-{ts}`.
 
-## Akzeptanzkriterien
-- `GET /rechnungen/:id/pdf` liefert ein gültiges PDF mit Belegnummer im Dateinamen und im Inhalt.
-- Zweiter Aufruf direkt aus Cache (kein Re-Render messbar in Logs).
-- Änderung an einer Position bricht den Cache, neue Bytes, neuer ETag.
-- Frontend zeigt im Online-Modus das Backend-PDF, im Demo-Modus weiterhin das Browser-PDF — ohne sichtbare Änderung der UI.
-- Vitest-Suite `backend/test/pdf.spec.ts` grün, alle bestehenden Tests bleiben grün.
+---
 
-Sag „weiter" — dann implementiere ich Step 5 in dieser Reihenfolge: Library + Layout-Port → Cache → Routes → Server-Wiring → Frontend-Hook-Umstellung → Tests.
+### 4. Tests (`backend/test/email.spec.ts` + `drive.spec.ts`)
+
+E-Mail:
+- Vorlage-CRUD inkl. Default-Switch (genau eine `ist_standard` pro Kontext).
+- Platzhalter-Render escaped HTML korrekt, unbekannte Token bleiben leer.
+- Worker: pending → sending → erfolg (mit gemocktem Transport via `nodemailer.createTransport({ jsonTransport: true })`).
+- Backoff bei Fehler, max-Versuche → manuell.
+- Idempotenz-Key UNIQUE → 409.
+- PDF-Anhang via Step-5-Renderer enthält `%PDF-`-Header.
+
+Drive:
+- OAuth-State HMAC verify, abgelaufener State → 400.
+- Folder-Cache wird bei zweitem Upload nicht neu erstellt (Mock googleapis).
+- Auto-Enqueue bei `rechnung.status=versendet`, idempotent bei Doppel-Mutation.
+- Upload-Worker: success setzt `drive_file_id`, fehler setzt Backoff, `disconnect` invalidiert Tokens.
+
+---
+
+### 5. Memory-Updates
+
+- Neue Datei `mem://features/backend-step6-mail-drive` mit Architektur-Zusammenfassung.
+- Index-Eintrag „Step 6 — Mail+Drive".
+- `mem://features/google-drive` aktualisieren: Routenpfade, Folder-Cache-Setting-Key, `drive.file`-Scope, Auto-Enqueue-Trigger.
+
+---
+
+### 6. Reihenfolge der Umsetzung (1 Prompt, ohne Rückfragen)
+
+```
+1. Migration 009 (email_*, drive_upload_queue) + Default-Vorlagen seed
+2. backend/src/email/* (transport, templates, signaturen, versand-repo, attachments, worker, events)
+3. backend/src/routes/email.ts + server.ts wiring + Worker-Start
+4. backend/src/drive/* (oauth, client, folders, upload-repo, upload-worker, events)
+5. backend/src/routes/drive.ts + server.ts wiring + Auto-Enqueue-Hook in belege/events
+6. SmtpSettings-Reload-Hook bei PUT /einstellungen/smtp
+7. Frontend: api/client.ts Prefixe, GoogleDriveTab, EmailEinstellungen-SMTP-Test, DriveSyncBadge, useDrive, „Per E-Mail senden"-Dialog im Beleg-Detail
+8. Tests email.spec.ts + drive.spec.ts (mit nodemailer-jsonTransport + googleapis-mock)
+9. mem-Updates
+```
+
+**Sag „weiter", dann lege ich mit Migration 009 + Mail-Modul los.**
