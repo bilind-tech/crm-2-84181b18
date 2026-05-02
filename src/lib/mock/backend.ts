@@ -366,8 +366,43 @@ export async function mockBackend<T>(method: string, path: string, body?: unknow
       );
     }
     result = liste;
+  } else if (m === "GET" && match(path.split("?")[0], "/kunden/kuerzel-frei")) {
+    // Live-Verfügbarkeitsprüfung für Kunden-Kürzel.
+    // Antwort: { frei: boolean, kunde?: { id, nummer, name } }
+    const q = query(path);
+    const roh = (q.get("kuerzel") ?? "").trim().toUpperCase();
+    const exceptId = q.get("exceptId") ?? undefined;
+    if (!roh) {
+      result = { frei: true };
+    } else {
+      const treffer = d.kunden.find(
+        (kk) =>
+          (kk.kuerzel ?? "").trim().toUpperCase() === roh &&
+          kk.id !== exceptId,
+      );
+      if (treffer) {
+        const name = treffer.firmenname || `${treffer.vorname ?? ""} ${treffer.nachname ?? ""}`.trim() || "Kunde";
+        result = { frei: false, kunde: { id: treffer.id, nummer: treffer.nummer, name } };
+      } else {
+        result = { frei: true };
+      }
+    }
   } else if (m === "POST" && match(path, "/kunden")) {
     const k = body as Partial<Kunde> & { startZaehlerAktuellerMonat?: number };
+    // Kürzel-Eindeutigkeit erzwingen (case-insensitive, getrimmt)
+    const eingehendesKuerzel = k.kuerzel?.trim().toUpperCase().slice(0, 4);
+    if (eingehendesKuerzel) {
+      const konflikt = d.kunden.find(
+        (kk) => (kk.kuerzel ?? "").trim().toUpperCase() === eingehendesKuerzel,
+      );
+      if (konflikt) {
+        const name = konflikt.firmenname || `${konflikt.vorname ?? ""} ${konflikt.nachname ?? ""}`.trim() || "Kunde";
+        throw new ApiError(
+          `Kürzel «${eingehendesKuerzel}» wird bereits von ${konflikt.nummer} (${name}) verwendet.`,
+          409,
+        );
+      }
+    }
     d.zaehler.kunde += 1;
     const neu: Kunde = {
       id: uuid(),
