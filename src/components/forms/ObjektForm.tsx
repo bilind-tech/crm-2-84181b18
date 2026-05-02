@@ -3,7 +3,6 @@ import { useNavigate } from "@tanstack/react-router";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -13,7 +12,6 @@ import {
 } from "@/components/ui/select";
 import { useKunden, useCreateObjekt } from "@/hooks/useApi";
 import { toast } from "sonner";
-import type { Reinigungsfrequenz, ObjektTyp } from "@/lib/api/types";
 
 interface Props {
   onClose: () => void;
@@ -28,13 +26,10 @@ export function ObjektForm({ onClose, defaultKundeId, kompakt }: Props) {
   const navigate = useNavigate();
   const [kundeId, setKundeId] = useState(defaultKundeId ?? "");
   const [name, setName] = useState("");
-  const [typ, setTyp] = useState<ObjektTyp>("buero");
+  const [nummer, setNummer] = useState("");
   const [strasse, setStrasse] = useState("");
   const [plz, setPlz] = useState("");
   const [ort, setOrt] = useState("");
-  const [qmZuReinigen, setQm] = useState<number | "">("");
-  const [frequenz, setFrequenz] = useState<Reinigungsfrequenz>("woechentlich");
-  const [zugang, setZugang] = useState("");
 
   const isKompakt = kompakt ?? false;
 
@@ -60,14 +55,13 @@ export function ObjektForm({ onClose, defaultKundeId, kompakt }: Props) {
         : {
             kundeId,
             name,
-            typ,
-            strasse,
-            plz,
-            ort,
-            qmZuReinigen: typeof qmZuReinigen === "number" ? qmZuReinigen : undefined,
-            frequenz,
+            nummer: nummer.trim() || undefined,
+            typ: "buero",
+            strasse: strasse || undefined,
+            plz: plz || undefined,
+            ort: ort || undefined,
+            frequenz: "auf_abruf",
             reinigungstage: [],
-            zugangsinfo: zugang || undefined,
             status: "aktiv",
           }
     );
@@ -88,7 +82,7 @@ export function ObjektForm({ onClose, defaultKundeId, kompakt }: Props) {
           />
         </Field>
         <p className="text-xs text-muted-foreground">
-          Adresse, Frequenz und weitere Details kannst du später auf der Objekt-Detailseite ergänzen.
+          Adresse und weitere Details kannst du später auf der Objekt-Detailseite ergänzen.
         </p>
         <div className="sticky bottom-0 -mx-4 -mb-6 mt-2 flex flex-col-reverse items-stretch gap-2 border-t border-border bg-background px-4 py-3 sm:-mx-8 sm:px-8 sm:flex-row sm:items-center sm:justify-end">
           <Button variant="outline" onClick={onClose}>Abbrechen</Button>
@@ -102,67 +96,36 @@ export function ObjektForm({ onClose, defaultKundeId, kompakt }: Props) {
 
   return (
     <div className="space-y-4">
+      <Field label="Kunde *">
+        <Select value={kundeId || undefined} onValueChange={setKundeId}>
+          <SelectTrigger><SelectValue placeholder="Kunde wählen…" /></SelectTrigger>
+          <SelectContent>
+            {kunden.map((k) => (
+              <SelectItem key={k.id} value={k.id}>
+                {k.firmenname || `${k.vorname ?? ""} ${k.nachname ?? ""}`.trim()}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </Field>
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Kunde *">
-          <Select value={kundeId || undefined} onValueChange={setKundeId}>
-            <SelectTrigger><SelectValue placeholder="Kunde wählen…" /></SelectTrigger>
-            <SelectContent>
-              {kunden.map((k) => (
-                <SelectItem key={k.id} value={k.id}>
-                  {k.firmenname || `${k.vorname ?? ""} ${k.nachname ?? ""}`.trim()}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <Field label="Bezeichnung *">
+          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="z. B. Bürogebäude Hauptsitz" />
         </Field>
-        <Field label="Objekttyp">
-          <Select value={typ} onValueChange={(v) => setTyp(v as ObjektTyp)}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="buero">Büro</SelectItem>
-              <SelectItem value="wohnen">Wohnen</SelectItem>
-              <SelectItem value="gewerbe">Gewerbe</SelectItem>
-              <SelectItem value="industrie">Industrie</SelectItem>
-              <SelectItem value="medizin">Medizin</SelectItem>
-              <SelectItem value="bildung">Bildung</SelectItem>
-              <SelectItem value="sonstiges">Sonstiges</SelectItem>
-            </SelectContent>
-          </Select>
+        <Field label="Objektnummer">
+          <Input
+            value={nummer}
+            onChange={(e) => setNummer(e.target.value)}
+            placeholder="leer = automatisch"
+            className="font-mono"
+          />
         </Field>
       </div>
-      <Field label="Bezeichnung *">
-        <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="z. B. Bürogebäude Hauptsitz" />
-      </Field>
       <Field label="Straße & Hausnummer"><Input value={strasse} onChange={(e) => setStrasse(e.target.value)} /></Field>
       <div className="grid gap-4 sm:grid-cols-3">
         <Field label="PLZ"><Input value={plz} onChange={(e) => setPlz(e.target.value)} /></Field>
         <Field label="Ort" className="sm:col-span-2"><Input value={ort} onChange={(e) => setOrt(e.target.value)} /></Field>
       </div>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="m² zu reinigen">
-          <Input
-            type="number"
-            value={qmZuReinigen}
-            onChange={(e) => setQm(e.target.value === "" ? "" : Number(e.target.value))}
-          />
-        </Field>
-        <Field label="Reinigungsfrequenz">
-          <Select value={frequenz} onValueChange={(v) => setFrequenz(v as Reinigungsfrequenz)}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="taeglich">Täglich</SelectItem>
-              <SelectItem value="woechentlich">Wöchentlich</SelectItem>
-              <SelectItem value="14taegig">14-tägig</SelectItem>
-              <SelectItem value="monatlich">Monatlich</SelectItem>
-              <SelectItem value="quartalsweise">Quartalsweise</SelectItem>
-              <SelectItem value="auf_abruf">Auf Abruf</SelectItem>
-            </SelectContent>
-          </Select>
-        </Field>
-      </div>
-      <Field label="Zugang / Hinweise">
-        <Textarea rows={3} value={zugang} onChange={(e) => setZugang(e.target.value)} placeholder="Schlüssel beim Pförtner, Code …" />
-      </Field>
 
       <div className="sticky bottom-0 -mx-4 -mb-6 mt-2 flex flex-col-reverse items-stretch gap-2 border-t border-border bg-background px-4 py-3 sm:-mx-8 sm:px-8 sm:flex-row sm:items-center sm:justify-end ">
         <Button variant="outline" onClick={onClose}>Abbrechen</Button>

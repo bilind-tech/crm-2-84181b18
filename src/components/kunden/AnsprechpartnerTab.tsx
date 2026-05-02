@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Star, Trash2, User } from "lucide-react";
+import { Pencil, Plus, Star, Trash2, User } from "lucide-react";
 import {
   useCreateAnsprechpartner,
   useUpdateAnsprechpartner,
@@ -35,12 +35,15 @@ interface Props {
 }
 
 type Anrede = "herr" | "frau" | "divers" | "keine";
+type Mode = "create" | "edit";
 
 export function AnsprechpartnerTab({ kundeId, liste }: Props) {
   const create = useCreateAnsprechpartner(kundeId);
   const update = useUpdateAnsprechpartner(kundeId);
   const remove = useDeleteAnsprechpartner(kundeId);
 
+  const [mode, setMode] = useState<Mode>("create");
+  const [editId, setEditId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
@@ -60,11 +63,27 @@ export function AnsprechpartnerTab({ kundeId, liste }: Props) {
     setEmail("");
     setTelefon("");
     setPrimaer(liste.length === 0);
+    setEditId(null);
+    setMode("create");
   }
 
-  function openForm() {
+  function openCreate() {
     reset();
     setPrimaer(liste.length === 0);
+    setMode("create");
+    setShowForm(true);
+  }
+
+  function openEdit(a: Ansprechpartner) {
+    setMode("edit");
+    setEditId(a.id);
+    setAnrede((a.anrede as Anrede) ?? "keine");
+    setVorname(a.vorname ?? "");
+    setNachname(a.nachname ?? "");
+    setPosition(a.position ?? "");
+    setEmail(a.email ?? "");
+    setTelefon(a.telefon ?? "");
+    setPrimaer(a.primaer);
     setShowForm(true);
   }
 
@@ -88,27 +107,47 @@ export function AnsprechpartnerTab({ kundeId, liste }: Props) {
       return;
     }
     try {
-      const created = await create.mutateAsync({
-        anrede,
-        vorname: vorname || undefined,
-        nachname: nachname || undefined,
-        position: position || undefined,
-        email: email || undefined,
-        telefon: telefon || undefined,
-        primaer: primaer || liste.length === 0,
-      });
-      if ((primaer || liste.length === 0) && created?.id) {
-        // andere demovieren
-        await Promise.all(
-          liste
-            .filter((a) => a.primaer)
-            .map((a) => update.mutateAsync({ id: a.id, primaer: false }))
-        );
-        if (!created.primaer) {
-          await update.mutateAsync({ id: created.id, primaer: true });
+      if (mode === "edit" && editId) {
+        await update.mutateAsync({
+          id: editId,
+          anrede,
+          vorname: vorname || undefined,
+          nachname: nachname || undefined,
+          position: position || undefined,
+          email: email || undefined,
+          telefon: telefon || undefined,
+          primaer,
+        });
+        if (primaer) {
+          await Promise.all(
+            liste
+              .filter((a) => a.id !== editId && a.primaer)
+              .map((a) => update.mutateAsync({ id: a.id, primaer: false }))
+          );
         }
+        toast.success("Ansprechpartner aktualisiert");
+      } else {
+        const created = await create.mutateAsync({
+          anrede,
+          vorname: vorname || undefined,
+          nachname: nachname || undefined,
+          position: position || undefined,
+          email: email || undefined,
+          telefon: telefon || undefined,
+          primaer: primaer || liste.length === 0,
+        });
+        if ((primaer || liste.length === 0) && created?.id) {
+          await Promise.all(
+            liste
+              .filter((a) => a.primaer)
+              .map((a) => update.mutateAsync({ id: a.id, primaer: false }))
+          );
+          if (!created.primaer) {
+            await update.mutateAsync({ id: created.id, primaer: true });
+          }
+        }
+        toast.success("Ansprechpartner angelegt");
       }
-      toast.success("Ansprechpartner angelegt");
       setShowForm(false);
       reset();
     } catch {
@@ -132,11 +171,13 @@ export function AnsprechpartnerTab({ kundeId, liste }: Props) {
     }
   }
 
+  const isPending = create.isPending || update.isPending;
+
   return (
     <div className="space-y-4">
       <div className="flex justify-end">
         <Button
-          onClick={openForm}
+          onClick={openCreate}
           variant="outline"
           className="rounded-full"
           disabled={showForm}
@@ -147,6 +188,9 @@ export function AnsprechpartnerTab({ kundeId, liste }: Props) {
 
       {showForm && (
         <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+          <p className="mb-4 text-sm font-semibold">
+            {mode === "edit" ? "Ansprechpartner bearbeiten" : "Neuer Ansprechpartner"}
+          </p>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Anrede">
               <Select value={anrede} onValueChange={(v) => setAnrede(v as Anrede)}>
@@ -180,11 +224,11 @@ export function AnsprechpartnerTab({ kundeId, liste }: Props) {
             <Checkbox
               checked={primaer}
               onCheckedChange={(v) => setPrimaer(Boolean(v))}
-              disabled={liste.length === 0}
+              disabled={mode === "create" && liste.length === 0}
             />
             <span>
               Als primären Ansprechpartner setzen
-              {liste.length === 0 && (
+              {mode === "create" && liste.length === 0 && (
                 <span className="ml-1 text-xs text-muted-foreground">(automatisch, da erster)</span>
               )}
             </span>
@@ -194,8 +238,8 @@ export function AnsprechpartnerTab({ kundeId, liste }: Props) {
             <Button variant="outline" onClick={() => { setShowForm(false); reset(); }}>
               Abbrechen
             </Button>
-            <Button onClick={handleSave} disabled={create.isPending} className="rounded-md px-6">
-              {create.isPending ? "Speichere…" : "Speichern"}
+            <Button onClick={handleSave} disabled={isPending} className="rounded-md px-6">
+              {isPending ? "Speichere…" : "Speichern"}
             </Button>
           </div>
         </div>
@@ -238,6 +282,15 @@ export function AnsprechpartnerTab({ kundeId, liste }: Props) {
                         <Star className="mr-1 h-3.5 w-3.5" /> Als primär
                       </Button>
                     )}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="rounded-full"
+                      onClick={() => openEdit(a)}
+                      disabled={showForm}
+                    >
+                      <Pencil className="mr-1 h-3.5 w-3.5" /> Bearbeiten
+                    </Button>
                     <Button
                       size="sm"
                       variant="ghost"

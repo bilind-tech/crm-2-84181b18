@@ -47,7 +47,7 @@ function Page() {
     <div className="space-y-6">
       <PageHeader
         title="Objekte"
-        subtitle="Reinigungsobjekte deiner Kunden mit Frequenz und Zugang."
+        subtitle="Reinigungsobjekte deiner Kunden mit Adresse."
         actions={
           <PrimaryAction onClick={() => setOpen(true)} label="Neues Objekt" />
         }
@@ -83,9 +83,8 @@ function Page() {
             meta={
               <>
                 <span className="font-mono">{o.nummer}</span>
-                {o.ort && <span>· {o.ort}</span>}
-                <span>· {o.frequenz.replace("_", " ")}</span>
-                {o.qmZuReinigen != null && <span>· {o.qmZuReinigen} m²</span>}
+                {o.strasse && <span>· {o.strasse}</span>}
+                {o.ort && <span>· {[o.plz, o.ort].filter(Boolean).join(" ")}</span>}
               </>
             }
             badge={
@@ -110,9 +109,8 @@ function Page() {
             <tr className="border-b border-border bg-muted/30 text-left text-xs uppercase tracking-wider text-muted-foreground">
               <th className="px-4 py-3 font-medium">Nummer</th>
               <th className="px-4 py-3 font-medium">Name</th>
+              <th className="px-4 py-3 font-medium">Adresse</th>
               <th className="px-4 py-3 font-medium">Ort</th>
-              <th className="px-4 py-3 font-medium">Frequenz</th>
-              <th className="px-4 py-3 text-right font-medium">m²</th>
               <th className="px-4 py-3" />
             </tr>
           </thead>
@@ -133,9 +131,8 @@ function Page() {
               >
                 <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{o.nummer}</td>
                 <td className="px-4 py-3 font-medium">{o.name}</td>
-                <td className="px-4 py-3 text-muted-foreground">{o.ort ?? "—"}</td>
-                <td className="px-4 py-3 text-muted-foreground capitalize">{o.frequenz.replace("_", " ")}</td>
-                <td className="px-4 py-3 text-right">{o.qmZuReinigen ?? "—"}</td>
+                <td className="px-4 py-3 text-muted-foreground">{o.strasse ?? "—"}</td>
+                <td className="px-4 py-3 text-muted-foreground">{[o.plz, o.ort].filter(Boolean).join(" ") || "—"}</td>
                 <td className="px-4 py-3 text-right">
                   <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground" />
                 </td>
