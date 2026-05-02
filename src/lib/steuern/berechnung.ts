@@ -15,14 +15,12 @@ function isoDate(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
-/** Bezahltes Datum einer Rechnung (letzte Zahlung) oder null. */
 function bezahltAm(r: Rechnung): string | null {
   if (!r.zahlungen?.length) return null;
   const sorted = [...r.zahlungen].sort((a, b) => a.datum.localeCompare(b.datum));
   return sorted[sorted.length - 1].datum;
 }
 
-/** Ist die Rechnung als „bezahlt" zu werten (Vollzahlung)? */
 function istVollBezahlt(r: Rechnung): boolean {
   if (r.status === "storniert" || r.status === "entwurf") return false;
   const { brutto } = summenRechnung(r.positionen, r.rabattGesamt);
@@ -30,7 +28,6 @@ function istVollBezahlt(r: Rechnung): boolean {
   return summe >= brutto - 0.005;
 }
 
-/** Periode (Monat oder Quartal) für ein Datum. */
 function periode(date: string, rhythmus: UstRhythmus): { jahr: number; monat?: number; quartal?: 1 | 2 | 3 | 4 } {
   const d = new Date(date);
   const jahr = d.getFullYear();
@@ -43,15 +40,15 @@ function periode(date: string, rhythmus: UstRhythmus): { jahr: number; monat?: n
   return { jahr };
 }
 
-/** Letzter Tag der Periode + Fälligkeit (10. Folgemonat). */
+/** Fälligkeit = 10. des Folgemonats. `endMonat` ist 1-basiert (1=Jan). */
 function ustFaelligAm(p: { jahr: number; monat?: number; quartal?: 1 | 2 | 3 | 4 }): string {
   let endMonat: number;
   if (p.monat) endMonat = p.monat;
   else if (p.quartal) endMonat = p.quartal * 3;
   else endMonat = 12;
-  // 10. des Folgemonats
-  const f = new Date(p.jahr, endMonat, 10); // Date(year, monthIndex0..) → endMonat (0-basiert) = nächster Monat
-  return isoDate(f);
+  // new Date(jahr, endMonat, 10) = 10. des Folgemonats (monthIndex 0-basiert).
+  // Bei endMonat=12 → 10.01. des Folgejahres ✓.
+  return isoDate(new Date(p.jahr, endMonat, 10));
 }
 
 function periodeKey(p: { jahr: number; monat?: number; quartal?: 1 | 2 | 3 | 4 }): string {
@@ -101,8 +98,9 @@ export function aggregiereUst(
     if (!d.steuerrelevant || !d.betrag || !d.dokumentdatum) continue;
     const p = periode(d.dokumentdatum, rhythmus);
     const key = periodeKey(p);
-    // Annahme: 19% USt im Bruttobetrag eingebettet (Vorsteuer = brutto/1.19 * 0.19)
-    const vorsteuer = (d.betrag / 1.19) * 0.19;
+    // Vorsteuer = brutto / (1 + satz) * satz, Default 19 %
+    const satz = (d.ustSatz ?? 19) / 100;
+    const vorsteuer = (d.betrag / (1 + satz)) * satz;
     const agg = map.get(key) ?? { zeitraum: p, ust: 0, vorsteuer: 0, rechnungIds: [], dokumentIds: [] };
     agg.vorsteuer += vorsteuer;
     agg.dokumentIds.push(d.id);
@@ -146,8 +144,8 @@ export function gewinnYtd(
   for (const d of dokumente) {
     if (!d.steuerrelevant || !d.betrag || !d.dokumentdatum) continue;
     if (new Date(d.dokumentdatum).getFullYear() !== jahr) continue;
-    // Netto = brutto / 1.19
-    nettoAusgaben += d.betrag / 1.19;
+    const satz = (d.ustSatz ?? 19) / 100;
+    nettoAusgaben += d.betrag / (1 + satz);
     dokumentIds.push(d.id);
   }
 
@@ -171,22 +169,33 @@ export function generiereAutomatischePosten(
 ): SteuerPosten[] {
   const posten: SteuerPosten[] = [];
   const now = new Date().toISOString();
+  const heute = new Date();
 
-  // --- USt-Voranmeldungen ---
+  // --- USt-Voranmeldungen (auch reine Vorsteuer-Perioden = Erstattung) ---
   const ust = aggregiereUst(rechnungen, dokumente, einstellungen.ustRhythmus);
   for (const u of ust) {
     if (u.zeitraum.jahr !== jahr) continue;
     const zahllast = u.ust - u.vorsteuer;
     const faellig = ustFaelligAm(u.zeitraum);
-    const ueberfaellig = new Date(faellig) < new Date() && zahllast > 0;
+    const istVergangen = new Date(faellig) < heute;
+    const istErstattung = zahllast < -0.005;
+
     posten.push({
       id: `auto-ust-${periodeKey(u.zeitraum)}`,
       art: "ust",
-      titel: `USt-Voranmeldung ${periodeLabel(u.zeitraum)}`,
+      titel: istErstattung
+        ? `USt-Erstattung ${periodeLabel(u.zeitraum)}`
+        : `USt-Voranmeldung ${periodeLabel(u.zeitraum)}`,
       zeitraum: u.zeitraum,
       faelligAm: faellig,
-      geschaetzterBetrag: Math.max(0, zahllast),
-      status: zahllast <= 0 ? "bezahlt" : ueberfaellig ? "ueberfaellig" : "offen",
+      geschaetzterBetrag: Math.abs(zahllast),
+      status: istErstattung
+        ? "offen" // Erstattungen bleiben „offen" bis vom FA gezahlt
+        : zahllast <= 0.005
+        ? "bezahlt"
+        : istVergangen
+        ? "ueberfaellig"
+        : "offen",
       automatisch: true,
       berechnungsgrundlage: {
         rechnungIds: u.rechnungIds,
@@ -194,84 +203,107 @@ export function generiereAutomatischePosten(
         ust: u.ust,
         vorsteuer: u.vorsteuer,
       },
+      notiz: istErstattung
+        ? `Vorsteuer-Überhang — Erstattung vom Finanzamt erwartet.`
+        : undefined,
       erstelltAm: now,
     });
   }
 
-  // --- Jahressteuern KSt + Soli + GewSt (auf YTD-Gewinn hochgerechnet) ---
+  // --- Jahressteuern KSt + Soli + GewSt: 4 Quartals-Vorauszahlungen ---
   const g = gewinnYtd(rechnungen, dokumente, jahr);
-  if (g.gewinn > 0) {
-    const kst = g.gewinn * (einstellungen.kstSatz / 100);
-    const soli = kst * (einstellungen.soliSatz / 100);
-    const gewstSatz = (einstellungen.gewstMesszahl / 100) * (einstellungen.gewstHebesatz / 100);
-    const gewst = g.gewinn * gewstSatz;
 
-    // Nächste Vorauszahlungs-Termine
-    const heute = new Date();
-    const kstTermine = ["03-10", "06-10", "09-10", "12-10"];
-    const gewstTermine = ["02-15", "05-15", "08-15", "11-15"];
-    const naechsterTermin = (mmDdListe: string[]): string => {
-      for (const md of mmDdListe) {
-        const d = new Date(`${jahr}-${md}`);
-        if (d >= heute) return isoDate(d);
-      }
-      return isoDate(new Date(jahr + 1, 2, 10));
-    };
+  // Jahres-Hochrechnung: YTD linear auf 365 Tage hochrechnen
+  const jahresStart = new Date(jahr, 0, 1);
+  const heuteOderJahresende = heute.getFullYear() === jahr ? heute : new Date(jahr, 11, 31);
+  const tageVergangen = Math.max(
+    1,
+    Math.floor((heuteOderJahresende.getTime() - jahresStart.getTime()) / 86_400_000) + 1,
+  );
+  const tageImJahr = ((jahr % 4 === 0 && jahr % 100 !== 0) || jahr % 400 === 0) ? 366 : 365;
+  const hochrechnungsFaktor = Math.min(4, tageImJahr / tageVergangen); // cap bei ×4 (Q1)
+  const prognoseGewinn = Math.max(0, g.gewinn * hochrechnungsFaktor);
 
-    posten.push({
-      id: `auto-kst-${jahr}`,
-      art: "kst",
-      titel: `Körperschaftsteuer-Vorauszahlung ${jahr}`,
-      zeitraum: { jahr },
-      faelligAm: naechsterTermin(kstTermine),
-      geschaetzterBetrag: kst / 4, // pro Quartal
-      status: "offen",
-      automatisch: true,
-      berechnungsgrundlage: {
-        rechnungIds: g.rechnungIds,
-        dokumentIds: g.dokumentIds,
-        nettoEinnahmen: g.nettoEinnahmen,
-        nettoAusgaben: g.nettoAusgaben,
-      },
-      notiz: `Jahres-KSt geschätzt ${(kst).toFixed(2)} € (Gewinn YTD × ${einstellungen.kstSatz}%) — nächste Vorauszahlung 1/4`,
-      erstelltAm: now,
-    });
+  if (prognoseGewinn > 0) {
+    const kstJahr = prognoseGewinn * (einstellungen.kstSatz / 100);
+    const soliJahr = kstJahr * (einstellungen.soliSatz / 100);
+    const gewstJahr =
+      prognoseGewinn * (einstellungen.gewstMesszahl / 100) * (einstellungen.gewstHebesatz / 100);
 
-    posten.push({
-      id: `auto-soli-${jahr}`,
-      art: "soli",
-      titel: `Solidaritätszuschlag ${jahr}`,
-      zeitraum: { jahr },
-      faelligAm: naechsterTermin(kstTermine),
-      geschaetzterBetrag: soli / 4,
-      status: "offen",
-      automatisch: true,
-      berechnungsgrundlage: {
-        rechnungIds: g.rechnungIds,
-        dokumentIds: g.dokumentIds,
-      },
-      notiz: `${einstellungen.soliSatz}% der KSt — nächste Vorauszahlung 1/4`,
-      erstelltAm: now,
-    });
+    // Quartals-Termine: KSt+Soli am 10.03/06/09/12, GewSt am 15.02/05/08/11
+    const kstTermine: Array<[1 | 2 | 3 | 4, string]> = [
+      [1, "03-10"], [2, "06-10"], [3, "09-10"], [4, "12-10"],
+    ];
+    const gewstTermine: Array<[1 | 2 | 3 | 4, string]> = [
+      [1, "02-15"], [2, "05-15"], [3, "08-15"], [4, "11-15"],
+    ];
 
-    posten.push({
-      id: `auto-gewst-${jahr}`,
-      art: "gewst",
-      titel: `Gewerbesteuer-Vorauszahlung ${jahr}`,
-      zeitraum: { jahr },
-      faelligAm: naechsterTermin(gewstTermine),
-      geschaetzterBetrag: gewst / 4,
-      status: "offen",
-      automatisch: true,
-      berechnungsgrundlage: {
-        rechnungIds: g.rechnungIds,
-        dokumentIds: g.dokumentIds,
-        nettoEinnahmen: g.nettoEinnahmen,
-        nettoAusgaben: g.nettoAusgaben,
-      },
-      notiz: `Hebesatz Sankt Augustin ${einstellungen.gewstHebesatz}% — Jahres-GewSt geschätzt ${(gewst).toFixed(2)} €`,
-      erstelltAm: now,
-    });
+    const hochrechnungsNotiz =
+      hochrechnungsFaktor > 1.05
+        ? ` (Hochrechnung aus YTD × ${hochrechnungsFaktor.toFixed(2)})`
+        : "";
+
+    for (const [q, md] of kstTermine) {
+      const faellig = `${jahr}-${md}`;
+      const istVergangen = new Date(faellig) < heute;
+      posten.push({
+        id: `auto-kst-${jahr}-Q${q}`,
+        art: "kst",
+        titel: `Körperschaftsteuer Q${q} ${jahr}`,
+        zeitraum: { jahr, quartal: q },
+        faelligAm: faellig,
+        geschaetzterBetrag: kstJahr / 4,
+        status: istVergangen ? "ueberfaellig" : "offen",
+        automatisch: true,
+        berechnungsgrundlage: {
+          rechnungIds: g.rechnungIds,
+          dokumentIds: g.dokumentIds,
+          nettoEinnahmen: g.nettoEinnahmen,
+          nettoAusgaben: g.nettoAusgaben,
+        },
+        notiz: `Jahres-KSt geschätzt ${kstJahr.toFixed(2)} €${hochrechnungsNotiz} — 1/4 fällig.`,
+        erstelltAm: now,
+      });
+      posten.push({
+        id: `auto-soli-${jahr}-Q${q}`,
+        art: "soli",
+        titel: `Solidaritätszuschlag Q${q} ${jahr}`,
+        zeitraum: { jahr, quartal: q },
+        faelligAm: faellig,
+        geschaetzterBetrag: soliJahr / 4,
+        status: istVergangen ? "ueberfaellig" : "offen",
+        automatisch: true,
+        berechnungsgrundlage: {
+          rechnungIds: g.rechnungIds,
+          dokumentIds: g.dokumentIds,
+        },
+        notiz: `${einstellungen.soliSatz}% der KSt — 1/4 fällig.`,
+        erstelltAm: now,
+      });
+    }
+
+    for (const [q, md] of gewstTermine) {
+      const faellig = `${jahr}-${md}`;
+      const istVergangen = new Date(faellig) < heute;
+      posten.push({
+        id: `auto-gewst-${jahr}-Q${q}`,
+        art: "gewst",
+        titel: `Gewerbesteuer Q${q} ${jahr}`,
+        zeitraum: { jahr, quartal: q },
+        faelligAm: faellig,
+        geschaetzterBetrag: gewstJahr / 4,
+        status: istVergangen ? "ueberfaellig" : "offen",
+        automatisch: true,
+        berechnungsgrundlage: {
+          rechnungIds: g.rechnungIds,
+          dokumentIds: g.dokumentIds,
+          nettoEinnahmen: g.nettoEinnahmen,
+          nettoAusgaben: g.nettoAusgaben,
+        },
+        notiz: `Hebesatz Sankt Augustin ${einstellungen.gewstHebesatz}% — Jahres-GewSt geschätzt ${gewstJahr.toFixed(2)} €${hochrechnungsNotiz}.`,
+        erstelltAm: now,
+      });
+    }
   }
 
   return posten;
@@ -280,17 +312,11 @@ export function generiereAutomatischePosten(
 // ---------- Aggregierte Kennzahlen ----------
 
 export interface SteuerKennzahlen {
-  /** Nächster fälliger offener Posten. */
   naechsteFaelligkeit: SteuerPosten | null;
-  /** Summe aller offenen + überfälligen Posten. */
   offenSumme: number;
-  /** Summe aller bezahlten Posten dieses Jahr. */
   bezahltJahrSumme: number;
-  /** Empfohlene Rücklage = Gewinn YTD × ruecklageSatz. */
   empfohleneRuecklage: number;
-  /** YTD-Gewinn (für Anzeige). */
   gewinnYtd: number;
-  /** Projizierte Jahressteuer GmbH = Gewinn × 0,3420 (mit Defaults). */
   projizierteJahressteuer: number;
 }
 
@@ -313,7 +339,6 @@ export function berechneKennzahlen(
   const g = gewinnYtd(rechnungen, dokumente, jahr);
   const empfohleneRuecklage = Math.max(0, g.gewinn * (einstellungen.ruecklageSatz / 100));
 
-  // Effektivsatz = KSt + Soli-auf-KSt + GewSt-effektiv
   const kstAnteil = einstellungen.kstSatz / 100;
   const soliAnteil = kstAnteil * (einstellungen.soliSatz / 100);
   const gewstAnteil = (einstellungen.gewstMesszahl / 100) * (einstellungen.gewstHebesatz / 100);
