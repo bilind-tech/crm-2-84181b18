@@ -1,42 +1,90 @@
-## Problem
+## Ziel
 
-Beim Erstellen einer Rechnung oder eines Angebots zeigt die Belegnummer-Vorschau (nach Auswahl des Kunden) immer `…/01`, auch wenn der Kunde im aktuellen Monat schon mehrere Belege hat oder der Start-Zähler in den Stammdaten z. B. auf `12` gesetzt wurde. Die tatsächlich gespeicherte Nummer ist korrekt — nur die Vorschau lügt und das ist verwirrend.
+Die Umsatz-Grafik im Dashboard wird vom statischen Balkendiagramm zu einem kompakten, interaktiven Chart-Modul — mit eigenem Zeitraum, Diagramm-Typ und sinnvollen Vergleichswerten. Übersichtlich, nicht überladen.
 
-## Ursache
+## Was sich ändert
 
-`src/lib/belegNummer.ts` → `vorschauBelegnummer()` hängt hart `"/01"` an, statt den nächsten freien Zähler aus dem Backend zu lesen.
+### 1. Neue Komponente `UmsatzChartCard`
 
-Im Backend existiert bereits der passende Endpoint:
-- `GET /kunden/:id/zaehler` → `{ periode, naechsterStart }`
-- React-Hook: `useKundenZaehler(id)` (in `src/hooks/useApi.ts`)
+Datei: `src/components/dashboard/UmsatzChartCard.tsx`
+Ersetzt im Dashboard den bisherigen Inline-Chart-Block (Zeilen 190–236 in `src/routes/index.tsx`).
 
-Dieser Hook wird heute nur im Kunden-Bearbeiten-Dialog verwendet, nicht in den Erstell-Formularen.
+Enthält drei kleine, schlichte Bedien-Elemente in der Card-Header-Zeile (rechtsbündig, dezent):
 
-## Lösung
+1. **Zeitraum** (eigener, lokaler Zeitraum — unabhängig vom globalen Dashboard-Filter, damit man oben „aktueller Monat" sehen und in der Grafik trotzdem 12 Monate vergleichen kann):
+   - `Letzte 6 Monate` (Default)
+   - `Letzte 12 Monate`
+   - `Aktuelles Jahr`
+   - `Letztes Jahr`
+   - `Quartalsweise (4 Quartale)`
+2. **Diagramm-Typ** (Icon-Toggle, 3 Optionen):
+   - Balken (Default)
+   - Linie
+   - Fläche
+3. **Wert** (kleines Segment-Toggle):
+   - Brutto (Default)
+   - Netto
 
-Vorschau in den Forms gegen den echten nächsten Zähler des gewählten Kunden austauschen.
+### 2. Was die Karte zusätzlich anzeigt
 
-### `src/lib/belegNummer.ts`
-Zweiten Parameter ergänzen, der den nächsten Zähler erhält (Fallback `1`, wenn noch nicht geladen):
+Über dem Chart eine schlanke Kennzahlen-Zeile mit drei Werten — knapp, eine Zeile:
 
-```
-vorschauBelegnummer(kuerzel, fallbackPraefix, naechsterZaehler = 1, basisDatum = new Date())
-```
-- Mit Kürzel: `${KUERZEL}${MM}${YY}/${String(naechsterZaehler).padStart(2,"0")}`
-- Ohne Kürzel: bestehender Fallback, aber `{####}` / `{###}` mit `naechsterZaehler` statt `1`.
+- **Summe** im gewählten Zeitraum
+- **Ø pro Monat** (bzw. pro Quartal im Quartals-Modus)
+- **Δ vs. Vorperiode** mit kleinem Pfeil + Prozent (grün/rot, dezent)
 
-### `src/components/forms/RechnungForm.tsx` und `AngebotForm.tsx`
-- `useKundenZaehler(kundeId)` aufrufen (greift dank `enabled: !!id` nur wenn Kunde gewählt).
-- `vorschauNummer` neu berechnen mit `zaehlerQ.data?.naechsterStart ?? 1`.
-- Während `zaehlerQ.isLoading`: dezenter Hinweis „wird ermittelt …" statt einer falschen Nummer.
+Der vorhandene „Summe" rechts oben entfällt — geht in die neue Zeile auf.
 
-### Frische Daten beim Öffnen
-Damit nach dem Anlegen einer Rechnung sofort `…/02` als nächste Vorschau erscheint, in den `onSuccess`-Handlern von `useCreateRechnung` und `useCreateAngebot` die Query `["kunden", kundeId, "zaehler"]` invalidieren.
+### 3. Chart-Verhalten
 
-## Was sich nicht ändert
-- Vergabe der echten Belegnummer im Backend bleibt unverändert (`nextCustomerNumber` in `src/lib/mock/backend.ts`).
-- Format `{KÜRZEL}{MM}{YY}/{NN}` bleibt identisch.
-- Start-Zähler-Logik in den Kundenstammdaten bleibt unverändert — sie wird durch die korrekte Vorschau jetzt sichtbar.
+- Eine `<ResponsiveContainer>` rendert je nach Auswahl `BarChart` / `LineChart` / `AreaChart` aus `recharts`.
+- Tooltip zeigt: Label, Brutto **und** Netto (egal welche Option aktiv ist) + Monatsname lang.
+- Klick auf einen Datenpunkt setzt den **globalen** Dashboard-Zeitraum oben auf diesen Monat (so springt man von der Grafik in die Detailsicht der KPI-Kacheln und der Listen unter dem Chart).
+- Quartals-Modus aggregiert die 12 Monate des Jahres clientseitig zu Q1–Q4.
+- Achsen, Grid, Farben bleiben wie bisher (`var(--primary)`, `var(--border)`), Linien-/Flächen-Variante nutzt eine sanfte `primary`-Tönung (`color-mix` mit transparent für die Fläche).
+
+### 4. Datenbeschaffung
+
+- `useUmsatz()` wird mit dem **lokalen** Chart-Zeitraum aufgerufen, nicht mit dem globalen Dashboard-Filter.
+  - „Letzte 12 Monate" → `useUmsatz()` ohne Argumente (Backend liefert bereits 12 Monate).
+  - „Letzte 6 Monate" → `useUmsatz()` ohne Argumente, clientseitig auf die letzten 6 gekürzt.
+  - „Aktuelles Jahr" / „Letztes Jahr" → `useUmsatz({ jahr, monat: "alle" })` (Backend liefert genau diese 12 Monate).
+  - „Quartalsweise" → wie aktuelles Jahr, danach clientseitig zu 4 Quartalen aggregiert.
+- Keine Backend-Änderung nötig — die bestehende Route `/dashboard/umsatz` deckt alle Fälle ab.
+- „Δ vs. Vorperiode" wird mit einem zweiten `useUmsatz`-Aufruf für die Vorperiode geholt (gleiche Länge, davorliegender Zeitraum).
+
+### 5. Persistenz der Auswahl
+
+Die drei Bedien-Werte werden in `localStorage` unter dem Key `dashboard.umsatzChart` gespeichert (Zeitraum / Typ / Wert), sodass die Einstellung beim nächsten Besuch erhalten bleibt. Reine Client-State, kein Backend-Roundtrip.
+
+### 6. Mobile
+
+- Die drei Toggles fließen unter den Titel, nicht in die Header-Zeile rechts (Stack auf `< sm`).
+- Chart-Höhe bleibt 256 px (`h-64`).
+
+### 7. Was bewusst NICHT kommt
+
+- Kein Export-Button, kein Datums-Picker, keine Vergleichs-Overlays — würden die Karte überladen.
+- Kein zweites Diagramm (z. B. Kunden-Anteile) auf dem Dashboard — gehört auf eine spätere Auswertungs-Seite.
+- Keine Animationen/Verzierungen (Memory-Regel: keine Deko-Icons, keine Gradients in Cards).
+
+## Technische Details (Kurz)
+
+- Recharts ist bereits installiert (`Bar`, `BarChart`, `CartesianGrid`, `ResponsiveContainer`, `Tooltip`, `XAxis`, `YAxis` werden heute schon genutzt).
+- Neu importiert: `Line`, `LineChart`, `Area`, `AreaChart` aus `recharts`.
+- Lucide-Icons für Toggles: `BarChart3`, `LineChart` (als Icon), `AreaChart` (als Icon), `TrendingUp`, `TrendingDown`.
+- `src/routes/index.tsx` schrumpft um ca. 50 Zeilen, der Chart-Block wird zu `<UmsatzChartCard onMonatKlick={(monat) => setZeitraum({ jahr, monat })} />`.
+- Keine neuen Dependencies.
 
 ## Ergebnis
-Nach Auswahl des Kunden im Erstell-Dialog steht die Belegnummer, die der Beleg auch wirklich bekommen würde — z. B. `GFU0526/13`, wenn im Mai 2026 schon 12 Belege für diesen Kunden existieren.
+
+Eine einzige, ruhige Card mit:
+
+```text
+┌─ Umsatz ──────────────────  [6M] [12M] [Jahr] …  [Bal│Lin│Flä]  [Brutto│Netto] ┐
+│ Summe 24.300 €    Ø 4.050 €/Monat    +12 % vs. Vorperiode                       │
+│                                                                                  │
+│   ▮  ▮  ▮▮  ▮▮▮  ▮▮▮▮  ▮▮▮                                                       │
+│                                                                                  │
+└─ Klick auf Balken → globaler Zeitraum springt auf diesen Monat ────────────────┘
+```
