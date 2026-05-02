@@ -10,7 +10,9 @@ import { ensureMasterKey } from "./crypto/masterkey.js";
 import { healthRoutes } from "./routes/health.js";
 import { authRoutes } from "./routes/auth.js";
 import { einstellungenRoutes } from "./routes/einstellungen.js";
-import { purgeExpiredSessions } from "./auth/sessions.js";
+import { purgeExpiredSessions, warmTouchCacheFromDb } from "./auth/sessions.js";
+import { purgeOldAuditEntries } from "./auth/audit.js";
+import { purgeOldLockouts } from "./auth/lockout.js";
 
 async function main(): Promise<void> {
   for (const dir of [
@@ -26,6 +28,16 @@ async function main(): Promise<void> {
 
   const keyStatus = ensureMasterKey(config.keyPath);
   openDatabase(config.dbPath);
+
+  // CORS-Härtung: in Production darf "*" nicht stehen, sonst Bootabbruch.
+  if (config.nodeEnv === "production") {
+    if (config.corsOrigins.includes("*") || config.corsOrigins.length === 0) {
+      console.error(
+        "FATAL: In Production muss CORS_ORIGINS explizit gesetzt sein (kommagetrennte Liste). '*' ist mit Cookie-Auth nicht erlaubt.",
+      );
+      process.exit(2);
+    }
+  }
 
   const app = Fastify({
     logger: {
@@ -45,6 +57,9 @@ async function main(): Promise<void> {
     origin: config.corsOrigins.includes("*") ? true : config.corsOrigins,
     credentials: true,
   });
+  if (config.nodeEnv !== "production" && config.corsOrigins.includes("*")) {
+    app.log.warn("CORS = '*' (DEV-Modus). In Production explizit setzen.");
+  }
   await app.register(rateLimit, {
     max: 200,
     timeWindow: "1 minute",
@@ -63,6 +78,9 @@ async function main(): Promise<void> {
   await app.register(authRoutes);
   await app.register(einstellungenRoutes);
 
+  // Touch-Throttle aus DB warmladen → kein Update-Sturm nach Restart
+  const warmed = warmTouchCacheFromDb();
+
   await app.listen({ port: config.port, host: config.host });
   app.log.info(
     {
@@ -70,17 +88,22 @@ async function main(): Promise<void> {
       dataDir: config.dataDir,
       schemaVersion: getSchemaVersion(),
       masterKeyCreated: keyStatus.created,
+      sessionsWarmed: warmed,
     },
     "MyCleanCenter backend ready",
   );
 
-  // Hintergrund: abgelaufene Sessions wegräumen (alle 10 Min)
+  // Hintergrund-Sweeps
   const sweepId = setInterval(() => {
     try {
-      const n = purgeExpiredSessions();
-      if (n > 0) app.log.info({ purged: n }, "expired sessions purged");
+      const sess = purgeExpiredSessions();
+      const audit = purgeOldAuditEntries();
+      const lock = purgeOldLockouts();
+      if (sess + audit + lock > 0) {
+        app.log.info({ sess, audit, lock }, "background sweep");
+      }
     } catch (e) {
-      app.log.warn({ err: e }, "session purge failed");
+      app.log.warn({ err: e }, "sweep failed");
     }
   }, 10 * 60_000);
   sweepId.unref?.();
