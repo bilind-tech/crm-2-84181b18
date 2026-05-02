@@ -24,6 +24,7 @@ import type { Dokument, DokumentTyp } from "@/lib/api/types";
 import { useConfirm } from "@/hooks/useConfirm";
 import { fristStatus, FRIST_LABEL, fristBadgeClass } from "@/lib/dokument/frist";
 import { DriveSyncRow } from "./DriveSyncBadge";
+import { useDokumentBlobUrl } from "@/hooks/useDokumentBlobUrl";
 
 interface Props {
   dokument: Dokument | null;
@@ -132,15 +133,7 @@ export function DokumentBearbeitenDialog({ dokument, open, onOpenChange }: Props
 
           <div className="space-y-4">
             {/* Vorschau */}
-            <div className="overflow-hidden rounded-xl border border-border bg-muted">
-              {dokument.url && dokument.mimeType.startsWith("image/") ? (
-                <img src={dokument.url} alt={dokument.titel} className="max-h-56 w-full object-contain" />
-              ) : (
-                <div className="flex h-32 items-center justify-center text-sm text-muted-foreground">
-                  {dokument.dateiname}
-                </div>
-              )}
-            </div>
+            <DokumentVorschau dokument={dokument} />
 
             {status !== "ohne" && (
               <div className="flex items-center justify-between rounded-xl border border-border bg-card px-3 py-2">
@@ -280,5 +273,20 @@ export function DokumentBearbeitenDialog({ dokument, open, onOpenChange }: Props
       </Dialog>
       {confirmDialog}
     </>
+  );
+}
+
+function DokumentVorschau({ dokument }: { dokument: Dokument }) {
+  const { url } = useDokumentBlobUrl(dokument);
+  return (
+    <div className="overflow-hidden rounded-xl border border-border bg-muted">
+      {url && dokument.mimeType.startsWith("image/") ? (
+        <img src={url} alt={dokument.titel} className="max-h-56 w-full object-contain" />
+      ) : (
+        <div className="flex h-32 items-center justify-center text-sm text-muted-foreground">
+          {dokument.dateiname}
+        </div>
+      )}
+    </div>
   );
 }

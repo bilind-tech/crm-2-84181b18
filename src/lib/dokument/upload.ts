@@ -1,13 +1,20 @@
-// Hilfsfunktionen für Datei-Upload (Drag&Drop, Klick, Handy-Scan).
-// Bildkompression läuft client-seitig, damit Mobile-Uploads schnell durchgehen.
+// Hilfsfunktionen für Datei-Upload.
+//
+// Live-Backend: Multipart-POST (Datei + Meta-JSON) gegen `/dokumente`
+// bzw. `/upload-sessions/:token/dokumente`.
+// Mock-Modus (kein Backend konfiguriert): base64-Data-URL als Fallback,
+// damit die UI weiterhin offline funktioniert.
 
 import type { Dokument, DokumentTyp } from "@/lib/api/types";
+import { getBackendUrl, isBackendUrlExplicit } from "@/lib/api/backendUrl";
+import { piApi, PiApiError } from "@/lib/api/piClient";
+import { mockBackend } from "@/lib/mock/backend";
 
 export const MAX_BYTES = 20 * 1024 * 1024; // 20 MB
 export const ACCEPT_PATTERN = "image/*,application/pdf";
 
-/** Liest Datei als Data-URL. */
-export function fileToDataUrl(file: File): Promise<string> {
+/** Liest Datei als Data-URL (nur für Mock-Fallback). */
+export function fileToDataUrl(file: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const r = new FileReader();
     r.onload = () => resolve(r.result as string);
@@ -17,10 +24,10 @@ export function fileToDataUrl(file: File): Promise<string> {
 }
 
 /** Komprimiert ein Bild auf max. `maxLong` Pixel lange Kante, JPEG ~0.8 Qualität. */
-export async function compressImage(file: File, maxLong = 1600, quality = 0.8): Promise<string> {
-  if (!file.type.startsWith("image/")) return fileToDataUrl(file);
+export async function compressImage(file: File, maxLong = 1600, quality = 0.8): Promise<Blob> {
+  if (!file.type.startsWith("image/")) return file;
   const dataUrl = await fileToDataUrl(file);
-  return new Promise((resolve, reject) => {
+  return new Promise<Blob>((resolve) => {
     const img = new Image();
     img.onload = () => {
       const ratio = Math.min(1, maxLong / Math.max(img.width, img.height));
@@ -30,18 +37,15 @@ export async function compressImage(file: File, maxLong = 1600, quality = 0.8): 
       canvas.width = w;
       canvas.height = h;
       const ctx = canvas.getContext("2d");
-      if (!ctx) {
-        resolve(dataUrl);
-        return;
-      }
+      if (!ctx) return resolve(file);
       ctx.drawImage(img, 0, 0, w, h);
-      try {
-        resolve(canvas.toDataURL("image/jpeg", quality));
-      } catch {
-        resolve(dataUrl);
-      }
+      canvas.toBlob(
+        (blob) => resolve(blob ?? file),
+        "image/jpeg",
+        quality,
+      );
     };
-    img.onerror = () => reject(new Error("Bild konnte nicht decodiert werden"));
+    img.onerror = () => resolve(file);
     img.src = dataUrl;
   });
 }
@@ -52,27 +56,129 @@ export function dokumentTypAusMime(mime: string): DokumentTyp {
   return "sonstiges";
 }
 
-/** Wandelt eine File in ein partielles Dokument-Objekt um (mit komprimierter Data-URL). */
-export async function fileToDokumentPayload(
+export interface DokumentMeta {
+  titel?: string;
+  beschreibung?: string;
+  typ?: DokumentTyp;
+  kundeId?: string;
+  objektId?: string;
+  dokumentdatum?: string;
+  betrag?: number;
+  steuerrelevant?: boolean;
+  ustSatz?: number;
+  faelligAm?: string;
+  quelle?: Dokument["quelle"];
+}
+
+/** Datei + Meta vorbereiten (Bild ggf. komprimieren). */
+export async function prepareUpload(
   file: File,
-  opts?: { kundeId?: string; objektId?: string; quelle?: Dokument["quelle"]; titel?: string },
-): Promise<Partial<Dokument>> {
+  meta: DokumentMeta,
+): Promise<{ blob: Blob; filename: string; mimeType: string; meta: DokumentMeta }> {
   if (file.size > MAX_BYTES) {
     throw new Error(`Datei "${file.name}" ist größer als 20 MB.`);
   }
-  const url = file.type.startsWith("image/")
-    ? await compressImage(file)
-    : await fileToDataUrl(file);
+  const blob = file.type.startsWith("image/") ? await compressImage(file) : file;
+  const mimeType = blob.type || file.type || "application/octet-stream";
   return {
-    titel: opts?.titel ?? file.name,
-    dateiname: file.name,
-    mimeType: file.type || "application/octet-stream",
-    groesseBytes: file.size,
-    url,
-    typ: dokumentTypAusMime(file.type),
-    kundeId: opts?.kundeId,
-    objektId: opts?.objektId,
-    steuerrelevant: false,
-    quelle: opts?.quelle ?? "upload",
+    blob,
+    filename: file.name,
+    mimeType,
+    meta: {
+      ...meta,
+      titel: meta.titel ?? file.name,
+      typ: meta.typ ?? dokumentTypAusMime(mimeType),
+    },
   };
+}
+
+function buildFormData(blob: Blob, filename: string, meta: DokumentMeta): FormData {
+  const fd = new FormData();
+  fd.append("file", blob, filename);
+  fd.append("meta", JSON.stringify(meta));
+  return fd;
+}
+
+/** Klein-Helfer: liefert kompletten Pfad zur Backend-URL (Mock liefert dataURL). */
+export function dokumentDateiUrl(d: Pick<Dokument, "url">): string {
+  if (!d.url) return "";
+  if (d.url.startsWith("data:") || d.url.startsWith("http") || d.url.startsWith("blob:")) {
+    return d.url;
+  }
+  // Server-relative URL → vor Pi-Backend hängen
+  return `${getBackendUrl()}${d.url}`;
+}
+
+/** Lädt eine Datei mit Auth-Cookies und gibt eine Blob-URL zurück. Caller muss URL.revokeObjectURL() aufrufen. */
+export async function fetchDokumentBlobUrl(d: Pick<Dokument, "url">): Promise<string> {
+  if (!d.url) return "";
+  if (d.url.startsWith("data:") || d.url.startsWith("blob:")) return d.url;
+  const url = dokumentDateiUrl(d);
+  const res = await fetch(url, { credentials: "include" });
+  if (!res.ok) throw new Error(`Datei nicht ladbar (${res.status})`);
+  const blob = await res.blob();
+  return URL.createObjectURL(blob);
+}
+
+async function shouldFallbackToMock(err: unknown): Promise<boolean> {
+  if (err instanceof PiApiError && err.status === 0 && !isBackendUrlExplicit()) return true;
+  return false;
+}
+
+/** Lädt Datei live ans Backend. Im Mock-Modus: base64 in JSON-POST. */
+export async function uploadDokument(file: File, meta: DokumentMeta): Promise<Dokument> {
+  const prep = await prepareUpload(file, meta);
+  // Live: Multipart
+  try {
+    return await piApi.post<Dokument>(
+      "/dokumente",
+      buildFormData(prep.blob, prep.filename, prep.meta),
+    );
+  } catch (err) {
+    if (!(await shouldFallbackToMock(err))) throw err;
+  }
+  // Mock: base64
+  const dataUrl = await fileToDataUrl(prep.blob);
+  return mockBackend<Dokument>("POST", "/dokumente", {
+    ...prep.meta,
+    dateiname: prep.filename,
+    mimeType: prep.mimeType,
+    groesseBytes: prep.blob.size,
+    url: dataUrl,
+  });
+}
+
+/** Lädt Datei live in eine Upload-Session. Mock-Fallback wie oben. */
+export async function uploadDokumentToSession(
+  token: string,
+  file: File,
+  meta: DokumentMeta = {},
+): Promise<Dokument> {
+  const prep = await prepareUpload(file, meta);
+  try {
+    return await piApi.post<Dokument>(
+      `/upload-sessions/${token}/dokumente`,
+      buildFormData(prep.blob, prep.filename, prep.meta),
+    );
+  } catch (err) {
+    if (!(await shouldFallbackToMock(err))) throw err;
+  }
+  const dataUrl = await fileToDataUrl(prep.blob);
+  // Legacy-Mock-Endpoint nimmt Liste in JSON entgegen
+  const res = await mockBackend<{ dateien: Dokument[] }>(
+    "POST",
+    `/upload-sessions/${token}/dateien`,
+    {
+      dateien: [
+        {
+          ...prep.meta,
+          dateiname: prep.filename,
+          mimeType: prep.mimeType,
+          groesseBytes: prep.blob.size,
+          url: dataUrl,
+        },
+      ],
+    },
+  );
+  return res.dateien[0];
 }

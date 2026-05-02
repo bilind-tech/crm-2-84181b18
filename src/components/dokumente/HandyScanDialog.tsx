@@ -15,6 +15,7 @@ import {
   useUploadSessionLive,
 } from "@/hooks/useApi";
 import type { UploadSession } from "@/lib/api/types";
+import { DokumentThumb } from "./DokumentThumb";
 
 interface Props {
   open: boolean;
@@ -117,22 +118,11 @@ export function HandyScanDialog({ open, onOpenChange }: Props) {
                 {dateien.length > 0 && (
                   <div className="mt-3 grid grid-cols-4 gap-2 sm:grid-cols-6">
                     {dateien.map((d) => (
-                      <div
+                      <DokumentThumb
                         key={d.id}
-                        className="aspect-square overflow-hidden rounded-lg border border-border bg-muted"
-                      >
-                        {d.url && d.mimeType?.startsWith("image/") ? (
-                          <img
-                            src={d.url}
-                            alt={d.titel}
-                            className="h-full w-full object-cover"
-                          />
-                        ) : (
-                          <div className="flex h-full w-full flex-col items-center justify-center p-1 text-[10px] text-muted-foreground">
-                            <span className="rounded bg-background px-1 py-0.5 font-semibold">PDF</span>
-                          </div>
-                        )}
-                      </div>
+                        dokument={d}
+                        className="aspect-square h-auto w-full"
+                      />
                     ))}
                   </div>
                 )}

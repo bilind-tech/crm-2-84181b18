@@ -49,6 +49,9 @@ const PI_PREFIXES = [
   "/system/",
   // Step 10
   "/steuern/",
+  // Step 12
+  "/dokumente",
+  "/upload-sessions",
 ];
 // Ausnahmen: /einstellungen/* die noch nicht im Pi-Backend leben → Mock
 const MOCK_OVERRIDE_PREFIXES = [

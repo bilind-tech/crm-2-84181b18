@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useMemo } from "react";
-import { Smartphone, Receipt, Image as ImageIcon, FileText, AlertTriangle, X } from "lucide-react";
+import { Smartphone, Receipt, AlertTriangle, X } from "lucide-react";
 import { useDokumente, useKunden, useObjekte } from "@/hooks/useApi";
 import { formatEUR, formatDate } from "@/lib/format";
 import { PageHeader, KpiCard } from "@/components/layout/PageHeader";
@@ -11,6 +11,7 @@ import { HandyScanDialog } from "@/components/dokumente/HandyScanDialog";
 import { DokumentBearbeitenDialog } from "@/components/dokumente/DokumentBearbeitenDialog";
 import { DokumentViewer } from "@/components/dokumente/DokumentViewer";
 import { DriveSyncBadge } from "@/components/dokumente/DriveSyncBadge";
+import { DokumentThumb } from "@/components/dokumente/DokumentThumb";
 import { fristStatus, FRIST_LABEL, fristBadgeClass } from "@/lib/dokument/frist";
 import {
   Select,
@@ -246,13 +247,7 @@ function Page() {
                     >
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
-                          {d.url && d.mimeType.startsWith("image/") ? (
-                            <img src={d.url} alt="" className="h-10 w-10 shrink-0 rounded-lg border border-border object-cover" />
-                          ) : (
-                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-                              {d.typ === "bild" ? <ImageIcon className="h-5 w-5" /> : <FileText className="h-5 w-5" />}
-                            </div>
-                          )}
+                          <DokumentThumb dokument={d} className="h-10 w-10" />
                           <div className="min-w-0">
                             <div className="flex items-center gap-1.5">
                               <p className="truncate font-medium">{d.titel}</p>
@@ -319,13 +314,7 @@ function DokumentCard({
       onClick={onClick}
       className="flex w-full gap-3 rounded-2xl border border-border bg-card p-3 text-left shadow-sm transition active:bg-muted"
     >
-      {d.url && d.mimeType.startsWith("image/") ? (
-        <img src={d.url} alt="" className="h-16 w-16 shrink-0 rounded-lg border border-border object-cover" />
-      ) : (
-        <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-          {d.typ === "bild" ? <ImageIcon className="h-6 w-6" /> : <FileText className="h-6 w-6" />}
-        </div>
-      )}
+      <DokumentThumb dokument={d} className="h-16 w-16" />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5">
           <p className="truncate text-sm font-semibold">{d.titel}</p>

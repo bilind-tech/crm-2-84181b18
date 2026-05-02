@@ -2,13 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useRef, useState, type ChangeEvent } from "react";
 import { Camera, Trash2, Check, Upload, Loader2, FolderOpen, FileText } from "lucide-react";
 import { toast } from "sonner";
-import { useUploadDateienToSession } from "@/hooks/useApi";
-import {
-  compressImage,
-  fileToDataUrl,
-  dokumentTypAusMime,
-  MAX_BYTES,
-} from "@/lib/dokument/upload";
+import { uploadDokumentToSession, MAX_BYTES } from "@/lib/dokument/upload";
 import { PrimaryAction } from "@/components/layout/PrimaryAction";
 
 export const Route = createFileRoute("/m/upload/$session")({
@@ -17,10 +11,8 @@ export const Route = createFileRoute("/m/upload/$session")({
 
 interface DateiEntry {
   id: string;
-  dataUrl: string;
-  groesse: number;
-  mimeType: string;
-  dateiname: string;
+  file: File;
+  previewUrl: string; // local object URL für Preview
   istBild: boolean;
 }
 
@@ -31,86 +23,80 @@ function MobileUploadPage() {
   const [dateien, setDateien] = useState<DateiEntry[]>([]);
   const [uploading, setUploading] = useState(false);
   const [done, setDone] = useState(false);
-  const upload = useUploadDateienToSession(token);
 
-  async function verarbeite(files: FileList | File[]) {
+  function verarbeite(files: FileList | File[]) {
     const list = Array.from(files);
     if (!list.length) return;
     setDone(false);
+    const neue: DateiEntry[] = [];
     for (const f of list) {
       if (f.size > MAX_BYTES) {
         toast.error(`"${f.name}" ist größer als 20 MB`);
         continue;
       }
-      try {
-        const istBild = f.type.startsWith("image/");
-        const dataUrl = istBild
-          ? await compressImage(f, 1600, 0.8)
-          : await fileToDataUrl(f);
-        setDateien((prev) => [
-          ...prev,
-          {
-            id: Math.random().toString(36).slice(2),
-            dataUrl,
-            groesse: Math.round(dataUrl.length * 0.75),
-            mimeType: f.type || (istBild ? "image/jpeg" : "application/octet-stream"),
-            dateiname: f.name,
-            istBild,
-          },
-        ]);
-      } catch {
-        toast.error(`"${f.name}" konnte nicht verarbeitet werden`);
-      }
+      const istBild = f.type.startsWith("image/");
+      neue.push({
+        id: Math.random().toString(36).slice(2),
+        file: f,
+        previewUrl: istBild ? URL.createObjectURL(f) : "",
+        istBild,
+      });
     }
+    if (neue.length) setDateien((prev) => [...prev, ...neue]);
   }
 
-  async function onCamera(e: ChangeEvent<HTMLInputElement>) {
+  function onCamera(e: ChangeEvent<HTMLInputElement>) {
     const files = e.target.files;
     e.target.value = "";
-    if (files) await verarbeite(files);
+    if (files) verarbeite(files);
   }
 
-  async function onPicker(e: ChangeEvent<HTMLInputElement>) {
+  function onPicker(e: ChangeEvent<HTMLInputElement>) {
     const files = e.target.files;
     e.target.value = "";
-    if (files) await verarbeite(files);
+    if (files) verarbeite(files);
   }
 
   function entferne(id: string) {
-    setDateien((p) => p.filter((f) => f.id !== id));
+    setDateien((p) => {
+      const x = p.find((f) => f.id === id);
+      if (x?.previewUrl) URL.revokeObjectURL(x.previewUrl);
+      return p.filter((f) => f.id !== id);
+    });
   }
 
   async function alleHochladen() {
     if (dateien.length === 0) return;
     setUploading(true);
+    const stamp = new Date();
+    const datum = stamp.toISOString().slice(0, 10);
+    let ok = 0;
     try {
-      const stamp = new Date();
-      const datum = stamp.toISOString().slice(0, 10);
-      await upload.mutateAsync(
-        dateien.map((f, i) => {
-          const ext = f.istBild
-            ? "jpg"
-            : (f.dateiname.split(".").pop() || "bin").toLowerCase();
-          const titel = f.istBild
-            ? `Foto ${stamp.toLocaleDateString("de-DE")} #${i + 1}`
-            : f.dateiname.replace(/\.[^.]+$/, "");
-          return {
+      for (let i = 0; i < dateien.length; i++) {
+        const d = dateien[i];
+        const titel = d.istBild
+          ? `Foto ${stamp.toLocaleDateString("de-DE")} #${i + 1}`
+          : d.file.name.replace(/\.[^.]+$/, "");
+        try {
+          await uploadDokumentToSession(token, d.file, {
             titel,
-            dateiname: f.dateiname || `datei-${datum}-${i + 1}.${ext}`,
-            mimeType: f.mimeType,
-            groesseBytes: f.groesse,
-            url: f.dataUrl,
-            typ: dokumentTypAusMime(f.mimeType),
             dokumentdatum: datum,
+            quelle: "handy-scan",
             steuerrelevant: false,
-          };
-        }),
-      );
-      setDateien([]);
-      setDone(true);
-      toast.success("An den PC gesendet");
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Upload fehlgeschlagen");
+          });
+          if (d.previewUrl) URL.revokeObjectURL(d.previewUrl);
+          ok++;
+        } catch (e) {
+          toast.error(
+            e instanceof Error ? `${d.file.name}: ${e.message}` : "Upload fehlgeschlagen",
+          );
+        }
+      }
+      if (ok > 0) {
+        setDateien([]);
+        setDone(true);
+        toast.success(`${ok} an den PC gesendet`);
+      }
     } finally {
       setUploading(false);
     }
@@ -126,7 +112,6 @@ function MobileUploadPage() {
       </header>
 
       <main className="flex-1 space-y-3 p-4">
-        {/* Versteckte Inputs */}
         <input
           ref={cameraRef}
           type="file"
@@ -182,12 +167,12 @@ function MobileUploadPage() {
                   className="relative aspect-square overflow-hidden rounded-xl border border-border bg-muted"
                 >
                   {f.istBild ? (
-                    <img src={f.dataUrl} alt="" className="h-full w-full object-cover" />
+                    <img src={f.previewUrl} alt="" className="h-full w-full object-cover" />
                   ) : (
                     <div className="flex h-full w-full flex-col items-center justify-center gap-1 p-2 text-center">
                       <FileText className="h-7 w-7 text-muted-foreground" />
                       <span className="line-clamp-2 break-all text-[10px] text-muted-foreground">
-                        {f.dateiname}
+                        {f.file.name}
                       </span>
                     </div>
                   )}

@@ -1,9 +1,9 @@
 import { useRef, useState, type DragEvent, type ChangeEvent } from "react";
 import { Upload, FileUp } from "lucide-react";
 import { toast } from "sonner";
-import { useCreateDokument } from "@/hooks/useApi";
+import { useQueryClient } from "@tanstack/react-query";
 import { PrimaryAction } from "@/components/layout/PrimaryAction";
-import { ACCEPT_PATTERN, fileToDokumentPayload } from "@/lib/dokument/upload";
+import { ACCEPT_PATTERN, uploadDokument } from "@/lib/dokument/upload";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -17,7 +17,7 @@ export function DokumentUploader({ compact, kundeId, objektId }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [drag, setDrag] = useState(false);
   const [busy, setBusy] = useState(false);
-  const create = useCreateDokument();
+  const qc = useQueryClient();
 
   async function verarbeite(files: FileList | File[]) {
     const list = Array.from(files);
@@ -27,12 +27,7 @@ export function DokumentUploader({ compact, kundeId, objektId }: Props) {
     let fehler = 0;
     for (const file of list) {
       try {
-        const payload = await fileToDokumentPayload(file, {
-          kundeId,
-          objektId,
-          quelle: "upload",
-        });
-        await create.mutateAsync(payload);
+        await uploadDokument(file, { kundeId, objektId, quelle: "upload" });
         ok++;
       } catch (e) {
         fehler++;
@@ -40,6 +35,7 @@ export function DokumentUploader({ compact, kundeId, objektId }: Props) {
       }
     }
     setBusy(false);
+    qc.invalidateQueries({ queryKey: ["dokumente"] });
     if (ok > 0) toast.success(`${ok} Dokument(e) hochgeladen`);
     if (fehler > 0 && ok === 0) toast.error("Kein Dokument hochgeladen");
   }
