@@ -287,3 +287,17 @@ h1, h2, h3, h4, h5, h6 {
 .quick-create-dialog[data-state="closed"] {
   animation: quickCreateFadeOut 90ms ease-in !important;
 }
+
+/* ---------- Mobile Overflow-Schutz: kein horizontales Scrollen jemals ---------- */
+html, body {
+  overflow-x: hidden;
+}
+
+/* Helper für horizontal-scrollbare Tab-Leisten ohne sichtbare Scrollbar */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}

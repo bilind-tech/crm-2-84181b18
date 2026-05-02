@@ -179,13 +179,13 @@ export function KundeForm({ onClose, onCreated }: Props) {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-6">
       <Tabs defaultValue="basis">
-        <TabsList className="h-11 w-full justify-start gap-1 rounded-full bg-muted p-1">
-          <TabsTrigger value="basis" className="rounded-full px-5">Basis</TabsTrigger>
-          <TabsTrigger value="adresse" className="rounded-full px-5">Adresse</TabsTrigger>
-          <TabsTrigger value="steuer" className="rounded-full px-5">Steuer & Zahlung</TabsTrigger>
-          <TabsTrigger value="notizen" className="rounded-full px-5">Notizen</TabsTrigger>
+        <TabsList className="no-scrollbar flex h-11 w-full justify-start gap-1 overflow-x-auto rounded-full bg-muted p-1">
+          <TabsTrigger value="basis" className="shrink-0 rounded-full px-3 text-sm sm:px-5">Basis</TabsTrigger>
+          <TabsTrigger value="adresse" className="shrink-0 rounded-full px-3 text-sm sm:px-5">Adresse</TabsTrigger>
+          <TabsTrigger value="steuer" className="shrink-0 rounded-full px-3 text-sm sm:px-5">Steuer & Zahlung</TabsTrigger>
+          <TabsTrigger value="notizen" className="shrink-0 rounded-full px-3 text-sm sm:px-5">Notizen</TabsTrigger>
         </TabsList>
 
         <TabsContent value="basis" className="mt-6 space-y-4">
@@ -336,7 +336,7 @@ export function KundeForm({ onClose, onCreated }: Props) {
         </TabsContent>
       </Tabs>
 
-      <div className="sticky bottom-0 -mx-4 -mb-6 mt-2 flex flex-col-reverse items-stretch gap-2 border-t border-border bg-background px-4 py-3 sm:-mx-8 sm:px-8 sm:flex-row sm:items-center sm:justify-end ">
+      <div className="sticky bottom-0 -mx-4 -mb-5 mt-2 flex flex-col-reverse items-stretch gap-2 border-t border-border bg-background px-4 py-3 sm:-mx-8 sm:-mb-6 sm:px-8 sm:flex-row sm:items-center sm:justify-end ">
         <Button variant="outline" onClick={onClose}>Abbrechen</Button>
         <Button disabled={create.isPending} onClick={submit} className="rounded-md px-6">
           {create.isPending ? "Speichere…" : "Kunde anlegen"}

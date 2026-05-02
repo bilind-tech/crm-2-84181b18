@@ -96,24 +96,24 @@ function Page() {
 
       {/* Tabs */}
       <Tabs defaultValue="uebersicht">
-        <TabsList className="h-11 w-full justify-start gap-1 overflow-x-auto rounded-full bg-muted p-1">
-          <TabsTrigger value="uebersicht" className="rounded-full px-5">Übersicht</TabsTrigger>
-          <TabsTrigger value="ansprechpartner" className="rounded-full px-5">
+        <TabsList className="no-scrollbar flex h-11 w-full justify-start gap-1 overflow-x-auto rounded-full bg-muted p-1">
+          <TabsTrigger value="uebersicht" className="shrink-0 rounded-full px-3 sm:px-5">Übersicht</TabsTrigger>
+          <TabsTrigger value="ansprechpartner" className="shrink-0 rounded-full px-3 sm:px-5">
             Ansprechpartner ({k.ansprechpartner.length})
           </TabsTrigger>
-          <TabsTrigger value="objekte" className="rounded-full px-5">
+          <TabsTrigger value="objekte" className="shrink-0 rounded-full px-3 sm:px-5">
             Objekte ({k.objekte.length})
           </TabsTrigger>
-          <TabsTrigger value="angebote" className="rounded-full px-5">
+          <TabsTrigger value="angebote" className="shrink-0 rounded-full px-3 sm:px-5">
             Angebote ({k.angebote.length})
           </TabsTrigger>
-          <TabsTrigger value="rechnungen" className="rounded-full px-5">
+          <TabsTrigger value="rechnungen" className="shrink-0 rounded-full px-3 sm:px-5">
             Rechnungen ({k.rechnungen.length})
           </TabsTrigger>
-          <TabsTrigger value="belege" className="rounded-full px-5">
+          <TabsTrigger value="belege" className="shrink-0 rounded-full px-3 sm:px-5">
             Belege ({k.dokumente.length})
           </TabsTrigger>
-          <TabsTrigger value="notizen" className="rounded-full px-5">
+          <TabsTrigger value="notizen" className="shrink-0 rounded-full px-3 sm:px-5">
             Notizen ({k.notizen.length})
           </TabsTrigger>
         </TabsList>

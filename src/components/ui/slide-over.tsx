@@ -32,7 +32,7 @@ export function SlideOver({
             widthClass,
           )}
         >
-          <div className="flex items-start justify-between gap-4 border-b border-border px-8 pb-5 pt-7">
+          <div className="flex items-start justify-between gap-4 border-b border-border px-4 pb-5 pt-7 sm:px-8">
             <div className="min-w-0">
               <DialogPrimitive.Title className="text-2xl font-semibold tracking-tight">
                 {title}
@@ -48,9 +48,9 @@ export function SlideOver({
               <span className="sr-only">Schließen</span>
             </DialogPrimitive.Close>
           </div>
-          <div className="flex-1 overflow-y-auto px-8 py-6">{children}</div>
+          <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-5 sm:px-8 sm:py-6">{children}</div>
           {footer && (
-            <div className="border-t border-border bg-card/50 px-8 py-4">{footer}</div>
+            <div className="border-t border-border bg-card/50 px-4 py-4 sm:px-8">{footer}</div>
           )}
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>
