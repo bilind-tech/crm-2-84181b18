@@ -1,119 +1,57 @@
 ## Ziel
 
-Drei zusammenhängende Verbesserungen:
+In den Übersichten **Angebote** und **Rechnungen** einen zusätzlichen Zeitraum-Filter (Jahr + Monat) ergänzen. Wenn z. B. „2025" und „Mai" gewählt sind, werden nur Belege angezeigt, die in diesem Monat erstellt wurden. Funktioniert zusätzlich zu den bestehenden Status-Tabs und der Suche.
 
-1. **Angebot annehmen/ablehnen klarer machen** — sowohl in der Übersicht (Liste) als auch auf der Detailseite mit deutlich beschrifteten Buttons statt nur Daumen-Icons.
-2. **Rechnung „bezahlt markieren" verständlicher machen** — der grüne Haken in der Liste wird ersetzt durch einen beschrifteten Button.
-3. **Überfällige Rechnungen → automatisches Pop-up** oben rechts beim App-Start, sobald das Fälligkeitsdatum (Standard 14 Tage) überschritten ist und keine Zahlung erfasst wurde. Schließbar, aber bei jedem Neuladen wieder sichtbar (bis Zahlung erfasst ist).
+## Was passiert visuell
 
-## 1) Angebot „Angenommen / Abgelehnt" — verständlicher
+- Neben der Filter-Pillen-Leiste erscheinen zwei kompakte Dropdowns mit Kalender-Icon: **Jahr** und **Monat**.
+- Mobil: in der Filter-Sheet-Auswahl als zwei Selects untereinander (kein zusätzlicher horizontaler Scroll).
+- Standard: „Alle Jahre / Alle Monate" — wirkt wie kein Filter.
+- Sobald gefiltert: kleines „×"-Icon erscheint zum Zurücksetzen.
+- Monatsauswahl ist nur aktiv, wenn ein Jahr gewählt wurde (sonst macht „Mai über alle Jahre" keinen Sinn).
 
-### Übersicht (`src/routes/angebote.tsx`)
-Der bisherige `AngebotAnnahmeButtons` (zwei Icon-Buttons Daumen-hoch/runter) ist zu kryptisch.
+## Datums-Basis
 
-**Mobile Card-View:**
-- Zwei volle Buttons mit Text + Icon nebeneinander in der Action-Row, nur sichtbar wenn `status === "versendet"`:
-  - Grüner Button: „Angenommen" + `ThumbsUp`
-  - Outline-Button: „Abgelehnt" + `ThumbsDown`
-- Wenn bereits angenommen/abgelehnt: Statt Buttons ein deutlicher Status-Text in der Card-Meta (z. B. „✓ Angenommen am 15.04." in Grün oder „✗ Abgelehnt am 15.04." in Grau).
+| Liste | Filter-Datum |
+|---|---|
+| Angebote | `erstelltAm` (Erstellungsdatum des Angebots) |
+| Rechnungen | `rechnungsdatum` (das offizielle Rechnungsdatum) |
 
-**Desktop-Tabelle:**
-- In der Aktionen-Spalte: bei `status === "versendet"` zwei kleine Buttons mit Text („✓ Annehmen" / „✗ Ablehnen") statt Icon-only.
-- Status-Badge bleibt zusätzlich erhalten — die FlowBar zeigt den Verlauf, der Badge den aktuellen Stand.
+Begründung: Das ist das Datum, das auf dem Beleg steht und das der Nutzer im Kopf hat („Rechnung vom Mai 2025"). `erstelltAm`-Sortierung in der Tabelle bleibt unverändert.
 
-### Detailseite (`src/routes/angebote.$id.tsx`)
-Bereits vorhanden (Buttons „Angenommen" / „Abgelehnt" in der Action-Leiste bei Status `versendet`) — funktioniert gut. Wir prüfen nur, dass die Buttons:
-- prominent als grüner Primary („Angebot annehmen") + Outline („Ablehnen") sichtbar sind
-- nach Klick eine klare Toast-Bestätigung zeigen (vorhanden)
-- die FlowBar sich sofort aktualisiert (vorhanden)
+## Änderungen
 
-Keine zusätzlichen Änderungen auf der Detailseite nötig.
+### Neu: `src/components/filters/ZeitraumFilter.tsx`
+- Komponente mit Props `{ value, onChange, verfuegbareDaten }`.
+- Liest aus `verfuegbareDaten` (Liste der Datums-Strings) die vorhandenen Jahre und sortiert sie absteigend; aktuelles Jahr wird immer angeboten.
+- Zwei `Select`-Dropdowns (shadcn) im Pillen-Stil, passend zur bestehenden Filter-Leiste.
+- Exportiert zusätzlich:
+  - `ZeitraumState`-Typ: `{ jahr: "alle" | "YYYY"; monat: "alle" | "01"–"12" }`
+  - `ZEITRAUM_ALLE`-Konstante als Default
+  - `passtInZeitraum(iso, z)`-Helper für die Filter-Logik
 
-## 2) Rechnung „Als bezahlt markieren" — verständlicher
+### Edit: `src/routes/angebote.tsx`
+- Neuer State: `const [zeitraum, setZeitraum] = useState(ZEITRAUM_ALLE)`.
+- `filtered` zusätzlich filtern: `passtInZeitraum(a.erstelltAm, zeitraum)`.
+- `<ZeitraumFilter />` im `extra`-Slot der `FilterBar` einbinden, `verfuegbareDaten = alle.map(a => a.erstelltAm)`.
 
-### Übersicht (`src/routes/rechnungen.tsx`)
-Der grüne `CheckCircle2`-Icon-Button ohne Beschriftung ist nicht selbsterklärend.
+### Edit: `src/routes/rechnungen.tsx`
+- Analog: `passtInZeitraum(r.rechnungsdatum, zeitraum)`.
+- KPI-Karte „Eingang diesen Monat" bleibt unverändert (nutzt aktuellen Monat unabhängig vom Filter).
 
-**Mobile Card-View (390 px):**
-- Button mit Icon + Text: „Bezahlt" oder besser „Zahlung erfassen" (passt zum bestehenden `ZahlungErfassenDialog`).
-- Variante: grüner Button mit kompakter Beschriftung, nur sichtbar wenn `status !== "bezahlt" && status !== "storniert"`.
-
-**Desktop-Tabelle:**
-- Button mit Icon + Text-Label „Zahlung" (kompakt, passt in die Aktionen-Spalte).
-- Tooltip „Zahlung erfassen — markiert Rechnung als bezahlt".
-
-Beide Buttons öffnen wie bisher den `ZahlungErfassenDialog` mit Schnell-Buttons (Voll / Hälfte / Viertel).
-
-## 3) Überfällige Rechnungen — Pop-up oben rechts
-
-### Verhalten
-- Beim App-Start (Mount der Root-Layout) prüft ein Hook, ob es überfällige Rechnungen gibt:
-  - `faelligkeitsdatum < heute` AND `status !== "bezahlt"` AND `status !== "storniert"`
-- Wenn ja: Ein **Toast-artiges Pop-up oben rechts** wird automatisch eingeblendet — nicht der Bell-Icon-Popover, sondern ein eigenes, deutlich sichtbares Banner.
-- Pop-up zeigt:
-  - Titel: „X überfällige Rechnung(en)"
-  - Liste der ersten 3 überfälligen Rechnungen mit Kundenname, Nummer, Tagen Überfälligkeit, offenem Betrag
-  - Button „Alle ansehen" → navigiert zu `/rechnungen?filter=ueberfaellig`
-  - Bei nur einer Rechnung: direkter „Zur Rechnung"-Link
-  - X-Button zum Schließen
-- **Verhalten:** Das Pop-up wird bei jedem Seitenaufruf/Reload erneut gezeigt (kein localStorage-„dismissed"), solange es überfällige Rechnungen gibt. Schließen blendet es nur für die aktuelle Session aus (React-State, kein Persist).
-- Sobald für eine Rechnung eine Zahlung erfasst wird und sie damit nicht mehr überfällig ist, verschwindet sie aus der Berechnung.
-
-### Standard-Fälligkeit 14 Tage
-- Im Datenmodell existiert bereits `Kunde.zahlungszielTage: number = 14`.
-- Beim Erstellen einer Rechnung wird `faelligkeitsdatum = rechnungsdatum + zahlungszielTage` automatisch gesetzt (in `RechnungForm` prüfen — falls nicht der Fall, ergänzen).
-- Default bleibt 14 Tage; user kann pro Kunde überschreiben (bereits möglich).
-
-### Komponenten
-
-**Neu: `src/components/notifications/UeberfaelligPopup.tsx`**
-- Eigenständige Karte, fixed positioniert oben rechts (`fixed top-20 right-4 z-50 w-96 max-w-[calc(100vw-2rem)]`).
-- Mobile: voll responsive, etwas kleinere Breite.
-- Slide-in-Animation, manuell schließbar via X.
-- Schließen setzt nur `isOpen=false` im lokalen State — kein Persist.
-- Verwendet bestehende Card-Styles, kein Gradient (laut Memory-Regel).
-
-**Neu: `src/hooks/useUeberfaelligeRechnungen.ts`**
-- Liefert `{ count, gesamtOffen, rechnungen: [{ id, nummer, kundeName, tageUeber, offen }] }` aus `useRechnungen()`.
-- Memoized, automatisch reaktiv via React Query Cache.
-
-**Edit: `src/routes/__root.tsx`**
-- Das `UeberfaelligPopup` wird einmal global gerendert (innerhalb der Auth-geschützten Layout-Sektion), damit es auf jeder Seite verfügbar ist und beim ersten Mount erscheint.
-
-### Beziehung zum Bell-Icon
-- Der bestehende Benachrichtigungs-Popover (Bell + roter Zähler-Badge) bleibt unverändert und zeigt weiterhin alle Benachrichtigungen.
-- Das neue Pop-up ist **zusätzlich** und gezielt nur für überfällige Rechnungen — ohne dass der Nutzer den Bell-Button öffnen muss.
+### Edit: `src/routes/angebote.tsx` (FilterBar)
+- Die `FilterBar` hat bereits einen `extra`-Slot — der wird beim Desktop-Layout sichtbar. Für Mobile ergänzen wir den ZeitraumFilter ebenfalls in der Mobile-FilterBar (in der Sheet-Auswahl, als eigene Sektion „Zeitraum" über den Status-Tabs).
 
 ## Technische Details
 
-### Dateien
-
-| Datei | Änderung |
-|---|---|
-| `src/routes/angebote.tsx` | `AngebotAnnahmeButtons` umbauen: Text + Icon, Mobil + Desktop |
-| `src/routes/rechnungen.tsx` | Zahlung-Button mit Text-Label statt nur Icon |
-| `src/components/notifications/UeberfaelligPopup.tsx` | **neu** — fixed Pop-up oben rechts |
-| `src/hooks/useUeberfaelligeRechnungen.ts` | **neu** — Berechnung |
-| `src/routes/__root.tsx` | `<UeberfaelligPopup />` global einbinden |
-| `src/components/forms/RechnungForm.tsx` | sicherstellen, dass `faelligkeitsdatum = heute + zahlungszielTage` (Default 14) |
-
-### Datenfluss Pop-up
-```text
-useRechnungen() (React Query Cache)
-   │
-   └─▶ useUeberfaelligeRechnungen()  ── filtert + reichert mit Kundenname an
-           │
-           └─▶ UeberfaelligPopup       ── rendert nur wenn count > 0 && !manuelGeschlossen
-```
-
-### Routing
-- „Alle ansehen" navigiert zu `/rechnungen` mit gesetztem Filter `ueberfaellig` (über lokalen State oder URL-Query-Param — Filter ist bereits in der Liste vorhanden).
+- Filter-Datum-Felder im Datenmodell sind ISO-Strings (`YYYY-MM-DD`). Vergleich rein per String-Slice (`slice(0,4)` für Jahr, `slice(5,7)` für Monat) — schnell, kein Date-Parsing nötig.
+- Filter wird **nicht** in URL-Search-Params gespeichert (lokaler Komponenten-State). Reicht für den Use-Case und vermeidet Routen-Schema-Änderungen.
+- Bestehende Status-Tabs, Suche und KPI-Karten bleiben unverändert.
 
 ## Akzeptanzkriterien
 
-- In der Angebots-Liste: bei einem versendeten Angebot sind zwei klar beschriftete Buttons „Annehmen" und „Ablehnen" sichtbar (Mobil + Desktop).
-- In der Rechnungs-Liste: Bezahlt-Button hat ein Text-Label und ist auf den ersten Blick als „Zahlung erfassen" erkennbar.
-- Beim Öffnen der App erscheint automatisch oben rechts ein Pop-up, wenn überfällige Rechnungen existieren — auch nach Schließen erscheint es beim nächsten Reload wieder.
-- Standard-Zahlungsziel ist 14 Tage; Pop-up erscheint erst nach Ablauf.
-- Bell-Icon-Popover bleibt funktional und wird nicht doppelt eingeblendet.
-- Keine Sparkles, keine Gradient-Hintergründe (Memory-Regel respektiert).
+- In `/angebote` und `/rechnungen` gibt es Dropdowns „Jahr" und „Monat" neben den Status-Tabs.
+- Wahl von Jahr 2025 + Monat Mai zeigt nur Belege mit Datum im Mai 2025.
+- „Alle Jahre" als Default — keine Liste wird zunächst eingeschränkt.
+- Reset-Button (×) erscheint, sobald ein Filter aktiv ist.
+- Funktioniert auf Mobil (Filter-Sheet) und Desktop (Pillen-Leiste).

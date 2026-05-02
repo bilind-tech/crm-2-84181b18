@@ -17,6 +17,12 @@ import { MobileListCard } from "@/components/ui/mobile-list-card";
 import { AngebotForm } from "@/components/forms/AngebotForm";
 import { FlowBar } from "@/components/flow/FlowBar";
 import { angebotFlow } from "@/lib/flow/flows";
+import {
+  ZeitraumFilter,
+  ZEITRAUM_ALLE,
+  passtInZeitraum,
+  type ZeitraumState,
+} from "@/components/filters/ZeitraumFilter";
 import type { Angebot } from "@/lib/api/types";
 import { useConfirm } from "@/hooks/useConfirm";
 
@@ -73,6 +79,7 @@ function Page() {
   );
   const [filter, setFilter] = useState<string>("alle");
   const [q, setQ] = useState("");
+  const [zeitraum, setZeitraum] = useState<ZeitraumState>(ZEITRAUM_ALLE);
   const [open, setOpen] = useState(false);
   const [emailFuer, setEmailFuer] = useState<Angebot | null>(null);
 
@@ -92,6 +99,7 @@ function Page() {
   const filtered = useMemo(() => {
     let list = alle;
     if (filter !== "alle") list = list.filter((a) => a.status === filter);
+    list = list.filter((a) => passtInZeitraum(a.erstelltAm, zeitraum));
     if (q.trim()) {
       const t = q.toLowerCase();
       list = list.filter(
@@ -99,7 +107,7 @@ function Page() {
       );
     }
     return [...list].sort((a, b) => b.erstelltAm.localeCompare(a.erstelltAm));
-  }, [alle, filter, q]);
+  }, [alle, filter, q, zeitraum]);
 
   return (
     <div className="space-y-6">
@@ -130,6 +138,12 @@ function Page() {
           { value: "angenommen", label: "Angenommen" },
         ]}
         placeholder="Suche nach Nummer, Titel, Kunde…"
+      />
+
+      <ZeitraumFilter
+        value={zeitraum}
+        onChange={setZeitraum}
+        verfuegbareDaten={alle.map((a) => a.erstelltAm)}
       />
 
       {/* Mobil: Card-View */}

@@ -17,6 +17,12 @@ import { ZahlungErfassenDialog } from "@/components/forms/ZahlungErfassenDialog"
 import { useConfirm } from "@/hooks/useConfirm";
 import { FlowBar } from "@/components/flow/FlowBar";
 import { rechnungFlow } from "@/lib/flow/flows";
+import {
+  ZeitraumFilter,
+  ZEITRAUM_ALLE,
+  passtInZeitraum,
+  type ZeitraumState,
+} from "@/components/filters/ZeitraumFilter";
 import type { Rechnung } from "@/lib/api/types";
 
 export const Route = createFileRoute("/rechnungen")({ component: Layout });
@@ -70,6 +76,7 @@ function Page() {
   const del = useDeleteRechnung();
   const [filter, setFilter] = useState("alle");
   const [q, setQ] = useState("");
+  const [zeitraum, setZeitraum] = useState<ZeitraumState>(ZEITRAUM_ALLE);
   const [open, setOpen] = useState(false);
   const [zahlungFuer, setZahlungFuer] = useState<Rechnung | null>(null);
   const [emailFuer, setEmailFuer] = useState<Rechnung | null>(null);
@@ -99,12 +106,13 @@ function Page() {
       if (filter === "teilbezahlt") list = list.filter((r) => r.status === "teilbezahlt");
       else list = list.filter((r) => r.status === filter);
     }
+    list = list.filter((r) => passtInZeitraum(r.rechnungsdatum, zeitraum));
     if (q.trim()) {
       const t = q.toLowerCase();
       list = list.filter((r) => r.nummer.toLowerCase().includes(t) || r.titel.toLowerCase().includes(t));
     }
     return [...list].sort((a, b) => b.rechnungsdatum.localeCompare(a.rechnungsdatum));
-  }, [alle, filter, q]);
+  }, [alle, filter, q, zeitraum]);
 
   return (
     <div className="space-y-6">
@@ -152,6 +160,12 @@ function Page() {
           { value: "bezahlt", label: "Bezahlt" },
         ]}
         placeholder="Suche nach Nummer, Titel, Kunde…"
+      />
+
+      <ZeitraumFilter
+        value={zeitraum}
+        onChange={setZeitraum}
+        verfuegbareDaten={alle.map((r) => r.rechnungsdatum)}
       />
 
       {/* Mobil: Card-View */}
