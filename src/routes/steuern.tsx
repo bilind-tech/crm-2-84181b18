@@ -1,6 +1,7 @@
-// Steuer-Übersicht für GmbH (Sankt Augustin) — vollautomatisch, read-only.
+// Steuer-Übersicht für GmbH (Sankt Augustin) — automatisch + manuelle Zahlungs-Erfassung.
 // USt: präzise aus bezahlten Rechnungen + Belegen.
 // KSt/Soli/GewSt: YTD-Hochrechnung mit Hinweis.
+// Bezahlte Steuern werden vom Empfehlungs-Betrag abgezogen.
 
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
@@ -12,20 +13,27 @@ import {
   FileSpreadsheet,
   Building2,
   Info,
-  PiggyBank,
-  TrendingUp,
+  Plus,
+  X,
 } from "lucide-react";
 import { useRechnungen, useDokumente } from "@/hooks/useApi";
-import { useSteuerEinstellungen } from "@/lib/steuern/store";
+import {
+  useSteuerEinstellungen,
+  useBezahltMarkierungen,
+  type BezahltMarkierung,
+} from "@/lib/steuern/store";
 import {
   generiereAutomatischePosten,
   berechneKennzahlen,
 } from "@/lib/steuern/berechnung";
 import type { SteuerPosten, SteuerArt } from "@/lib/steuern/types";
 import { PageHeader, KpiCard } from "@/components/layout/PageHeader";
+import { PrimaryAction } from "@/components/layout/PrimaryAction";
+import { Button } from "@/components/ui/button";
 import { formatEUR, formatDate, daysBetween, todayISO } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { SteuerDetailDialog } from "@/components/steuern/SteuerDetailDialog";
+import { SteuerZahlungDialog } from "@/components/steuern/SteuerZahlungDialog";
 
 export const Route = createFileRoute("/steuern")({
   head: () => ({
@@ -49,28 +57,42 @@ function Page() {
   const { data: rechnungen = [] } = useRechnungen();
   const { data: dokumente = [] } = useDokumente();
   const { data: einstellungen } = useSteuerEinstellungen();
+  const { map: bezahltMap, setBezahlt, removeBezahlt } = useBezahltMarkierungen();
 
   const [detailDialog, setDetailDialog] = useState<SteuerPosten | null>(null);
+  const [zahlungOpen, setZahlungOpen] = useState(false);
 
   const jahr = new Date().getFullYear();
 
-  const allePosten = useMemo(
-    () => generiereAutomatischePosten(rechnungen, dokumente, einstellungen, jahr),
-    [rechnungen, dokumente, einstellungen, jahr],
-  );
+  // Automatisch generierte Posten + Bezahlt-Overlay aus dem Store
+  const allePosten = useMemo<SteuerPosten[]>(() => {
+    const auto = generiereAutomatischePosten(rechnungen, dokumente, einstellungen, jahr);
+    return auto.map((p) => {
+      const b = bezahltMap[p.id];
+      if (!b) return p;
+      return {
+        ...p,
+        status: "bezahlt" as const,
+        bezahltAm: b.bezahltAm,
+        tatsaechlicherBetrag: b.tatsaechlicherBetrag,
+        notiz: b.notiz ?? p.notiz,
+      };
+    });
+  }, [rechnungen, dokumente, einstellungen, jahr, bezahltMap]);
 
   const kennzahlen = useMemo(
     () => berechneKennzahlen(allePosten, rechnungen, dokumente, einstellungen, jahr),
     [allePosten, rechnungen, dokumente, einstellungen, jahr],
   );
 
-  // Aufschlüsselung der Rücklage
+  // Aufschlüsselung der Rücklage — nur OFFENE Beträge
   const ruecklage = useMemo(() => {
     let ust = 0;
     let kst = 0;
     let soli = 0;
     let gewst = 0;
     for (const p of allePosten) {
+      if (p.status === "bezahlt") continue;
       if (p.art === "ust") ust += p.geschaetzterBetrag;
       else if (p.art === "kst") kst += p.geschaetzterBetrag;
       else if (p.art === "soli") soli += p.geschaetzterBetrag;
@@ -88,28 +110,52 @@ function Page() {
 
   const offene = useMemo(
     () =>
-      [...allePosten].sort((a, b) => a.faelligAm.localeCompare(b.faelligAm)),
+      allePosten
+        .filter((p) => p.status !== "bezahlt")
+        .sort((a, b) => a.faelligAm.localeCompare(b.faelligAm)),
     [allePosten],
+  );
+
+  const bezahlte = useMemo(
+    () =>
+      allePosten
+        .filter((p) => p.status === "bezahlt" && p.bezahltAm && new Date(p.bezahltAm).getFullYear() === jahr)
+        .sort((a, b) => (b.bezahltAm ?? "").localeCompare(a.bezahltAm ?? "")),
+    [allePosten, jahr],
   );
 
   const offeneUst = offene.filter((p) => p.art === "ust");
   const offeneErtrag = offene.filter((p) => p.art !== "ust");
 
+  function handleZahlungSpeichern(postenId: string, eintrag: BezahltMarkierung) {
+    setBezahlt(postenId, eintrag);
+  }
+
+  function handleWiderrufen(postenId: string) {
+    removeBezahlt(postenId);
+  }
+
   return (
     <div className="space-y-6 pb-12">
       <PageHeader
         title="Steuern"
-        subtitle="Vollautomatisch aus deinen Rechnungen und Belegen berechnet."
+        subtitle="Automatisch aus Rechnungen und Belegen berechnet."
+        actions={
+          <PrimaryAction
+            icon={Plus}
+            label="Zahlung erfassen"
+            onClick={() => setZahlungOpen(true)}
+          />
+        }
       />
 
       {/* KPIs */}
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         <KpiCard
-          label="Umsatzsteuer-Schuld"
-          value={formatEUR(ruecklage.ust)}
-          sublabel="exakt aus bezahlten Rechnungen"
-          tone={ruecklage.ust > 0 ? "warning" : "success"}
-          icon={Receipt}
+          label="Empfohlene Rücklage"
+          value={formatEUR(ruecklage.gesamt)}
+          sublabel="USt + Ertragsteuer-Schätzung"
+          tone="primary"
         />
         <KpiCard
           label="Nächste Fälligkeit"
@@ -127,11 +173,11 @@ function Page() {
           icon={AlertCircle}
         />
         <KpiCard
-          label="Empfohlene Rücklage"
-          value={formatEUR(ruecklage.gesamt)}
-          sublabel="USt + Ertragsteuer-Schätzung"
-          tone="primary"
-          icon={PiggyBank}
+          label={`Bezahlt ${jahr}`}
+          value={formatEUR(kennzahlen.bezahltJahrSumme)}
+          sublabel={`${bezahlte.length} ${bezahlte.length === 1 ? "Zahlung" : "Zahlungen"} ans Finanzamt`}
+          tone="success"
+          icon={CheckCircle2}
         />
         <KpiCard
           label={`Gewinn ${jahr}`}
@@ -141,29 +187,21 @@ function Page() {
               ? "Verlust YTD"
               : "Netto-Einnahmen − Netto-Ausgaben"
           }
-          tone={kennzahlen.gewinnYtd >= 0 ? "success" : "default"}
-          icon={TrendingUp}
+          tone={kennzahlen.gewinnYtd >= 0 ? "default" : "default"}
         />
       </div>
 
-      {/* Rücklagen-Karte: prominent */}
+      {/* Rücklagen-Karte: schlicht, ohne Icon */}
       <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
-        <div className="flex items-start gap-4">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-            <PiggyBank className="h-6 w-6" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <h2 className="text-sm font-medium uppercase tracking-wider text-muted-foreground">
-              Was du zurücklegen solltest
-            </h2>
-            <p className="mt-1 text-4xl font-bold tracking-tight tabular-nums">
-              {formatEUR(ruecklage.gesamt)}
-            </p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Damit das Finanzamt jederzeit bedient werden kann.
-            </p>
-          </div>
-        </div>
+        <h2 className="text-sm font-medium uppercase tracking-wider text-muted-foreground">
+          Empfohlene Rücklage
+        </h2>
+        <p className="mt-1 text-4xl font-bold tracking-tight tabular-nums">
+          {formatEUR(ruecklage.gesamt)}
+        </p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Reicht aus, um alle aktuell offenen Steuerforderungen zu decken.
+        </p>
 
         <div className="mt-6 space-y-2.5 border-t border-border pt-5">
           <RuecklageZeile
@@ -194,7 +232,7 @@ function Page() {
       {/* Offene USt-Voranmeldungen */}
       <div>
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-          Umsatzsteuer · {einstellungen.ustRhythmus === "monatlich" ? "monatliche Voranmeldungen" : einstellungen.ustRhythmus === "quartalsweise" ? "Quartals-Voranmeldungen" : "jährlich"}
+          Umsatzsteuer
         </h2>
         {offeneUst.length === 0 ? (
           <EmptyHinweis text="Sobald bezahlte Rechnungen oder Belege im aktuellen Voranmeldungs-Zeitraum liegen, erscheint hier die nächste USt-Voranmeldung." />
@@ -221,6 +259,25 @@ function Page() {
         </div>
       )}
 
+      {/* Bereits bezahlt */}
+      {bezahlte.length > 0 && (
+        <div>
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+            Bereits bezahlt · {jahr}
+          </h2>
+          <div className="space-y-2">
+            {bezahlte.map((p) => (
+              <BezahltZeile
+                key={p.id}
+                posten={p}
+                onClick={() => setDetailDialog(p)}
+                onWiderrufen={() => handleWiderrufen(p.id)}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Disclaimer */}
       <div className="rounded-xl border border-border bg-muted/30 p-4 text-xs text-muted-foreground">
         <div className="flex items-start gap-2">
@@ -228,7 +285,7 @@ function Page() {
           <div>
             <p className="font-medium text-foreground">Schätzung — keine Steuerberatung</p>
             <p className="mt-1">
-              USt-Beträge sind exakt aus deinen bezahlten Rechnungen und steuerrelevanten Belegen berechnet.
+              USt-Beträge sind exakt aus bezahlten Rechnungen und steuerrelevanten Belegen berechnet.
               Ertragsteuern (KSt/Soli/GewSt) sind YTD-Hochrechnungen und werden mit jedem neuen Beleg präziser.
               Mit Steuerberater abstimmen vor Vorauszahlung oder Jahreserklärung.{" "}
               <Link to="/einstellungen" className="font-medium text-primary hover:underline">
@@ -243,6 +300,12 @@ function Page() {
       <SteuerDetailDialog
         posten={detailDialog}
         onOpenChange={(v: boolean) => !v && setDetailDialog(null)}
+      />
+      <SteuerZahlungDialog
+        open={zahlungOpen}
+        onOpenChange={setZahlungOpen}
+        posten={allePosten}
+        onSpeichern={handleZahlungSpeichern}
       />
     </div>
   );
@@ -345,5 +408,47 @@ function PostenZeile({ posten, onClick }: ZeileProps) {
         {formatEUR(posten.geschaetzterBetrag)}
       </p>
     </button>
+  );
+}
+
+function BezahltZeile({
+  posten,
+  onClick,
+  onWiderrufen,
+}: ZeileProps & { onWiderrufen: () => void }) {
+  const Icon = ART_ICON[posten.art];
+  const betrag = posten.tatsaechlicherBetrag ?? posten.geschaetzterBetrag;
+
+  return (
+    <div className="flex items-center gap-2 rounded-xl border border-border bg-card/50 p-2.5 shadow-sm sm:p-3">
+      <button
+        type="button"
+        onClick={onClick}
+        className="flex min-w-0 flex-1 items-center gap-3 text-left"
+      >
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-success/10 text-success">
+          <Icon className="h-4 w-4" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium">{posten.titel}</p>
+          <p className="truncate text-xs text-muted-foreground">
+            Bezahlt {posten.bezahltAm ? formatDate(posten.bezahltAm) : "—"}
+            {posten.notiz && ` · ${posten.notiz}`}
+          </p>
+        </div>
+        <p className="shrink-0 text-sm font-semibold tabular-nums text-success">
+          {formatEUR(betrag)}
+        </p>
+      </button>
+      <Button
+        size="icon"
+        variant="ghost"
+        onClick={onWiderrufen}
+        aria-label="Zahlung widerrufen"
+        className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
+      >
+        <X className="h-4 w-4" />
+      </Button>
+    </div>
   );
 }
