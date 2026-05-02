@@ -24,11 +24,10 @@ export class ApiError extends Error {
   }
 }
 
-const PI_PREFIXES = ["/auth/", "/einstellungen/"];
+const PI_PREFIXES = ["/auth/", "/einstellungen/", "/backup/"];
 // Ausnahmen: /einstellungen/* die noch nicht im Pi-Backend leben → Mock
 const MOCK_OVERRIDE_PREFIXES = [
   "/einstellungen/vorlagen",
-  "/einstellungen/backup-historie",
 ];
 
 function isPiPath(p: string): boolean {
