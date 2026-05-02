@@ -90,6 +90,15 @@ export const MahnungSchema = z.object({
   stufe3Tage: cInt(1, 180, 28),
   gebuehrStufe2: cNum(0, 1000, 5),
   gebuehrStufe3: cNum(0, 1000, 15),
+  // Step 13 — Mahn-Automatik:
+  modus: z.enum(["aus", "vorschlag", "auto"]).default("vorschlag"),
+  cronZeit: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).default("08:30"),
+  nurAnWerktagen: z.coerce.boolean().default(true),
+  benachrichtigungBeiVorschlag: z.coerce.boolean().default(true),
+  benachrichtigungBeiAutoversand: z.coerce.boolean().default(true),
+  emailVorlageStufe1: z.string().trim().max(64).optional().nullable(),
+  emailVorlageStufe2: z.string().trim().max(64).optional().nullable(),
+  emailVorlageStufe3: z.string().trim().max(64).optional().nullable(),
 });
 
 export const DauerauftragSchema = z.object({
