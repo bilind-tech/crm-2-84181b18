@@ -14,9 +14,10 @@ import {
 import { SmartInput, smartValue } from "@/components/ui/smart-input";
 import { useCreateKunde, useKuerzelFrei } from "@/hooks/useApi";
 import { useCreateDauerauftrag } from "@/hooks/useDauerauftraege";
+import { api } from "@/lib/api/client";
 import { toast } from "sonner";
 import { useNavigate } from "@tanstack/react-router";
-import type { Kunde, DauerauftragFrequenz, DauerauftragModus, Position } from "@/lib/api/types";
+import type { Kunde, Ansprechpartner, DauerauftragFrequenz, DauerauftragModus, Position } from "@/lib/api/types";
 import { cn } from "@/lib/utils";
 
 const PHONE_PREFIX = "+49 ";
@@ -224,6 +225,26 @@ export function KundeForm({ onClose, onCreated }: Props) {
       return;
     }
 
+    // Personendaten automatisch als primären Ansprechpartner speichern
+    const hatPerson = !!(f.vorname.trim() || f.nachname.trim() || f.email.trim() || f.telefon.trim() || f.mobil.trim());
+    if (hatPerson) {
+      try {
+        await api.post<Ansprechpartner>("/ansprechpartner", {
+          kundeId: k.id,
+          anrede: f.anrede || undefined,
+          vorname: f.vorname || undefined,
+          nachname: f.nachname || undefined,
+          telefon: smartValue(f.telefon, PHONE_PREFIX),
+          mobil: smartValue(f.mobil, PHONE_PREFIX),
+          email: f.email || undefined,
+          primaer: true,
+        });
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "Ansprechpartner konnte nicht angelegt werden";
+        toast.warning("Kunde angelegt, Ansprechpartner fehlgeschlagen", { description: msg });
+      }
+    }
+
     // Optional: Dauerauftrag direkt mit-anlegen
     if (f.daAktiv) {
       const positionen: Position[] = [];
@@ -410,6 +431,8 @@ export function KundeForm({ onClose, onCreated }: Props) {
               <SmartInput prefix={WEB_PREFIX} value={f.webseite} onChange={(v) => set("webseite", v)} inputMode="url" />
             </Field>
           </div>
+
+          <AnsprechpartnerHinweis f={f} />
         </TabsContent>
 
         <TabsContent value="adresse" className="mt-6 space-y-4">
@@ -621,6 +644,34 @@ function Field({
     <div className={className}>
       <Label className="text-xs font-medium text-muted-foreground">{label}</Label>
       <div className="mt-1.5">{children}</div>
+    </div>
+  );
+}
+
+function AnsprechpartnerHinweis({ f }: { f: FormState }) {
+  const anredeLabel =
+    f.anrede === "herr" ? "Herr" :
+    f.anrede === "frau" ? "Frau" :
+    f.anrede === "divers" ? "" :
+    f.anrede === "keine" ? "" : "";
+  const fullName = [anredeLabel, f.vorname.trim(), f.nachname.trim()].filter(Boolean).join(" ");
+  const kontakt = f.email.trim() || smartValue(f.telefon, PHONE_PREFIX) || smartValue(f.mobil, PHONE_PREFIX) || "";
+  const hatPerson = !!(f.vorname.trim() || f.nachname.trim() || f.email.trim() || f.telefon.trim() || f.mobil.trim());
+
+  if (!hatPerson) {
+    return (
+      <div className="rounded-lg border border-dashed border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+        Tipp: Trage Anrede + Name (oder Kontakt) ein – die Person wird automatisch als{" "}
+        <span className="font-medium text-foreground">primärer Ansprechpartner</span> für diesen Kunden gespeichert.
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-xs text-foreground">
+      Wird automatisch als <span className="font-medium">primärer Ansprechpartner</span> gespeichert:{" "}
+      <span className="font-medium">{fullName || "(ohne Name)"}</span>
+      {kontakt && <span className="text-muted-foreground"> · {kontakt}</span>}
     </div>
   );
 }
