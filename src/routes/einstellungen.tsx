@@ -195,6 +195,7 @@ function Page() {
           {tab === "vorlagen" && <VorlagenTab />}
           {tab === "drive" && <GoogleDriveTab />}
           {tab === "backup" && <BackupTab />}
+          {tab === "system-update" && <SystemUpdateTab />}
           {tab === "sicherheit" && <SicherheitTab />}
           {tab === "verlauf" && <VerlaufTab />}
         </div>
