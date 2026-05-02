@@ -1,9 +1,14 @@
 // Zod-Schemas für alle Einstellungs-Bereiche.
 // Defaults beschreiben, was die UI bei "noch nichts gesetzt" sieht.
+// Numerische Felder nutzen z.coerce, damit "465" (String aus Form-Inputs) toleriert wird.
 
 import { z } from "zod";
 
 const optStr = z.string().trim().max(500).optional().nullable();
+const cInt = (min: number, max: number, def: number) =>
+  z.coerce.number().int().min(min).max(max).default(def);
+const cNum = (min: number, max: number, def: number) =>
+  z.coerce.number().min(min).max(max).default(def);
 
 export const FirmaSchema = z.object({
   name: z.string().trim().min(1).max(200).default("MyCleanCenter GmbH"),
@@ -26,8 +31,8 @@ export type FirmaSettings = z.infer<typeof FirmaSchema>;
 
 export const SmtpSchema = z.object({
   host: z.string().trim().min(1).max(255).default("smtp.strato.de"),
-  port: z.number().int().min(1).max(65535).default(465),
-  secure: z.boolean().default(true),
+  port: cInt(1, 65535, 465),
+  secure: z.coerce.boolean().default(true),
   user: z.string().trim().max(255).default(""),
   // password is set separately via SmtpPasswordSchema (encrypted)
   fromName: z.string().trim().max(200).default(""),
@@ -42,35 +47,34 @@ export const SmtpPasswordSchema = z.object({
 export const NummernkreiseSchema = z.object({
   rechnungFormat: z.string().trim().min(1).max(64).default("{KUERZEL}{MM}{YY}/{NN}"),
   angebotFormat: z.string().trim().min(1).max(64).default("A-{KUERZEL}{MM}{YY}/{NN}"),
-  startNummer: z.number().int().min(1).max(99_999).default(1),
+  startNummer: cInt(1, 99_999, 1),
 });
 
 export const SicherheitSchema = z.object({
-  autoLockMinutes: z.number().int().min(1).max(720).default(30),
-  twoFactorEnabled: z.boolean().default(false),
+  autoLockMinutes: cInt(1, 720, 30),
+  twoFactorEnabled: z.coerce.boolean().default(false),
 });
 
 export const ErscheinungSchema = z.object({
   theme: z.enum(["light", "dark", "system"]).default("system"),
-  primaryHue: z.number().int().min(0).max(360).default(220),
+  primaryHue: cInt(0, 360, 220),
   density: z.enum(["compact", "comfortable"]).default("comfortable"),
 });
 
 export const BackupPlanSchema = z.object({
-  dailyEnabled: z.boolean().default(true),
-  dailyAtHour: z.number().int().min(0).max(23).default(3),
-  weeklyEnabled: z.boolean().default(true),
-  weeklyDay: z.number().int().min(0).max(6).default(0), // 0 = Sonntag
-  monthlyEnabled: z.boolean().default(true),
-  keepDaily: z.number().int().min(1).max(60).default(14),
-  keepWeekly: z.number().int().min(1).max(20).default(8),
-  keepMonthly: z.number().int().min(1).max(36).default(12),
-  driveUploadEnabled: z.boolean().default(false),
+  dailyEnabled: z.coerce.boolean().default(true),
+  dailyAtHour: cInt(0, 23, 3),
+  weeklyEnabled: z.coerce.boolean().default(true),
+  weeklyDay: cInt(0, 6, 0),
+  monthlyEnabled: z.coerce.boolean().default(true),
+  keepDaily: cInt(1, 60, 14),
+  keepWeekly: cInt(1, 20, 8),
+  keepMonthly: cInt(1, 36, 12),
+  driveUploadEnabled: z.coerce.boolean().default(false),
 });
 
 export const GoogleDriveSchema = z.object({
   clientId: z.string().trim().max(500).default(""),
-  // clientSecret + refreshToken werden separat verschlüsselt gespeichert
   rootFolderName: z.string().trim().min(1).max(100).default("mycleancenter.cm"),
 });
 
@@ -80,25 +84,25 @@ export const GoogleDriveSecretSchema = z.object({
 });
 
 export const MahnungSchema = z.object({
-  aktiv: z.boolean().default(true),
-  stufe1Tage: z.number().int().min(1).max(180).default(7),
-  stufe2Tage: z.number().int().min(1).max(180).default(14),
-  stufe3Tage: z.number().int().min(1).max(180).default(28),
-  gebuehrStufe2: z.number().min(0).max(1000).default(5),
-  gebuehrStufe3: z.number().min(0).max(1000).default(15),
+  aktiv: z.coerce.boolean().default(true),
+  stufe1Tage: cInt(1, 180, 7),
+  stufe2Tage: cInt(1, 180, 14),
+  stufe3Tage: cInt(1, 180, 28),
+  gebuehrStufe2: cNum(0, 1000, 5),
+  gebuehrStufe3: cNum(0, 1000, 15),
 });
 
 export const DauerauftragSchema = z.object({
-  laufzeitTagBeforeFaellig: z.number().int().min(0).max(60).default(7),
-  autoVersand: z.boolean().default(false),
+  laufzeitTagBeforeFaellig: cInt(0, 60, 7),
+  autoVersand: z.coerce.boolean().default(false),
 });
 
 export const SteuerSchema = z.object({
-  ustSatz: z.number().min(0).max(100).default(19),
-  kstSatz: z.number().min(0).max(100).default(15),
-  soliSatz: z.number().min(0).max(100).default(5.5),
-  gewerbesteuerHebesatz: z.number().int().min(0).max(1000).default(525),
-  ruecklageProzent: z.number().min(0).max(100).default(35),
+  ustSatz: cNum(0, 100, 19),
+  kstSatz: cNum(0, 100, 15),
+  soliSatz: cNum(0, 100, 5.5),
+  gewerbesteuerHebesatz: cInt(0, 1000, 525),
+  ruecklageProzent: cNum(0, 100, 35),
 });
 
 export const StundenzettelSchema = z.object({
