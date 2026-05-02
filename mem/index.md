@@ -22,6 +22,7 @@ Teilzahlungen sind Kernfeature: mehrere Zahlungen pro Rechnung, Status leitet si
 - [Backend-Roadmap](mem://features/backend-roadmap) — 12 Steps (0–11), neue Reihenfolge mit Settings/Auth+Backup vorgezogen, Akzeptanzkriterien, ABSOLUTE Regeln, DB-Architektur, Backup-Inhalt
 - [Backend Step 1 — Auth + Settings](mem://features/backend-step1-auth-settings) — argon2id, AES-GCM, HttpOnly-Cookie, /auth/* + /einstellungen/*, Setup-Token-Flow
 - [Backend Step 2 — Backup & Restore](mem://features/backend-step2-backup-restore) — tar.gz + manifest, Rotation 7-4-12, atomarer Restore mit pre-restore-Safety + Rollback, Wartungsmodus, Frontend Live-Phase/Progress + Stream-Download
+- [Backend Step 4 — Belege](mem://features/backend-step4-belege) — Angebote, Rechnungen, Positionen, Teilzahlungen, atomare Belegnummern, FTS5, Status-Engine, Scheduler
 - [Hardware Setup](mem://reference/hardware) — Pi 5 + USB-SSD, Pi-OS-Lite, Imager-Schritte
 - [Google Drive Integration](mem://features/google-drive) — OAuth-Flow, Ordnerstruktur, Dateinamen, Status-UI
 - [Keine Deko-Icons & Gradients](mem://design/no-decorative-icons) — Sparkles verboten, Dialoge ohne Gradient
