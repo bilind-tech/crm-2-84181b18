@@ -73,18 +73,22 @@ export function DokumentViewer({ dokument, open, onOpenChange, onEdit }: Props) 
 
         {/* Body */}
         <div className="flex-1 overflow-auto bg-muted/30">
-          {isImage && dokument.url ? (
+          {loading && !dateiUrl ? (
+            <div className="flex h-full items-center justify-center text-muted-foreground">
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Lade Datei…
+            </div>
+          ) : isImage && dateiUrl ? (
             <div className="flex min-h-full items-center justify-center p-4">
               <img
-                src={dokument.url}
+                src={dateiUrl}
                 alt={dokument.titel}
                 className="max-h-full max-w-full object-contain"
                 style={{ touchAction: "pinch-zoom" }}
               />
             </div>
-          ) : isPdf && dokument.url ? (
+          ) : isPdf && dateiUrl ? (
             <iframe
-              src={dokument.url}
+              src={dateiUrl}
               title={dokument.titel}
               className="h-full w-full border-0"
             />
@@ -99,19 +103,21 @@ export function DokumentViewer({ dokument, open, onOpenChange, onEdit }: Props) 
                   Diese Datei ({dokument.mimeType}) kann im Browser nicht angezeigt werden.
                 </p>
               </div>
-              {dokument.url && (
+              {dateiUrl && (
                 <div className="flex gap-2">
                   <Button onClick={handleDownload}>
                     <Download className="mr-1.5 h-4 w-4" /> Herunterladen
                   </Button>
                   <Button variant="outline" asChild>
-                    <a href={dokument.url} target="_blank" rel="noreferrer">
+                    <a href={dateiUrl} target="_blank" rel="noreferrer">
                       <ExternalLink className="mr-1.5 h-4 w-4" /> Im neuen Tab öffnen
                     </a>
                   </Button>
                 </div>
               )}
             </div>
+          )}
+        </div>
           )}
         </div>
 
