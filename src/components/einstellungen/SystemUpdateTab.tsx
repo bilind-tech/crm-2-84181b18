@@ -459,6 +459,20 @@ function UpdateProgressDialog({
               <Clock className="mr-1 inline h-3 w-3" />
               {formatDuration(lauf.startetAm, lauf.beendetAm)}
             </span>
+            {isRunning && (
+              <span
+                className={cn(
+                  "ml-2 inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-medium",
+                  sseConnected
+                    ? "border-emerald-500/30 bg-emerald-500/5 text-emerald-600 dark:text-emerald-400"
+                    : "border-muted-foreground/20 bg-muted/40 text-muted-foreground",
+                )}
+                title={sseConnected ? "Live-Aktualisierung aktiv" : "Aktualisierung in Kürze"}
+              >
+                <Radio className={cn("h-2.5 w-2.5", sseConnected && "animate-pulse")} />
+                {sseConnected ? "Live" : "—"}
+              </span>
+            )}
           </DialogDescription>
         </DialogHeader>
 
