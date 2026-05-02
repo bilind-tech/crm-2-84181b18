@@ -349,6 +349,8 @@ export const useCreateRechnung = () => {
     onSuccess: (created) => {
       qc.invalidateQueries({ queryKey: ["rechnungen"] });
       qc.invalidateQueries({ queryKey: qk.dashboard.kennzahlen });
+      qc.invalidateQueries({ queryKey: ["dauerauftraege"] });
+      qc.invalidateQueries({ queryKey: ["dauerauftrag-laeufe"] });
       if (created?.kundeId) {
         qc.invalidateQueries({ queryKey: ["kunden", created.kundeId, "zaehler"] });
       }
@@ -362,6 +364,8 @@ export const useUpdateRechnung = (id: string) => {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["rechnungen"] });
       qc.invalidateQueries({ queryKey: qk.rechnung(id) });
+      qc.invalidateQueries({ queryKey: ["dauerauftraege"] });
+      qc.invalidateQueries({ queryKey: ["dauerauftrag-laeufe"] });
     },
   });
 };

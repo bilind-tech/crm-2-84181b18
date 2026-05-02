@@ -102,7 +102,10 @@ export function RechnungForm({ onClose, defaultKundeId, defaultObjektId }: Props
         wiederkehrendDetails: optionen.wiederkehrend ? optionen.wiederkehrendDetails : undefined,
       },
     });
-    toast.success("Rechnung angelegt", { description: `${r.nummer} • erfolgreich gespeichert.` });
+    const beschreibung = r.dauerauftragNeu
+      ? `${r.nummer} • Dauerauftrag ${r.dauerauftragNeu.nummer} angelegt`
+      : `${r.nummer} • erfolgreich gespeichert.`;
+    toast.success("Rechnung angelegt", { description: beschreibung });
     onClose();
     navigate({ to: "/rechnungen/$id", params: { id: r.id } });
   }
