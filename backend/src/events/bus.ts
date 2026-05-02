@@ -14,6 +14,8 @@ export type AppEvent =
   | { type: "drive:upload-changed";    payload: { id: string; status: string; belegArt?: string | null; belegId?: string | null; fehlerText?: string | null } }
   | { type: "backup:changed";          payload: { id?: string; status: string; art?: string; fehlerText?: string | null } }
   | { type: "update:phase";            payload: { phase: string; detail?: string | null } }
+  | { type: "system:update:phase";     payload: { laufId: string; stepId: string; status: "wartet"|"laeuft"|"ok"|"fehler"|"uebersprungen"; label: string; detail?: string | null } }
+  | { type: "system:update:lauf";      payload: { laufId: string; status: "laeuft"|"erfolg"|"fehler"|"rollback" } }
   | { type: "einstellung:geaendert";   payload: { key: string; userId?: string | null } }
   | { type: "auth:login";              payload: { userId: string; username: string; ip?: string | null } }
   | { type: "auth:logout";             payload: { userId: string } }
