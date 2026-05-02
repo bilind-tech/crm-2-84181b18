@@ -259,10 +259,10 @@ function Page() {
                     <button
                       onClick={(e) => { e.stopPropagation(); e.preventDefault(); setZahlungFuer(r); }}
                       className="inline-flex h-9 items-center gap-1.5 rounded-md border border-success/30 bg-success/10 px-3 text-sm font-medium text-success hover:bg-success/20"
-                      title="Bezahlung eintragen — voll oder teilweise"
+                      title="Zahlung erfassen — voll oder teilweise"
                     >
                       <CheckCircle2 className="h-4 w-4" />
-                      <span>Als bezahlt markieren</span>
+                      <span>Zahlung erfassen</span>
                     </button>
                   )}
                   <button
@@ -374,10 +374,10 @@ function Page() {
                         <button
                           onClick={(e) => { e.stopPropagation(); e.preventDefault(); setZahlungFuer(r); }}
                           className="inline-flex h-8 items-center gap-1 rounded-md border border-success/30 bg-success/10 px-2.5 text-xs font-medium text-success hover:bg-success/20"
-                          title="Bezahlung eintragen — voll oder teilweise"
+                          title="Zahlung erfassen — voll oder teilweise"
                         >
                           <CheckCircle2 className="h-3.5 w-3.5" />
-                          <span>Bezahlt</span>
+                          <span>Zahlung</span>
                         </button>
                       )}
                       <button
