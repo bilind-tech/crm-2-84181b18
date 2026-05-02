@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, Outlet, useMatches } from "@tanstack/react-router";
 import { DetailSkeleton } from "@/components/layout/DetailSkeleton";
 import { NotFoundState } from "@/components/layout/NotFoundState";
 import { useState } from "react";
@@ -21,7 +21,14 @@ import { summenRechnung } from "@/lib/mock/backend";
 import { DauerauftragVerwaltungCard } from "@/components/dauerauftrag/DauerauftragVerwaltungCard";
 import { toast } from "sonner";
 
-export const Route = createFileRoute("/rechnungen/$id")({ component: Page });
+export const Route = createFileRoute("/rechnungen/$id")({ component: RouteShell });
+
+function RouteShell() {
+  const matches = useMatches();
+  const isChild = matches.some((m) => m.routeId === "/rechnungen/$id/bearbeiten");
+  if (isChild) return <Outlet />;
+  return <Page />;
+}
 
 function Page() {
   const { id } = Route.useParams();
