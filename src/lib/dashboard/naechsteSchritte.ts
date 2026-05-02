@@ -1,6 +1,8 @@
 // Berechnet priorisierte „Nächste Schritte" für das Dashboard.
-// Kombiniert Angebote, Rechnungen und Kunden zu konkreten, namentlich
-// adressierten Aufgaben („Schick die Rechnung an X").
+// Liefert Angebot-/Rechnung-Aufgaben (Erstellen, Versenden, Nachfassen).
+//
+// Mahn-Vorschläge werden NICHT mehr hier berechnet — sie kommen aus dem
+// Backend-Mahnlauf (`/mahnung/laeufe/:id`), siehe NaechsteSchritteCard.
 
 import type { Angebot, Rechnung, Kunde } from "@/lib/api/types";
 
