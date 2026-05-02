@@ -38,3 +38,4 @@ Teilzahlungen sind Kernfeature: mehrere Zahlungen pro Rechnung, Status leitet si
 - [Kürzel-Eindeutigkeit](mem://features/kuerzel-eindeutigkeit) — Kunden-Kürzel systemweit unique, Backend 409 + Live-Check via /kunden/kuerzel-frei, Submit blockiert bei Konflikt
 - [Backend Step 1 Hardening](mem://features/backend-step1-hardening) — Konstantzeit-Login, Cookie-Refresh, Setup-Token-TTL 24h, Owner-Check Sessions, Patch-Semantik, 10 Vitest grün
 - [Stundenzettel-Iframe](mem://features/stundenzettel-iframe) — CSP/X-Frame-Options, LAN-aus-Cloud, Mixed-Content, Lösungen
+- [Pi-Deployment](mem://features/pi-deployment) — systemd-Unit, install.sh, sudoers für systemctl, logrotate, Frontend-Health-Indikator, Datei-Layout
