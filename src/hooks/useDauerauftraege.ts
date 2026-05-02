@@ -77,6 +77,40 @@ export const useSofortLauf = (id: string) => {
   });
 };
 
+/**
+ * Bulk-Variante: löst für eine Liste von Dauerauftrags-IDs parallel je einen
+ * Sofort-Lauf aus und invalidiert am Ende einmal alle relevanten Queries.
+ * Liefert Anzahl Erfolge/Fehler und die erzeugten Rechnungs-IDs.
+ */
+export const useSofortLaufBulk = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (ids: string[]) => {
+      const results = await Promise.allSettled(
+        ids.map((id) => api.post<DauerauftragLauf>(`/dauerauftraege/${id}/sofort-lauf`)),
+      );
+      let erfolge = 0;
+      let fehler = 0;
+      const rechnungIds: string[] = [];
+      for (const r of results) {
+        if (r.status === "fulfilled") {
+          erfolge++;
+          if (r.value.rechnungId) rechnungIds.push(r.value.rechnungId);
+        } else {
+          fehler++;
+        }
+      }
+      return { erfolge, fehler, rechnungIds };
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qkDA.list });
+      qc.invalidateQueries({ queryKey: qkDA.laeufe() });
+      qc.invalidateQueries({ queryKey: ["rechnungen"] });
+      qc.invalidateQueries({ queryKey: ["aktivitaeten"] });
+    },
+  });
+};
+
 export const usePausiereDauerauftrag = (id: string) => {
   const qc = useQueryClient();
   return useMutation({
