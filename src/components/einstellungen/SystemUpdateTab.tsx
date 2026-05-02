@@ -53,6 +53,7 @@ import {
 import { Section } from "./_shared";
 import { LoadingPlaceholder } from "@/components/layout/LoadingPlaceholder";
 import { UpdateUploadDropzone } from "./UpdateUploadDropzone";
+import { RollbackConfirmDialog } from "./RollbackConfirmDialog";
 import {
   useSystemInfo,
   useUpdateHistorie,
@@ -104,6 +105,8 @@ export function SystemUpdateTab() {
   const [pendingPackage, setPendingPackage] = useState<UpdatePackageInfo | null>(null);
   // Aktuell laufender Update-Lauf — getriggert wird Polling über useUpdateLauf
   const [activeLaufId, setActiveLaufId] = useState<string | null>(null);
+  // Pending Rollback-Anfrage (öffnet den Bestätigungs-Dialog)
+  const [pendingRollback, setPendingRollback] = useState<string | null>(null);
 
   const { data: lauf } = useUpdateLauf(activeLaufId);
 
@@ -136,12 +139,20 @@ export function SystemUpdateTab() {
     });
   };
 
-  const startRollback = (version: string) => {
-    rollback.mutate(version, {
-      onSuccess: (newLauf) => setActiveLaufId(newLauf.id),
-      onError: (e) => toast.error(`Rollback fehlgeschlagen: ${(e as Error).message}`),
+  const confirmRollback = (version: string, passwort: string) =>
+    new Promise<void>((resolve, reject) => {
+      rollback.mutate(
+        { version, passwort },
+        {
+          onSuccess: (newLauf) => {
+            setActiveLaufId(newLauf.id);
+            setPendingRollback(null);
+            resolve();
+          },
+          onError: (e) => reject(e),
+        },
+      );
     });
-  };
 
   return (
     <div className="space-y-5 pb-24">
