@@ -25,6 +25,7 @@ import type {
   Dauerauftrag,
   DauerauftragEinstellungen,
   DauerauftragLauf,
+  DauerauftragFrequenz,
   DauerauftragSonderposition,
   Dokument,
   UploadSession,
