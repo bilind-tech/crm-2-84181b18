@@ -13,30 +13,46 @@ import {
   getSettingMeta,
   setSetting,
 } from "../settings/store.js";
-import { requireAuth } from "../auth/middleware.js";
+import { requireAuth, getCookieToken } from "../auth/middleware.js";
 import { audit } from "../auth/audit.js";
 import {
   deleteAllSessionsForUser,
-  deleteSession,
+  deleteSessionForUser,
   listSessions,
-  SESSION_COOKIE,
 } from "../auth/sessions.js";
 import { createConnection } from "node:net";
 
 function loadArea(name: keyof typeof AREAS): unknown {
   const a = AREAS[name];
   const stored = getSetting(a.key);
-  // Defaults aus Schema (alle optional/default-Felder)
   return a.schema.parse(stored ?? {});
 }
 
-function patchArea(name: keyof typeof AREAS, body: unknown):
+/**
+ * Patch-Semantik:
+ * 1. Body gegen Partial-Schema validieren (nur gesetzte Felder).
+ * 2. Mit aktuellem Stand mergen.
+ * 3. Gegen Vollschema validieren (Defaults bleiben für ungesetzte Felder erhalten).
+ * Leere Strings werden als gewollte Werte beibehalten (kein silent revert).
+ */
+function patchArea(
+  name: keyof typeof AREAS,
+  body: unknown,
+):
   | { ok: true; value: unknown }
   | { ok: false; status: number; error: string; issues?: unknown } {
   const a = AREAS[name];
-  // Partial-Patch: erst aktuellen Stand mergen, dann validieren
-  const current = a.schema.parse(getSetting(a.key) ?? {});
-  const merged = { ...(current as Record<string, unknown>), ...((body ?? {}) as Record<string, unknown>) };
+  // Partial-Validierung: nur Felder die der Client schickt
+  const partialSchema =
+    "partial" in a.schema && typeof (a.schema as { partial: () => unknown }).partial === "function"
+      ? ((a.schema as unknown as { partial: () => z.ZodTypeAny }).partial())
+      : a.schema;
+  const partial = partialSchema.safeParse(body ?? {});
+  if (!partial.success) {
+    return { ok: false, status: 422, error: "validation", issues: partial.error.issues };
+  }
+  const current = a.schema.parse(getSetting(a.key) ?? {}) as Record<string, unknown>;
+  const merged = { ...current, ...(partial.data as Record<string, unknown>) };
   const parsed = a.schema.safeParse(merged);
   if (!parsed.success) {
     return { ok: false, status: 422, error: "validation", issues: parsed.error.issues };
@@ -48,7 +64,6 @@ function patchArea(name: keyof typeof AREAS, body: unknown):
 export async function einstellungenRoutes(app: FastifyInstance): Promise<void> {
   app.addHook("preHandler", requireAuth);
 
-  // Generische Bereiche (gleicher GET/PATCH-Shape)
   const simpleAreas: Array<keyof typeof AREAS> = [
     "firma",
     "nummernkreise",
@@ -84,8 +99,7 @@ export async function einstellungenRoutes(app: FastifyInstance): Promise<void> {
     };
   });
   app.patch("/einstellungen/smtp", async (req, reply) => {
-    const body = (req.body ?? {}) as Record<string, unknown>;
-    // Passwort getrennt behandeln (falls mitgesendet)
+    const body = { ...((req.body ?? {}) as Record<string, unknown>) };
     if (typeof body.password === "string" && body.password.length > 0) {
       const pw = SmtpPasswordSchema.safeParse({ password: body.password });
       if (!pw.success) {
@@ -95,8 +109,8 @@ export async function einstellungenRoutes(app: FastifyInstance): Promise<void> {
       setSetting(SENSITIVE_KEYS.smtpPassword, pw.data.password, { encrypt: true });
     }
     delete body.password;
-    delete (body as Record<string, unknown>).passwordIsSet;
-    delete (body as Record<string, unknown>).passwordUpdatedAt;
+    delete body.passwordIsSet;
+    delete body.passwordUpdatedAt;
     const r = patchArea("smtp", body);
     if (!r.ok) {
       reply.status(r.status);
@@ -131,7 +145,7 @@ export async function einstellungenRoutes(app: FastifyInstance): Promise<void> {
     });
   });
 
-  // Google Drive — secrets separat
+  // Google Drive
   app.get("/einstellungen/google-drive", async () => {
     const base = loadArea("googleDrive");
     const sec = getSettingMeta(SENSITIVE_KEYS.googleClientSecret);
@@ -144,7 +158,7 @@ export async function einstellungenRoutes(app: FastifyInstance): Promise<void> {
     };
   });
   app.patch("/einstellungen/google-drive", async (req, reply) => {
-    const body = (req.body ?? {}) as Record<string, unknown>;
+    const body = { ...((req.body ?? {}) as Record<string, unknown>) };
     const secrets = GoogleDriveSecretSchema.safeParse({
       clientSecret: body.clientSecret,
       refreshToken: body.refreshToken,
@@ -188,26 +202,37 @@ export async function einstellungenRoutes(app: FastifyInstance): Promise<void> {
   // Sessions
   app.get("/einstellungen/sitzungen", async (req) => {
     if (!req.user) return [];
-    const cookies = (req as unknown as { cookies?: Record<string, string> }).cookies;
-    const currentToken = cookies?.[SESSION_COOKIE];
+    const currentToken = getCookieToken(req);
     return listSessions(req.user.id).map((s) => ({ ...s, isCurrent: s.token === currentToken }));
   });
   app.delete("/einstellungen/sitzungen/:token", async (req, reply) => {
+    if (!req.user) {
+      reply.status(401);
+      return { error: "unauthenticated" };
+    }
     const params = z.object({ token: z.string().min(1) }).safeParse(req.params);
     if (!params.success) {
       reply.status(422);
       return { error: "validation" };
     }
-    deleteSession(params.data.token);
-    audit({ userId: req.user?.id, action: "settings.sessions.revoke", ip: req.ip });
+    const ok = deleteSessionForUser(params.data.token, req.user.id);
+    if (!ok) {
+      reply.status(404);
+      return { error: "not-found" };
+    }
+    audit({ userId: req.user.id, action: "settings.sessions.revoke", ip: req.ip });
     return { ok: true };
   });
   app.post("/einstellungen/sitzungen/alle-beenden", async (req) => {
     if (!req.user) return { revoked: 0 };
-    const cookies = (req as unknown as { cookies?: Record<string, string> }).cookies;
-    const currentToken = cookies?.[SESSION_COOKIE];
+    const currentToken = getCookieToken(req);
     const n = deleteAllSessionsForUser(req.user.id, currentToken);
-    audit({ userId: req.user.id, action: "settings.sessions.revoke-all", detail: { revoked: n }, ip: req.ip });
+    audit({
+      userId: req.user.id,
+      action: "settings.sessions.revoke-all",
+      detail: { revoked: n },
+      ip: req.ip,
+    });
     return { revoked: n };
   });
 }
