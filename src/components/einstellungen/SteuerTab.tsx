@@ -115,6 +115,20 @@ export function SteuerTab() {
             </p>
           </div>
           <div className="space-y-1.5">
+            <Label>Vorsteuer-Puffer (%)</Label>
+            <Input
+              type="number"
+              step="1"
+              min="0"
+              max="50"
+              value={data.ustPufferSatz}
+              onChange={(e) => update({ ustPufferSatz: Math.max(0, Math.min(50, Number(e.target.value))) })}
+            />
+            <p className="text-xs text-muted-foreground">
+              Reduziert die USt-Schuld pauschal. Default 10 % — deckt Belege ab, die noch nicht erfasst sind (Auto, Material, etc.).
+            </p>
+          </div>
+          <div className="space-y-1.5">
             <Label>Liquiditätsrücklage (%)</Label>
             <Input
               type="number"
