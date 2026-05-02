@@ -230,10 +230,11 @@ export function KundeForm({ onClose, onCreated }: Props) {
       if (f.daPosBezeichnung.trim()) {
         positionen.push({
           id: crypto.randomUUID(),
-          bezeichnung: f.daPosBezeichnung.trim(),
+          beschreibung: f.daPosBezeichnung.trim(),
           menge: f.daPosMenge || 1,
           einheit: "monat",
-          einzelpreis: f.daPosEinzelpreis || 0,
+          einzelpreisNetto: f.daPosEinzelpreis || 0,
+          steuersatz: f.standardSteuersatz,
           rabatt: 0,
         });
       }
