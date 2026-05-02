@@ -20,6 +20,7 @@ Teilzahlungen sind Kernfeature: mehrere Zahlungen pro Rechnung, Status leitet si
 
 ## Memories
 - [Backend-Roadmap](mem://features/backend-roadmap) — 12 Steps (0–11), neue Reihenfolge mit Settings/Auth+Backup vorgezogen, Akzeptanzkriterien, ABSOLUTE Regeln, DB-Architektur, Backup-Inhalt
+- [Backend Step 1 — Auth + Settings](mem://features/backend-step1-auth-settings) — argon2id, AES-GCM, HttpOnly-Cookie, /auth/* + /einstellungen/*, Setup-Token-Flow
 - [Hardware Setup](mem://reference/hardware) — Pi 5 + USB-SSD, Pi-OS-Lite, Imager-Schritte
 - [Google Drive Integration](mem://features/google-drive) — OAuth-Flow, Ordnerstruktur, Dateinamen, Status-UI
 - [Keine Deko-Icons & Gradients](mem://design/no-decorative-icons) — Sparkles verboten, Dialoge ohne Gradient
