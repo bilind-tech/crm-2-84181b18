@@ -79,40 +79,15 @@ function Dashboard() {
     ? offeneAlle.filter((r) => passtInZeitraum(r.rechnungsdatum, zeitraum))
     : offeneAlle;
 
-  // Umsatz im Zeitraum (brutto-Summe der Punkte)
+  // Aktueller KPI-Wert "Umsatz" — bei Einzelmonat/Zeitraum die Summe der Punkte,
+  // sonst der zuletzt gelieferte Monat (aktueller Monat)
   const summeZeitraum = umsatz.reduce((acc, u) => acc + u.brutto, 0);
-
-  // Aktueller KPI-Wert "Umsatz" — bei Einzelmonat exakt der Monat,
-  // sonst Summe über alle gelieferten Punkte
   const umsatzKpi = aktiv
     ? summeZeitraum
     : umsatz[umsatz.length - 1]?.brutto ?? 0;
   const umsatzKpiSub = aktiv
     ? `brutto · ${zeitLabel}`
     : "brutto · aktueller Monat";
-
-  // Chart-Daten
-  const chartData = useMemo(() => {
-    const fmt = (k: string) =>
-      new Date(k + "-01").toLocaleDateString("de-DE", { month: "short" });
-    if (!aktiv) {
-      // Letzte 6 Monate
-      return umsatz.slice(-6).map((u) => ({ ...u, label: fmt(u.monat) }));
-    }
-    // Alle gelieferten Punkte (1 oder 12)
-    return umsatz.map((u) => ({ ...u, label: fmt(u.monat) }));
-  }, [umsatz, aktiv]);
-
-  const chartTitel = aktiv
-    ? zeitraum.monat === "alle"
-      ? `Umsatz ${zeitraum.jahr}`
-      : `Umsatz ${zeitLabel}`
-    : "Umsatz";
-  const chartSubtitel = aktiv
-    ? zeitraum.monat === "alle"
-      ? "Monatsverteilung (brutto)"
-      : "brutto"
-    : "Letzte 6 Monate (brutto)";
 
   return (
     <div className="space-y-6">
