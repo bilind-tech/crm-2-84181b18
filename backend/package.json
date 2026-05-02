@@ -41,6 +41,7 @@
     "@types/pdfmake": "^0.3.2",
     "@types/tar": "^7.0.87",
     "@types/unzipper": "^0.10.11",
+    "jszip": "^3.10.1",
     "tsx": "^4.19.0",
     "typescript": "^5.5.4",
     "vitest": "^2.1.0"
