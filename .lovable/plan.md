@@ -1,165 +1,154 @@
-## Step 7 — Aktivitäten + Benachrichtigungen + Audit + SSE (Live-Updates)
+## Step 8 — System-Update + Rollback (Backend)
 
-Ziel: Eine **einheitliche Ereignis-Pipeline** auf dem Pi. Jede relevante Mutation (Beleg-Status, Zahlung, Mahnung, Mail-Versand, Drive-Upload, Backup, Auth, Settings, Update) erzeugt:
-1. einen **Aktivitäts-Eintrag** (für User sichtbar, Verlauf + „Nächste Schritte"-Karte),
-2. optional eine **Benachrichtigung** (Bell-Icon, ungelesen-Zähler, Toast),
-3. einen **Audit-Eintrag** (forensisch, nicht löschbar in der UI),
-4. ein **SSE-Event** an alle verbundenen Clients (Desktop + Handy zeitgleich).
+Ziel: Das Frontend (`SystemUpdateTab.tsx` + `useSystemInfo/useValidateUpdate/useInstallUpdate/useUpdateLauf/useRollbackUpdate`) bekommt sein echtes Pi-Backend. Alle Endpoints, die heute noch ans Mock-Backend gehen, werden durch echte Fastify-Routen ersetzt — mit ZIP-Upload, Manifest-Validierung, erzwungenem Sicherheits-Backup, atomarem Symlink-Switch und automatischem Healthcheck-Rollback. Daten-Verzeichnis wird in keinem Schritt angefasst.
 
-Damit verschwindet das Polling aus `useApi.ts` und die UI fühlt sich live an.
+### 1. Datenmodell — Migration `011_system_update.sql`
 
----
+- `system_update_lauf`
+  - `id` TEXT PK, `gestartet_am` DATETIME, `beendet_am` DATETIME?
+  - `quelle` TEXT (`upload`/`rollback`), `paket_version` TEXT, `paket_sha256` TEXT, `paket_groesse` INT
+  - `vorherige_version` TEXT, `neue_version` TEXT
+  - `status` TEXT (`laufend`/`erfolg`/`fehler`/`zurueckgerollt`)
+  - `aktueller_step` TEXT, `fehler_text` TEXT?
+  - `user_id` TEXT, `safety_backup_id` TEXT? (FK auf backup-Tabelle)
+- `system_update_step` (Live-Steps für UI)
+  - `id` TEXT PK, `lauf_id` TEXT FK ON DELETE CASCADE
+  - `key` TEXT (`upload`,`validate`,`safety-backup`,`extract`,`deps`,`migrate-dry`,`swap`,`reload`,`healthcheck`,`cleanup`)
+  - `label` TEXT, `status` TEXT (`pending`/`laufend`/`erfolg`/`fehler`/`uebersprungen`)
+  - `gestartet_am`, `beendet_am`, `detail` TEXT?, `reihenfolge` INT
+- `system_update_paket` (Upload-Staging, kurzlebig)
+  - `id` TEXT PK, `dateiname` TEXT, `groesse_bytes` INT, `sha256` TEXT
+  - `manifest_json` TEXT, `staging_pfad` TEXT, `gueltig_bis` DATETIME, `validiert` BOOL
+- Indexe: `system_update_lauf(gestartet_am DESC)`, `system_update_step(lauf_id, reihenfolge)`
 
-### 1. Datenmodell (Migration `010_aktivitaet_benachrichtigung.sql`)
+### 2. Pfad-Layout (Pi)
 
-- `aktivitaet`
-  - `id` TEXT PK
-  - `art` TEXT (`beleg.status_geaendert`, `zahlung.erfasst`, `mahnung.erstellt`, `email.gesendet`, `email.fehler`, `drive.upload_erfolg`, `drive.upload_fehler`, `backup.erfolg`, `backup.fehler`, `update.installiert`, `update.rollback`, `kunde.angelegt`, `einstellung.geaendert`, `auth.login`, `auth.logout`)
-  - `bezug_art` TEXT? (`rechnung`/`angebot`/`kunde`/`backup`/`update`/`system`)
-  - `bezug_id` TEXT?
-  - `titel` TEXT
-  - `beschreibung` TEXT
-  - `kontext_json` TEXT? (z. B. alter/neuer Status, Beträge)
-  - `user_id` TEXT?
-  - `zeitpunkt` DATETIME DEFAULT CURRENT_TIMESTAMP
-  - Indexe: `(zeitpunkt DESC)`, `(bezug_art, bezug_id)`, `(art)`
-  - Retention: 365 Tage Hard-Delete via Scheduler.
-
-- `benachrichtigung`
-  - `id` TEXT PK
-  - `aktivitaet_id` TEXT FK → `aktivitaet.id` (ON DELETE CASCADE)
-  - `prioritaet` TEXT (`info`/`warnung`/`fehler`/`erfolg`)
-  - `gelesen_am` DATETIME?
-  - `weggewischt_am` DATETIME?
-  - `aktion_label` TEXT? / `aktion_route` TEXT? (z. B. `/rechnungen/abc`)
-  - `created_at` DATETIME
-  - Indexe: `(gelesen_am, weggewischt_am, created_at DESC)`
-  - Nicht jede Aktivität wird Benachrichtigung — Mapping siehe Modul 3.
-
-- `audit_log` existiert bereits — Step 7 erweitert nur die *Aufrufer*, nicht das Schema.
-
----
-
-### 2. Backend-Module
-
-**`backend/src/events/bus.ts`** — Prozess-interner EventEmitter (Singleton). Alle Module emittieren typisierte Events: `aktivitaet:neu`, `benachrichtigung:neu`, `benachrichtigung:gelesen`, `beleg:mutated`, `email:versand-changed`, `drive:upload-changed`, `backup:changed`, `update:phase`. Bestehende `belege/events.ts`, `email/events.ts` etc. werden hier registriert — keine doppelten Bus-Implementierungen.
-
-**`backend/src/aktivitaet/repo.ts`** — `record({art, bezugArt?, bezugId?, titel, beschreibung, kontext?, userId?})`: schreibt Row, mappt optional auf `benachrichtigung` (Tabelle `aktivitaet_regeln` als Code-Konstante, kein DB-Eintrag). Emittiert `aktivitaet:neu` + ggf. `benachrichtigung:neu`. Liefert `list({limit, vor?, art?, bezugArt?, bezugId?})` paginiert.
-
-**`backend/src/benachrichtigung/repo.ts`** — `list({nurUngelesen?})`, `markGelesen(id)`, `markAlleGelesen()`, `wegwischen(id)`, `ungeleseneZahl()`. Auto-Cleanup: weggewischte > 30 Tage werden gelöscht.
-
-**`backend/src/aktivitaet/wireup.ts`** — abonniert beim Start alle Domain-Events und ruft `aktivitaet.record(...)`. Genau ein Punkt der Wahrheit, was eine Aktivität auslöst:
-- `beleg:mutated` mit `statusVorher!==statusNachher` → `beleg.status_geaendert`.
-- `zahlung:erfasst` → `zahlung.erfasst` (+ Benachrichtigung „Rechnung X bezahlt" bei Status `bezahlt`).
-- `mahnung:erstellt` → Benachrichtigung „warnung".
-- `email:versand-changed` → bei `gesendet` → Aktivität; bei `fehler` (nach max. Versuchen) → Benachrichtigung „fehler".
-- `drive:upload-changed` → bei `fehler` Benachrichtigung, bei `erfolg` nur Aktivität.
-- `backup:changed` → bei `erfolg`/`fehler` Aktivität, Fehler = Benachrichtigung.
-- `auth.login`/`auth.logout` (von Step 1) → nur Audit + Aktivität (keine Benachrichtigung).
-- `einstellung.geaendert` (sensible Keys: SMTP, Drive, Backup-Plan, Sicherheit) → Aktivität + Audit.
-
-Jede Stelle, die `aktivitaet.record(...)` aufruft, ruft **zusätzlich** `audit({...})` für sicherheitsrelevante Aktionen — Audit bleibt eigene Senke (180-Tage-Retention bleibt).
-
----
-
-### 3. SSE-Endpoint (`backend/src/routes/events.ts`)
-
-- `GET /events/stream` (requireAuth, kein Rate-Limit auf dieser Route, `Connection: keep-alive`, `Content-Type: text/event-stream`, kein gzip — explizit `Content-Encoding: identity`).
-- Beim Connect: `event: hello\ndata: {serverTime, schemaVersion}`.
-- Heartbeat alle 25 s (`: ping`).
-- Subscriptions: forwarded `aktivitaet:neu`, `benachrichtigung:neu`, `benachrichtigung:gelesen`, `beleg:mutated`, `email:versand-changed`, `drive:upload-changed`, `backup:changed`, `update:phase`. Kein roher User-Content — nur IDs + minimal-Felder, Frontend invalidiert die jeweiligen TanStack-Queries.
-- Pro Connection eigener Listener-Set, `req.raw.on("close")` räumt auf. Max 10 parallele Connections pro User (FIFO-Drop ältester).
-- Gracefully durch Wartungsmodus: wenn `maintenance` aktiv → sofort `event: maintenance` + close, Frontend pausiert Reconnect.
-
-**Reconnect-Strategie clientseitig:** EventSource-Bridge in `src/lib/sse.ts` mit Exponential-Backoff (1s → 30s) und Resume durch `Last-Event-ID`-Header (Server merkt sich Ringpuffer der letzten 200 Events im RAM, schickt verpasste seit Last-ID nach).
-
----
-
-### 4. REST-Routen (`backend/src/routes/aktivitaet.ts` + `benachrichtigung.ts`)
-
-- `GET /aktivitaeten` — Filter `art`, `bezugArt`, `bezugId`, `vor` (Cursor), `limit` (max 100). Antwort: `{items, naechsterCursor?}`.
-- `GET /aktivitaeten/:id` (für Deep-Link).
-- `GET /benachrichtigungen` — `?nurUngelesen=true|false`, default false, immer ohne weggewischte.
-- `POST /benachrichtigungen/:id/lesen`
-- `POST /benachrichtigungen/lesen-alle`
-- `POST /benachrichtigungen/:id/wegwischen`
-- `GET /benachrichtigungen/anzahl` — `{ungelesen, gesamt}` (für Bell-Badge; durch SSE meist überflüssig, aber Initial-Load-fähig).
-- `GET /audit` — admin-only (User-Rolle existiert noch nicht → vorerst nur eingeloggter User darf eigenes Log lesen; volle Admin-Sicht erst mit Rollen-Modul). Filter: `action`, `userId`, `from`, `to`, paginiert.
-
----
-
-### 5. Frontend
-
-**Infra:**
-- `src/lib/sse.ts` — `createSseClient()` Singleton. Reconnect, Last-Event-ID, Browser-Tab-Visibility-Pause (kein Stream wenn Tab versteckt > 5 min, sofortiger Resync bei Re-Visibility).
-- `src/hooks/useSse.ts` — registriert globale Handler im Root-Layout, mappt Events auf `queryClient.invalidateQueries([...])`. Konkretes Mapping:
-  - `beleg:mutated` → invalidiert `["belege",art]`, `["beleg",art,id]`, `["dashboard"]`.
-  - `email:versand-changed` → `["email","versand"]` + Detail.
-  - `drive:upload-changed` → `["drive","uploads", belegId?]` + `DriveSyncBadge`.
-  - `backup:changed` → `["backups"]` + `["backup","status"]`.
-  - `aktivitaet:neu` → `["aktivitaeten"]`.
-  - `benachrichtigung:neu` → `["benachrichtigungen"]` + Toast (Sonner) mit `aktion_route`-Link, falls vorhanden.
-- Polling-Intervalle in `useApi.ts`, `useDrive.ts`, `useEmailVersand.ts` werden auf `staleTime: 30s, refetchInterval: false` reduziert — SSE ist Wahrheit, Polling nur als Sicherheitsnetz alle 60 s.
-
-**UI-Komponenten:**
-- `src/components/notifications/BenachrichtigungBell.tsx` — Bell-Icon im Header (`AppShell`), Badge mit Anzahl ungelesen, Popover mit Liste (Prio-Färbung, „Alle lesen", „Wegwischen", Klick auf Eintrag → navigiert zu `aktion_route`).
-- `src/components/notifications/BenachrichtigungItem.tsx` — Eintrag mit Icon je Prio (kein Sparkle, schlicht Lucide `Bell`/`AlertTriangle`/`CircleCheck`), Zeit relativ.
-- `src/routes/aktivitaet.tsx` — kompletter Rewrite: Filter-Bar (Art, Bezug, Zeitraum), virtualisierte Liste, Klick → Detail-Drawer mit `kontext_json`-Pretty-Print, Deep-Link zu Beleg/Backup/Update.
-- `src/components/dashboard/NaechsteSchritteCard.tsx` — bekommt SSE-Live-Update statt Refetch-Timer.
-- `src/routes/einstellungen.sicherheit.tsx` (existierender Tab erweitert) — Audit-Log-Viewer (eigene User-Aktionen), CSV-Export-Button.
-
-**Verhalten:**
-- Beim Login wird SSE gestartet, beim Logout sauber geschlossen.
-- Unread-Badge persistiert nicht im LocalStorage — kommt immer vom Server (geräteübergreifend konsistent).
-- Toast-Throttle: max 3 Toasts gleichzeitig, weitere werden in Bell gesammelt (kein Spam beim Massen-Mail-Versand).
-
----
-
-### 6. Sicherheit & Härtung
-
-- SSE-Auth über vorhandenes HttpOnly-Cookie (Fastify-Cookie ist schon registriert). Kein Token in URL.
-- Pro IP max 5 SSE-Connections (zusätzlich zum 10/User-Limit).
-- Keine sensiblen Felder im Stream (kein Klartext-SMTP-Passwort, keine PDF-Bytes — nur IDs/Statuswechsel).
-- Audit-Einträge: Insert-only, keine UI-Lösch-Route, Retention-Purge nur via Scheduler.
-- Rate-Limit: `/benachrichtigungen/lesen-alle` 10/min.
-
----
-
-### 7. Tests (`backend/test/aktivitaet.spec.ts`, `sse.spec.ts`, `benachrichtigung.spec.ts`)
-
-- Wireup: simulieren `beleg:mutated` → genau 1 Aktivität, kein Doppel-Eintrag bei identischem Status.
-- Mahnung-Event → Benachrichtigung mit `prioritaet=warnung` + `aktion_route`.
-- Mail-Fehler nach max-Versuchen → genau 1 Benachrichtigung (nicht pro Retry).
-- Repo: `markGelesen` idempotent, `wegwischen` setzt Timestamp, `ungeleseneZahl` korrekt.
-- SSE: Connect → `hello`, Emit eines Events → empfangen, `Last-Event-ID`-Resume liefert verpasste Events, Maintenance schließt Stream.
-- Audit: Sensible Settings-Änderung erzeugt Audit + Aktivität, normale Logo-Änderung nur Aktivität.
-- Retention: 366-Tage-alte Aktivität → vom Purge gelöscht, jüngere bleiben.
-
----
-
-### 8. Memory-Updates
-
-- Neue Datei `mem://features/backend-step7-aktivitaet-sse` (Architektur, Event-Liste, Mapping-Tabelle Aktivität→Benachrichtigung, SSE-Vertrag).
-- Index-Eintrag „Step 7 — Aktivitäten + Benachrichtigungen + SSE".
-- Roadmap-Tabelle in `mem://features/backend-roadmap` markiert Step 7 als done nach Abschluss.
-
----
-
-### 9. Reihenfolge (1 Prompt, ohne Rückfragen)
-
-```
-1. Migration 010 (aktivitaet, benachrichtigung) + Indexe
-2. backend/src/events/bus.ts + Konsolidierung der bestehenden Module-Emitter
-3. backend/src/aktivitaet/{repo,wireup}.ts + benachrichtigung/repo.ts + Regel-Mapping
-4. backend/src/routes/{aktivitaet,benachrichtigung,audit,events}.ts + server.ts wiring
-5. SSE-Server: Heartbeat, Last-Event-ID-Ringpuffer, Connection-Limits, Maintenance-Hook
-6. Audit-Aufrufe in auth/einstellungen/backup/update ergänzen (wo noch nicht vorhanden)
-7. Retention-Scheduler (aktivitaet 365d, benachrichtigung weggewischt 30d)
-8. Frontend: lib/sse.ts + hooks/useSse.ts + Root-Layout-Integration
-9. UI: BenachrichtigungBell + Popover + Toast-Bridge, Aktivitätsseite-Rewrite, Audit-Viewer
-10. Polling-Reduktion in useApi/useDrive/useEmailVersand auf 60 s Sicherheitsnetz
-11. Tests aktivitaet.spec.ts + sse.spec.ts + benachrichtigung.spec.ts
-12. mem-Updates + Roadmap-Häkchen
+```text
+/opt/mycleancenter/
+  current -> versions/2026-05-02T12-00-00Z/
+  versions/<ts>/             aktuelle + 1 Vorgänger (max 2)
+  staging/<uploadId>/        entpackte ZIPs vor Swap
+  safety-current/            Symlink auf letzten erfolgreichen Stand
 ```
 
-**Sag „weiter", dann lege ich mit Migration 010 + Event-Bus los.**
+`/var/lib/mycleancenter/` wird NIE berührt — keine Reads-mit-Lock, keine Schreibops.
+
+### 3. Backend-Module
+
+**`backend/src/system/paths.ts`** — Singleton mit `appRoot()`, `currentLink()`, `versionsDir()`, `stagingDir(id)`. Im Dev-Modus zeigt alles auf `./dev-root/` damit lokal ohne sudo getestet werden kann.
+
+**`backend/src/system/manifest.ts`** — `validateManifest(json)`:
+- Pflichtfelder: `appVersion` (semver), `schemaVersion` (≥ aktuelle), `createdAt`, `minBackendVersion`, `signature` (HMAC-SHA256 über Datei-SHA mit Master-Key — verhindert Fremd-ZIPs).
+- Schema-Downgrade verboten.
+- App-Version muss strikt > installierte sein (außer `quelle=rollback`).
+
+**`backend/src/system/zip.ts`** — `extractZipSafe(file, target)`:
+- Stream-basiert via `unzipper`, max 200 MB Gesamtgröße.
+- Zip-Bomb-Schutz: max 500 Dateien, max 50 MB pro Eintrag, max 5× Kompressionsverhältnis.
+- Pfad-Sanitizing (`..` und absolute Pfade verboten).
+
+**`backend/src/system/runner.ts`** — Kern. State-Machine über `system_update_step`. Jeder Step:
+1. Setze Status `laufend`, emit Bus-Event `system:update:phase`.
+2. Führe Aktion aus.
+3. Setze Status `erfolg`/`fehler`. Bei Fehler → kompletter Lauf abbrechen, ggf. Rollback.
+
+Steps in Reihenfolge:
+1. **upload** (im Validate-Endpoint vorgelagert, hier nur referenziert)
+2. **validate** — Manifest + Signatur erneut prüfen
+3. **safety-backup** — `backup.create({type:"safety", reason:"pre-update"})` aus Step 2-Lib synchron, ID merken
+4. **extract** — ZIP nach `staging/<uploadId>/` (existiert ggf. schon → wiederverwenden)
+5. **deps** — `npm ci --omit=dev` im Staging-Ordner; stdout/stderr → `detail`
+6. **migrate-dry** — DB nach `tmp.sqlite` kopieren, alle neuen Migrationen darauf laufen lassen, dann verwerfen. Fehler → Abbruch ohne Swap
+7. **swap** — atomar: `versions/<ts>/` = `staging/<id>/` (move), `current.tmp -> versions/<ts>`, `mv -T current.tmp current`. Vorherigen Symlink in `previous` merken
+8. **reload** — `systemctl reload mycleancenter` via `child_process.execFile` (im Dev: No-Op)
+9. **healthcheck** — alle 5 s `GET http://localhost:8787/health`, max 60 s. Fail → automatischer Rollback (Symlink zurück, neuen Code nach `versions/broken-<ts>/`, Lauf-Status `zurueckgerollt`)
+10. **cleanup** — alte `versions/` außer aktuell+previous löschen; Staging-Ordner löschen
+
+**Zentrale Garantie:** vor Step 7 (Swap) wird **nichts** am laufenden System verändert. Bricht etwas vorher ab, ist Service unverändert weiter.
+
+**`backend/src/system/info.ts`** — `getSystemInfo()`: liest `package.json` (App-Version), `schema_version`, RAM/Disk via `os.totalmem`/`statvfs`, Kernel via `os.release()`. Gibt das `SystemInfo`-Format aus `src/lib/api/types.ts` zurück.
+
+**`backend/src/system/repo.ts`** — `recordLauf`, `updateLaufStep`, `listHistorie` (max 20), `getLauf(id)`, `markRollback`. Schreibt + emittiert `system:update:phase` über Bus → SSE pickt es auf (Step 7 ist live).
+
+### 4. REST-Routen — `backend/src/routes/system.ts`
+
+Alle Routen sind admin-only (vorerst: jeder eingeloggte User; Rollen kommen später). Rate-Limit: Validate 5/min, Install 1 gleichzeitig (Lock-File `staging/.install.lock`).
+
+| Methode | Pfad | Zweck |
+|--|--|--|
+| `GET` | `/system/info` | Versionen, Schema, RAM, Disk, Uptime, lastUpdate |
+| `GET` | `/system/update/historie` | Liste `InstallierteVersion[]` aus `system_update_lauf` |
+| `POST` | `/system/update/validate` | Multipart-Upload (max 200 MB), entpackt nur `manifest.json`, prüft, gibt `UpdatePackageInfo` mit `uploadId` |
+| `POST` | `/system/update/install/:uploadId` | Startet Runner asynchron, antwortet sofort mit `UpdateLauf` (Status `laufend`) |
+| `GET` | `/system/update/lauf/:id` | Aktueller Stand inkl. aller Steps |
+| `GET` | `/system/update/lauf/aktuell` | Falls ein Lauf läuft (für Reconnect nach Page-Reload) |
+| `POST` | `/system/update/rollback/:version` | Body `{passwort}` → bcrypt-Vergleich → Sicherheits-Backup → Symlink-Swap auf `versions/<version>/` |
+| `POST` | `/system/update/abbruch/:laufId` | Nur erlaubt vor Step 7 (Swap); danach geht nur Rollback |
+
+**Zugriffsschutz Rollback:**
+- Body-Passwort wird über bestehende `auth.verifyPassword(userId, pw)` verglichen.
+- 3 Fehlversuche in 5 Min sperren Endpoint pro User für 15 Min (in-memory).
+
+### 5. SSE-Wireup (Step-7-Bus erweitern)
+
+- Neuer Event-Typ `system:update:phase` mit Payload `{laufId, step, status, label}`.
+- Frontend-`useLiveEvents` (Step 7) bekommt zusätzliche Cases: invalidiert `["system","update","lauf",laufId]` und `["system","update","historie"]`. Damit braucht `useUpdateLauf` kein Polling mehr — `refetchInterval` raus, `staleTime: Infinity`, SSE treibt Updates.
+
+### 6. Frontend-Anpassungen
+
+Nur minimal, weil das UI fertig ist:
+- `src/lib/api/client.ts` PI_PREFIXES: `/system/` ergänzen.
+- `useUpdateLauf` Polling ausschalten (SSE übernimmt), aber Initial-Fetch behalten.
+- `useInstallUpdate` Multipart-Upload-Pfad: ist heute schon `multipart/form-data` (im Frontend-Hook prüfen — nur durchreichen).
+- Beim ersten Render von `SystemUpdateTab` einmal `GET /system/update/lauf/aktuell` aufrufen, falls ein Lauf bei einem Reload weiterläuft.
+- Mock-Backend-Routen `/system/*` als Mock-Override deaktivieren, sobald `isBackendUrlExplicit()` true ist (Pi-Modus).
+
+### 7. Sicherheit & Härtung
+
+- ZIP-Inhalt darf NUR aus `node_modules/`-freien App-Dateien bestehen (Blacklist `.env`, `data/`, `keys/`, `backups/`).
+- HMAC-Manifest-Signatur mit Master-Key — verhindert externe Fremd-ZIPs (nur eigene Releases gültig).
+- `/system/update/install/*` benötigt aktive Auth-Session, Audit-Eintrag mit User+IP.
+- Lock-File verhindert parallele Updates. Nach Crash: Lock-File älter 30 min wird beim Server-Start aufgeräumt.
+- Healthcheck nutzt eigenen Loopback (127.0.0.1), ignoriert TLS, max 60 s, sonst Auto-Rollback.
+- `npm ci`-Subprocess: Timeout 5 min, max 500 MB Stdout-Buffer, eigener `cwd`, keine Shell-Interpolation.
+- Alle Subprocess-Aufrufe via `child_process.execFile` (NICHT `exec`).
+
+### 8. Tests — `backend/test/system-update.spec.ts`
+
+Setup: `dev-root/` Verzeichnis, kleine Test-ZIPs mit verschiedenem Manifest.
+
+- Upload + Validate gültiges Paket → `UpdatePackageInfo`, `validiert=true`.
+- Validate mit ungültiger Signatur → 400, kein Staging-Ordner.
+- Validate mit Schema-Downgrade → 400.
+- Install Happy-Path (mit Stub-Healthcheck) → Symlink wandert, Lauf-Status `erfolg`, alte Version landet als `previous`, ältere weg.
+- Install mit fehlschlagender Migration (dry-run wirft) → kein Swap, Lauf-Status `fehler`, Symlink unverändert.
+- Install mit fehlschlagendem Healthcheck → automatischer Rollback, Lauf-Status `zurueckgerollt`, Symlink wieder auf alt, neuer Code in `versions/broken-*`.
+- Rollback mit falschem Passwort → 401, 3× → 429 mit Sperre 15 min.
+- Rollback Happy-Path → Symlink auf gewählte Vorgängerversion, Sicherheits-Backup angelegt.
+- Parallele Install-Calls: zweite kriegt 409 wegen Lock-File.
+- ZIP-Bomb (1 GB entpackt) → 413 beim Extract.
+- DATA_DIR-Schutz: Test versucht in `/var/lib/...` zu schreiben (gemockter Pfad) → fail, aber Daten unverändert.
+- Reconnect-Szenario: laufenden Lauf simulieren, `GET /system/update/lauf/aktuell` liefert ihn.
+
+### 9. Memory-Updates
+
+- `mem://features/system-update` wird ergänzt um: HMAC-Signatur-Vertrag, Step-Liste 1:1, Lock-File-Mechanismus, Healthcheck-Details, dev-root-Modus.
+- Index bekommt Step-8-Eintrag mit Verweis auf `mem://features/backend-step8-system-update`.
+
+### 10. Reihenfolge (1 Prompt, ohne Rückfragen)
+
+1. Migration 011 + Repo
+2. `paths.ts`, `manifest.ts`, `zip.ts` (Utilities + Tests)
+3. `runner.ts` mit State-Machine + Bus-Events
+4. REST-Routen + Rate-Limit + Lock-File
+5. SSE-Bus-Erweiterung + Frontend-`useLiveEvents`-Mapping
+6. Frontend-Hooks: Polling raus, `lauf/aktuell` rein, `/system/` in PI_PREFIXES
+7. Tests
+8. Memory-Files
+
+### 11. Was Step 8 NICHT enthält
+
+- Update-Server (woher das ZIP kommt) — User lädt manuell hoch.
+- Auto-Updates oder Update-Benachrichtigungen — bleibt manuell.
+- Migrations-Reverse-Scripts — Migration ist additiv-only (Roadmap-Regel), Rollback nutzt nur Code-Tausch + Backup-Restore bei Bedarf.
+- Frontend-Redesign — UI ist fertig, nur Hooks werden zart angepasst.
