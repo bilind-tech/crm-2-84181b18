@@ -53,8 +53,18 @@ import { StundenzettelTab } from "@/components/einstellungen/StundenzettelTab";
 import { BackendVerbindungTab } from "@/components/einstellungen/BackendVerbindungTab";
 import type { Firmendaten } from "@/lib/api/types";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/einstellungen")({ component: Page });
+
+// Tabs, die nur für Owner sichtbar sind:
+const OWNER_ONLY: ReadonlyArray<TabId> = [
+  "drive",
+  "backup",
+  "system-update",
+  "sicherheit",
+  "steuern",
+];
 
 type TabId =
   | "firmendaten"
