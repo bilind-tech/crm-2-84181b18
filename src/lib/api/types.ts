@@ -518,9 +518,18 @@ export interface AppearanceEinstellungen {
 
 export interface BackupEinstellungen {
   autoBackup: boolean;
-  zeitpunkt: string; // "02:00"
+  zeitpunkt: string; // "03:00"
+  /** Legacy-Feld für Abwärtskompatibilität (entspricht behaltenDaily). */
   behaltenAnzahl: number;
+  /** Wie viele Tages-Backups maximal aufgehoben werden (Rotation). */
+  behaltenDaily: number;
+  /** Wie viele Wochen-Backups maximal aufgehoben werden (Sonntags). */
+  behaltenWeekly: number;
+  /** Wie viele Monats-Backups maximal aufgehoben werden (1. d. Monats). */
+  behaltenMonthly: number;
   zielordner: string; // Pi-Pfad
+  /** Wenn true, werden Backups zusätzlich nach Google Drive gespiegelt. */
+  driveSpiegel: boolean;
 }
 
 // ---------- Google Drive ----------
@@ -556,15 +565,100 @@ export interface GoogleDriveEinstellungen {
   letzterFehler?: string;
 }
 
-/** Eintrag in der Backup-Historie. Mock liefert simulierte Daten. */
+export type BackupKategorie =
+  | "daily"
+  | "weekly"
+  | "monthly"
+  | "manuell"
+  | "pre-restore"
+  | "pre-update";
+
+export type BackupAusloeser = "auto" | "manuell" | "vor-restore" | "vor-update";
+
+/** Eintrag in der Backup-Historie. Mock liefert simulierte Daten.
+ *  WICHTIG: Ein Eintrag gilt nur als "fertig", wenn `abgeschlossenAm !== null`
+ *  UND `status === "erfolg"`. Solange `status === "in_arbeit"` läuft das Backup. */
 export interface BackupEintrag {
   id: ID;
+  /** Legacy-Feld — entspricht zeitpunktStart. */
   zeitpunkt: ISODateTime;
+  /** Wann das Backup gestartet wurde. */
+  zeitpunktStart: ISODateTime;
+  /** Wann das Backup abgeschlossen wurde. null solange noch in Arbeit. */
+  abgeschlossenAm: ISODateTime | null;
+  kategorie: BackupKategorie;
+  ausloeser: BackupAusloeser;
   groesseBytes: number;
-  status: "erfolg" | "fehler";
+  status: "in_arbeit" | "erfolg" | "fehler";
   fehler?: string;
-  /** Pfad/Dateiname auf dem Pi. */
+  /** Pfad/Dateiname auf dem Pi (z.B. "data-2026-05-02.sqlite.gz"). */
   dateiname: string;
+  /** Optional: Drive-Spiegel-Status. */
+  driveStatus?: "pending" | "synced" | "error";
+}
+
+// ---------- System / Updates ----------
+
+/** System- und Versions-Info des laufenden CRM. */
+export interface SystemInfo {
+  appName: string;
+  version: string;
+  installedAt: ISODateTime;
+  node: string;
+  sqlite: string;
+  hardware: string;
+}
+
+/** Ergebnis der Validierung eines hochgeladenen Update-Pakets (vor Install). */
+export interface UpdatePackageInfo {
+  /** Eindeutige ID dieses Upload-Vorgangs (für nachfolgendes /install). */
+  uploadId: ID;
+  fileName: string;
+  sizeBytes: number;
+  /** Aus package.json extrahierte Version, leer bei ungültigem Paket. */
+  version: string;
+  pendingMigrations: string[];
+  warnings: string[];
+  valide: boolean;
+  fehlerGrund?: string;
+}
+
+export type UpdateStepId =
+  | "entpacken"
+  | "backup"
+  | "quarantaene"
+  | "install"
+  | "migrations"
+  | "neustart"
+  | "smoketest"
+  | "rollback";
+
+export interface UpdateStepStatus {
+  id: UpdateStepId;
+  label: string;
+  status: "wartet" | "laeuft" | "ok" | "fehler";
+  /** Optionaler Live-Detail-Text, z.B. "45 / 120 Pakete". */
+  detail?: string;
+  fehlerGrund?: string;
+}
+
+export interface UpdateLauf {
+  id: ID;
+  von: string;
+  zu: string;
+  startetAm: ISODateTime;
+  beendetAm: ISODateTime | null;
+  status: "laeuft" | "erfolg" | "fehler" | "rollback";
+  steps: UpdateStepStatus[];
+  /** Bei Fehler: Schritt der fehlgeschlagen ist. */
+  fehlgeschlagenBei?: UpdateStepId;
+}
+
+export interface InstallierteVersion {
+  version: string;
+  installedAt: ISODateTime;
+  istAktiv: boolean;
+  rollbackVerfuegbar: boolean;
 }
 
 /** Aktive Sitzung / Gerät im LAN. Pi-Backend liefert echte Daten. */
