@@ -1,6 +1,6 @@
 // Zentrale React-Query-Hooks. Jede Entität hat ein QueryKey-Objekt + Hooks.
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api/client";
 import type {
   Aktivitaet,
@@ -342,13 +342,27 @@ export const useRechnungen = (params?: { kundeId?: string; status?: string }) =>
 export const useRechnung = (id: string) =>
   useQuery({ queryKey: qk.rechnung(id), queryFn: () => api.get<Rechnung>(`/rechnungen/${id}`), enabled: !!id });
 
+/**
+ * Invalidiert alle Caches, die sich verändern, wenn eine Rechnung oder
+ * Zahlung angelegt/geändert/gelöscht wird. So aktualisieren KPI-Kacheln,
+ * Dashboard, Umsatz-Chart, Warnungen und Aktivitäten live.
+ */
+function invalidateRechnungScope(qc: QueryClient, rechnungId?: string) {
+  qc.invalidateQueries({ queryKey: ["rechnungen"] });
+  if (rechnungId) qc.invalidateQueries({ queryKey: qk.rechnung(rechnungId) });
+  qc.invalidateQueries({ queryKey: qk.dashboard.kennzahlen });
+  qc.invalidateQueries({ queryKey: qk.dashboard.umsatz });
+  qc.invalidateQueries({ queryKey: qk.dashboard.warnungen });
+  qc.invalidateQueries({ queryKey: qk.aktivitaeten });
+  qc.invalidateQueries({ queryKey: qk.benachrichtigungen });
+}
+
 export const useCreateRechnung = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (data: Partial<Rechnung>) => api.post<Rechnung>("/rechnungen", data),
     onSuccess: (created) => {
-      qc.invalidateQueries({ queryKey: ["rechnungen"] });
-      qc.invalidateQueries({ queryKey: qk.dashboard.kennzahlen });
+      invalidateRechnungScope(qc);
       qc.invalidateQueries({ queryKey: ["dauerauftraege"] });
       qc.invalidateQueries({ queryKey: ["dauerauftrag-laeufe"] });
       if (created?.kundeId) {
@@ -362,8 +376,7 @@ export const useUpdateRechnung = (id: string) => {
   return useMutation({
     mutationFn: (data: Partial<Rechnung>) => api.patch<Rechnung>(`/rechnungen/${id}`, data),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["rechnungen"] });
-      qc.invalidateQueries({ queryKey: qk.rechnung(id) });
+      invalidateRechnungScope(qc, id);
       qc.invalidateQueries({ queryKey: ["dauerauftraege"] });
       qc.invalidateQueries({ queryKey: ["dauerauftrag-laeufe"] });
     },
@@ -373,29 +386,21 @@ export const useDeleteRechnung = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => api.delete<void>(`/rechnungen/${id}`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["rechnungen"] }),
+    onSuccess: () => invalidateRechnungScope(qc),
   });
 };
 export const useSendeRechnung = (id: string) => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: () => api.post<void>(`/rechnungen/${id}/senden`),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: qk.rechnung(id) });
-      qc.invalidateQueries({ queryKey: ["rechnungen"] });
-    },
+    onSuccess: () => invalidateRechnungScope(qc, id),
   });
 };
 export const useAddZahlung = (rechnungId: string) => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (data: Partial<Zahlung>) => api.post<Zahlung>(`/rechnungen/${rechnungId}/zahlungen`, data),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: qk.rechnung(rechnungId) });
-      qc.invalidateQueries({ queryKey: ["rechnungen"] });
-      qc.invalidateQueries({ queryKey: qk.dashboard.kennzahlen });
-      qc.invalidateQueries({ queryKey: qk.aktivitaeten });
-    },
+    onSuccess: () => invalidateRechnungScope(qc, rechnungId),
   });
 };
 export const useDeleteZahlung = (rechnungId: string) => {
@@ -403,10 +408,7 @@ export const useDeleteZahlung = (rechnungId: string) => {
   return useMutation({
     mutationFn: (zahlungId: string) =>
       api.delete<void>(`/rechnungen/${rechnungId}/zahlungen/${zahlungId}`),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: qk.rechnung(rechnungId) });
-      qc.invalidateQueries({ queryKey: ["rechnungen"] });
-    },
+    onSuccess: () => invalidateRechnungScope(qc, rechnungId),
   });
 };
 
