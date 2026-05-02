@@ -1,15 +1,20 @@
-// API-Client. Schaltet zwischen Mock-Backend (in-memory, localStorage-persistiert)
-// und echtem Pi-Backend um, basierend auf Vite-Env-Variablen.
+// API-Client. Routet basierend auf dem Pfad-Prefix:
+// - /auth/* und /einstellungen/* -> echtes Pi-Backend (Cookie-Auth)
+// - alles andere -> Mock-Backend (in-memory)
 //
-//   VITE_USE_MOCK=true   -> Mock (Default in Dev)
-//   VITE_USE_MOCK=false  -> Echtes Backend
-//   VITE_API_BASE_URL=http://meinpi.local:4000
+// Wenn das Pi-Backend nicht erreichbar ist und VITE_USE_MOCK !== "false",
+// fällt der Auth-/Einstellungs-Pfad still zurück auf das Mock-Backend.
+// So funktioniert die App im Demo-Modus unverändert weiter.
+//
+// Override per Env:
+//   VITE_USE_MOCK=false     -> nie Mock (alles ans Pi-Backend)
+//   VITE_API_BASE_URL=...   -> Default-Backend-URL (Pi)
 
 import { mockBackend } from "@/lib/mock/backend";
+import { piApi, PiApiError } from "@/lib/api/piClient";
 
 const USE_MOCK =
   (import.meta.env.VITE_USE_MOCK ?? "true").toString().toLowerCase() !== "false";
-const BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "").toString().replace(/\/$/, "");
 
 export class ApiError extends Error {
   status: number;
@@ -21,53 +26,48 @@ export class ApiError extends Error {
   }
 }
 
-type FetchInit = Omit<RequestInit, "body"> & { body?: unknown };
+function isPiPath(p: string): boolean {
+  return p.startsWith("/auth/") || p.startsWith("/einstellungen");
+}
 
-async function request<T>(method: string, path: string, init: FetchInit = {}): Promise<T> {
-  const headers = new Headers(init.headers ?? {});
-  let body: BodyInit | undefined;
-
-  if (init.body !== undefined) {
-    if (init.body instanceof FormData) {
-      body = init.body;
-    } else {
-      headers.set("Content-Type", "application/json");
-      body = JSON.stringify(init.body);
+async function viaPi<T>(method: string, path: string, body?: unknown): Promise<T> {
+  try {
+    switch (method) {
+      case "GET":
+        return await piApi.get<T>(path);
+      case "POST":
+        return await piApi.post<T>(path, body);
+      case "PATCH":
+        return await piApi.patch<T>(path, body);
+      case "PUT":
+        return await piApi.patch<T>(path, body); // PUT als PATCH semantisch
+      case "DELETE":
+        return await piApi.delete<T>(path);
+      default:
+        throw new Error(`Methode nicht unterstützt: ${method}`);
     }
+  } catch (err) {
+    if (err instanceof PiApiError) {
+      // Backend offline (Status 0) -> ggf. Fallback auf Mock
+      if (err.status === 0 && USE_MOCK) {
+        return mockBackend<T>(method, path, body);
+      }
+      throw new ApiError(err.message, err.status, err.body);
+    }
+    throw err;
   }
-
-  const res = await fetch(`${BASE_URL}${path}`, {
-    method,
-    headers,
-    body,
-    credentials: "include", // für HttpOnly-Cookie-Auth vom Pi
-  });
-
-  if (res.status === 204) return undefined as T;
-
-  const contentType = res.headers.get("content-type") ?? "";
-  const data = contentType.includes("application/json") ? await res.json() : await res.text();
-
-  if (!res.ok) {
-    throw new ApiError(
-      typeof data === "string" ? data : (data as { message?: string }).message ?? res.statusText,
-      res.status,
-      data,
-    );
-  }
-  return data as T;
 }
 
 export const api = {
   isMock: USE_MOCK,
   get: <T>(path: string) =>
-    USE_MOCK ? mockBackend<T>("GET", path) : request<T>("GET", path),
+    isPiPath(path) ? viaPi<T>("GET", path) : USE_MOCK ? mockBackend<T>("GET", path) : viaPi<T>("GET", path),
   post: <T>(path: string, body?: unknown) =>
-    USE_MOCK ? mockBackend<T>("POST", path, body) : request<T>("POST", path, { body }),
+    isPiPath(path) ? viaPi<T>("POST", path, body) : USE_MOCK ? mockBackend<T>("POST", path, body) : viaPi<T>("POST", path, body),
   patch: <T>(path: string, body?: unknown) =>
-    USE_MOCK ? mockBackend<T>("PATCH", path, body) : request<T>("PATCH", path, { body }),
+    isPiPath(path) ? viaPi<T>("PATCH", path, body) : USE_MOCK ? mockBackend<T>("PATCH", path, body) : viaPi<T>("PATCH", path, body),
   put: <T>(path: string, body?: unknown) =>
-    USE_MOCK ? mockBackend<T>("PUT", path, body) : request<T>("PUT", path, { body }),
+    isPiPath(path) ? viaPi<T>("PUT", path, body) : USE_MOCK ? mockBackend<T>("PUT", path, body) : viaPi<T>("PUT", path, body),
   delete: <T>(path: string) =>
-    USE_MOCK ? mockBackend<T>("DELETE", path) : request<T>("DELETE", path),
+    isPiPath(path) ? viaPi<T>("DELETE", path) : USE_MOCK ? mockBackend<T>("DELETE", path) : viaPi<T>("DELETE", path),
 };
