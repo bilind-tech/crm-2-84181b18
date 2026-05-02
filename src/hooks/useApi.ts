@@ -474,10 +474,22 @@ export const useDeleteNotiz = (kundeId?: string) => {
 };
 
 // ---------- Dashboard ----------
-export const useDashboardKennzahlen = () =>
-  useQuery({ queryKey: qk.dashboard.kennzahlen, queryFn: () => api.get<DashboardKennzahlen>("/dashboard/kennzahlen") });
-export const useUmsatz = () =>
-  useQuery({ queryKey: qk.dashboard.umsatz, queryFn: () => api.get<UmsatzPunkt[]>("/dashboard/umsatz") });
+function zeitraumQuery(z?: { jahr: string; monat: string }): string {
+  if (!z || z.jahr === "alle") return "";
+  const params = new URLSearchParams({ jahr: z.jahr });
+  if (z.monat !== "alle") params.set("monat", z.monat);
+  return `?${params.toString()}`;
+}
+export const useDashboardKennzahlen = (zeitraum?: { jahr: string; monat: string }) =>
+  useQuery({
+    queryKey: [...qk.dashboard.kennzahlen, zeitraum ?? null] as const,
+    queryFn: () => api.get<DashboardKennzahlen>(`/dashboard/kennzahlen${zeitraumQuery(zeitraum)}`),
+  });
+export const useUmsatz = (zeitraum?: { jahr: string; monat: string }) =>
+  useQuery({
+    queryKey: [...qk.dashboard.umsatz, zeitraum ?? null] as const,
+    queryFn: () => api.get<UmsatzPunkt[]>(`/dashboard/umsatz${zeitraumQuery(zeitraum)}`),
+  });
 export const useWarnungen = () =>
   useQuery({ queryKey: qk.dashboard.warnungen, queryFn: () => api.get<Warnung[]>("/dashboard/warnungen") });
 
