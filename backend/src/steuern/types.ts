@@ -28,7 +28,7 @@ export const STEUER_DEFAULTS: Omit<SteuerEinstellungen, "updatedAt"> = {
 export interface ManuellerPostenInput {
   art: SteuerArt;
   titel: string;
-  zeitraum: { jahr: number; monat?: number | null; quartal?: 1 | 2 | 3 | 4 | null };
+  zeitraum: { jahr: number; monat?: number | null; quartal?: number | null };
   faelligAm: string;
   geschaetzterBetrag: number;
   notiz?: string | null;
