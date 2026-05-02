@@ -35,11 +35,28 @@ function writeJson(key: string, value: unknown) {
   }
 }
 
+/** Subscribe auf StorageEvents für einen bestimmten Key. */
+function useStorageListener(key: string, onChange: () => void) {
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handler = (e: StorageEvent) => {
+      if (e.key === key) onChange();
+    };
+    window.addEventListener("storage", handler);
+    return () => window.removeEventListener("storage", handler);
+  }, [key, onChange]);
+}
+
 // ---------- Einstellungen ----------
 
 export function useSteuerEinstellungen() {
   const [data, setData] = useState<SteuerEinstellungen>(() =>
     readJson(SETTINGS_KEY, STEUER_DEFAULTS),
+  );
+
+  useStorageListener(
+    SETTINGS_KEY,
+    useCallback(() => setData(readJson(SETTINGS_KEY, STEUER_DEFAULTS)), []),
   );
 
   const update = useCallback((patch: Partial<SteuerEinstellungen>) => {
@@ -66,6 +83,11 @@ export function getSteuerEinstellungen(): SteuerEinstellungen {
 
 export function useManuellePosten() {
   const [posten, setPosten] = useState<SteuerPosten[]>(() => readJson<SteuerPosten[]>(POSTEN_KEY, []));
+
+  useStorageListener(
+    POSTEN_KEY,
+    useCallback(() => setPosten(readJson<SteuerPosten[]>(POSTEN_KEY, [])), []),
+  );
 
   const add = useCallback((neu: Omit<SteuerPosten, "id" | "erstelltAm" | "automatisch">) => {
     const p: SteuerPosten = {
@@ -108,6 +130,11 @@ export function useBezahltMarkierungen() {
     readJson<Record<string, BezahltMarkierung>>(BEZAHLT_KEY, {}),
   );
 
+  useStorageListener(
+    BEZAHLT_KEY,
+    useCallback(() => setMap(readJson<Record<string, BezahltMarkierung>>(BEZAHLT_KEY, {})), []),
+  );
+
   const setBezahlt = useCallback((postenId: string, eintrag: BezahltMarkierung) => {
     setMap((prev) => {
       const next = { ...prev, [postenId]: eintrag };
@@ -126,18 +153,4 @@ export function useBezahltMarkierungen() {
   }, []);
 
   return { map, setBezahlt, removeBezahlt };
-}
-
-/** Cross-Tab-Sync */
-export function useStorageSync(callback: () => void) {
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const handler = (e: StorageEvent) => {
-      if (e.key === SETTINGS_KEY || e.key === POSTEN_KEY || e.key === BEZAHLT_KEY) {
-        callback();
-      }
-    };
-    window.addEventListener("storage", handler);
-    return () => window.removeEventListener("storage", handler);
-  }, [callback]);
 }
