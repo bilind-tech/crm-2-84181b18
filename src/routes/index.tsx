@@ -76,6 +76,13 @@ function Dashboard() {
 
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         <KpiCard
+          label="Umsatz Monat"
+          value={formatEUR(last6[last6.length - 1]?.brutto ?? 0)}
+          sublabel="brutto"
+          icon={Euro}
+          tone="success"
+        />
+        <KpiCard
           label="Kunden"
           value={k?.aktiveKunden ?? 0}
           sublabel="aktiv"
@@ -87,13 +94,6 @@ function Dashboard() {
           value={k?.aktiveObjekte ?? 0}
           sublabel={`${k?.aktiveObjekte ?? 0} Objekte`}
           icon={ClipboardList}
-        />
-        <KpiCard
-          label="Umsatz Monat"
-          value={formatEUR(last6[last6.length - 1]?.brutto ?? 0)}
-          sublabel="brutto"
-          icon={Euro}
-          tone="success"
         />
         <KpiCard
           label="Offene Rechnungen"

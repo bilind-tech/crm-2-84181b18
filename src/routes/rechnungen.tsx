@@ -125,6 +125,12 @@ function Page() {
 
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         <KpiCard
+          label="Eingang diesen Monat"
+          value={formatEUR(counts.eingangMonat)}
+          sublabel="Bezahlt im Monat"
+          tone="success"
+        />
+        <KpiCard
           label="Offene Posten"
           value={formatEUR(counts.offenSumme)}
           sublabel={`${counts.offenAnzahl} Rechnung(en)`}
@@ -135,12 +141,6 @@ function Page() {
           value={formatEUR(counts.ueberSumme)}
           sublabel={`${counts.ueberAnzahl} Rechnung(en)`}
           tone="danger"
-        />
-        <KpiCard
-          label="Eingang diesen Monat"
-          value={formatEUR(counts.eingangMonat)}
-          sublabel="Bezahlt im Monat"
-          tone="success"
         />
         <KpiCard label="Gesamt" value={counts.gesamt} sublabel="Alle Rechnungen" />
       </div>

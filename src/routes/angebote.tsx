@@ -130,10 +130,10 @@ function Page() {
       />
 
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+        <KpiCard label="Offenes Volumen" value={formatEUR(counts.offenesVolumen)} tone="success" />
         <KpiCard label="Gesamt" value={counts.gesamt} tone="primary" />
         <KpiCard label="Entwürfe" value={counts.entwurf} />
         <KpiCard label="Versendet" value={counts.versendet} />
-        <KpiCard label="Offenes Volumen" value={formatEUR(counts.offenesVolumen)} tone="success" />
       </div>
 
       <FilterBar
@@ -472,22 +472,18 @@ function ZeitraumPills({
 }
 
 function DesktopFilterBar({ filter, setFilter, q, setQ, tabs, placeholder, extra, zeitraum, setZeitraum, verfuegbareDaten }: FilterBarProps) {
+  const aktiv = tabs.find((t) => t.value === filter);
+  const statusAktiv = filter !== "alle";
   return (
     <div className="flex w-full min-w-0 flex-wrap items-center gap-3 rounded-2xl border border-border bg-card p-2.5 shadow-sm">
-      <div className="flex flex-wrap gap-1 rounded-full bg-muted p-1">
-        {tabs.map((t) => (
-          <button
-            key={t.value}
-            onClick={() => setFilter(t.value)}
-            className={`rounded-full px-4 py-1.5 text-sm font-medium transition ${
-              filter === t.value
-                ? "bg-card text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
+      <div className="relative min-w-0 flex-1">
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          placeholder={placeholder}
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          className="h-9 w-full rounded-full border-border bg-background pl-9"
+        />
       </div>
       {zeitraum && setZeitraum && verfuegbareDaten && (
         <ZeitraumPills
@@ -497,14 +493,26 @@ function DesktopFilterBar({ filter, setFilter, q, setQ, tabs, placeholder, extra
         />
       )}
       {extra}
-      <div className="relative ml-auto w-full min-w-0 flex-1 sm:w-auto">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          placeholder={placeholder}
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          className="h-9 w-full rounded-full border-border bg-background pl-9"
-        />
+      <div className="relative flex items-center gap-1">
+        <Select value={filter} onValueChange={setFilter}>
+          <SelectTrigger className="h-9 min-w-[170px] gap-2 rounded-full border-border bg-background text-sm">
+            <SlidersHorizontal className="h-4 w-4 text-muted-foreground" />
+            <span className="truncate">
+              <span className="text-muted-foreground">Filter: </span>
+              <span className="font-medium">{aktiv?.label ?? "Alle"}</span>
+            </span>
+          </SelectTrigger>
+          <SelectContent align="end">
+            {tabs.map((t) => (
+              <SelectItem key={t.value} value={t.value}>
+                {t.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {statusAktiv && (
+          <span className="pointer-events-none absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-primary" />
+        )}
       </div>
     </div>
   );
