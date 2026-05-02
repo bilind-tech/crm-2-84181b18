@@ -91,6 +91,12 @@ export function KundeBearbeitenDialog({ kunde, open, onOpenChange }: Props) {
     return `${k}${mm}${yy}/${nn}`;
   }, [kuerzel, startNummer]);
 
+  const kuerzelFreiQ = useKuerzelFrei(kuerzel, kunde.id);
+  const kuerzelKonflikt =
+    kuerzel.length >= 3 && kuerzelFreiQ.data && !kuerzelFreiQ.data.frei
+      ? kuerzelFreiQ.data.kunde
+      : null;
+
   async function speichern() {
     if (kunde.typ === "firma" && !firmenname.trim()) {
       toast.error("Firmenname ist erforderlich");
@@ -102,6 +108,10 @@ export function KundeBearbeitenDialog({ kunde, open, onOpenChange }: Props) {
     }
     if (kuerzel && kuerzel.length < 3) {
       toast.error("Kürzel muss 3–4 Zeichen haben");
+      return;
+    }
+    if (kuerzelKonflikt) {
+      toast.error(`Kürzel «${kuerzel}» ist bereits vergeben (${kuerzelKonflikt.nummer} • ${kuerzelKonflikt.name}).`);
       return;
     }
     await update.mutateAsync({
