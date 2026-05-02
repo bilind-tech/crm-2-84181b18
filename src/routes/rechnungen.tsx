@@ -15,6 +15,7 @@ import { MobileListCard } from "@/components/ui/mobile-list-card";
 import { RechnungForm } from "@/components/forms/RechnungForm";
 import { ZahlungErfassenDialog } from "@/components/forms/ZahlungErfassenDialog";
 import { useConfirm } from "@/hooks/useConfirm";
+import { RechnungAusDauerauftragDialog } from "@/components/dauerauftrag/RechnungAusDauerauftragDialog";
 import { FlowBar } from "@/components/flow/FlowBar";
 import { rechnungFlow } from "@/lib/flow/flows";
 import {
@@ -78,6 +79,7 @@ function Page() {
   const [zeitraum, setZeitraum] = useState<ZeitraumState>(ZEITRAUM_ALLE);
   const [nurDA, setNurDA] = useState(false);
   const [open, setOpen] = useState(false);
+  const [daDialog, setDaDialog] = useState(false);
   const [zahlungFuer, setZahlungFuer] = useState<Rechnung | null>(null);
   const [emailFuer, setEmailFuer] = useState<Rechnung | null>(null);
   const { confirm, dialog: confirmDialog } = useConfirm();
@@ -121,7 +123,18 @@ function Page() {
         title="Rechnungen"
         subtitle="Rechnungen erstellen, Zahlungen erfassen, Mahnungen senden."
         actions={
-          <PrimaryAction onClick={() => setOpen(true)} label="Neue Rechnung" />
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="outline"
+              className="rounded-lg"
+              onClick={() => setDaDialog(true)}
+              title="Rechnungen aus Daueraufträgen erzeugen"
+            >
+              <Repeat className="mr-1.5 h-4 w-4" />
+              Aus Dauerauftrag
+            </Button>
+            <PrimaryAction onClick={() => setOpen(true)} label="Neue Rechnung" />
+          </div>
         }
       />
 
@@ -424,6 +437,8 @@ function Page() {
           onClose={() => setEmailFuer(null)}
         />
       )}
+
+      <RechnungAusDauerauftragDialog open={daDialog} onOpenChange={setDaDialog} />
 
       {confirmDialog}
     </div>
