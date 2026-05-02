@@ -896,6 +896,33 @@ export const useMahnLaeufe = () =>
     staleTime: 15_000,
   });
 
+export const useMahnLauf = (id: string | null | undefined) =>
+  useQuery({
+    queryKey: ["mahnung", "laeufe", id] as const,
+    queryFn: () =>
+      api.get<import("@/lib/api/types").MahnLaufDetail>(`/mahnung/laeufe/${id}`),
+    enabled: !!id,
+  });
+
+export const useMahnungVersenden = (rechnungId: string) => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (stufe: import("@/lib/api/types").MahnStufe) =>
+      api.post<{ ok: true; emailVersandId?: string }>(
+        `/rechnungen/${rechnungId}/mahnung-versenden`,
+        { stufe },
+      ),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.rechnung(rechnungId) });
+      qc.invalidateQueries({ queryKey: ["rechnungen"] });
+      qc.invalidateQueries({ queryKey: ["mahnung"] });
+      qc.invalidateQueries({ queryKey: ["email"] });
+      qc.invalidateQueries({ queryKey: qk.aktivitaeten });
+      qc.invalidateQueries({ queryKey: qk.benachrichtigungen });
+    },
+  });
+};
+
 export const useMahnJetztPruefen = () => {
   const qc = useQueryClient();
   return useMutation({
