@@ -18,7 +18,6 @@ import { useConfirm } from "@/hooks/useConfirm";
 import { FlowBar } from "@/components/flow/FlowBar";
 import { rechnungFlow } from "@/lib/flow/flows";
 import {
-  ZeitraumFilter,
   ZEITRAUM_ALLE,
   passtInZeitraum,
   type ZeitraumState,
@@ -160,11 +159,8 @@ function Page() {
           { value: "bezahlt", label: "Bezahlt" },
         ]}
         placeholder="Suche nach Nummer, Titel, Kunde…"
-      />
-
-      <ZeitraumFilter
-        value={zeitraum}
-        onChange={setZeitraum}
+        zeitraum={zeitraum}
+        setZeitraum={setZeitraum}
         verfuegbareDaten={alle.map((r) => r.rechnungsdatum)}
       />
 

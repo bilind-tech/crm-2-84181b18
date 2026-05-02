@@ -1,59 +1,37 @@
-## Problem
-
-1. „Zahlung erfassen" ist als Button-Beschriftung unklar — klingt nach Buchhaltungs-Jargon.
-2. Der Dialog `ZahlungErfassenDialog` zeigt sofort sehr viele Felder (Offen-Übersicht, 3 Schnell-Buttons, Betrag, Datum, Methode, Notiz). Auf dem Handy wirkt das überladen und „hässlich".
-3. Es gibt keine einfache Ja/Nein-Frage für den häufigsten Fall: „Hat der Kunde voll bezahlt?".
-
 ## Ziel
-
-- Klarer, aktiver Button-Text statt „Zahlung erfassen".
-- Beim Klick öffnet sich ein **kleines, mittig zentriertes** Dialog-Fenster mit nur einer Frage: „Hat der Kunde bezahlt?" + Buttons **Ja, voll bezahlt** / **Nein, Teilbetrag** / **Abbrechen**.
-- Klick auf **Ja** → bucht sofort den vollen offenen Betrag, Dialog schließt.
-- Klick auf **Nein** → wechselt im selben Dialog zu einem zweiten, ebenfalls minimalen Schritt: nur Betrags-Eingabe (groß, Ziffern-Tastatur) + zwei Buttons (Speichern / Abbrechen).
-- Datum, Methode, Notiz verschwinden aus der UI — werden automatisch gesetzt (Datum = heute, Methode = Überweisung, Notiz leer). Bestehende Datenstruktur bleibt voll erhalten.
+Den separaten **„Zeitraum"-Balken** (Jahr/Monat) auf der Rechnungs- und Angebotsseite entfernen — er hängt aktuell als zweite Leiste unter der FilterBar und sieht „hässlich" aus. Stattdessen wird der Zeitraum **in den bestehenden Filter integriert**: auf Desktop kompakt in der FilterBar selbst, auf Mobile im Filter-Sheet (das man über das Filter-Icon öffnet).
 
 ## Änderungen
 
-### 1. Neuer Button-Text
-Überall wo aktuell „Zahlung erfassen" steht (`src/routes/rechnungen.tsx` Zeilen 237/240/345 + Tooltips, `src/routes/rechnungen.$id.tsx` Zeilen 76/147), ersetzen durch:
+### 1. `src/routes/angebote.tsx` & `src/routes/rechnungen.tsx`
+- Den eigenständigen `<ZeitraumFilter ... />`-Block (eigene Zeile unter der FilterBar) entfernen.
+- Stattdessen `zeitraum` + `setZeitraum` + `verfuegbareDaten` als neue Props an `FilterBar` übergeben.
 
-- **Button-Label:** „Als bezahlt markieren"
-- **Tooltip:** „Bezahlung eintragen — voll oder teilweise"
+### 2. `src/routes/angebote.tsx` — `FilterBar` erweitern
+Neue Props auf `FilterBarProps`:
+```ts
+zeitraum?: ZeitraumState;
+setZeitraum?: (v: ZeitraumState) => void;
+verfuegbareDaten?: string[];
+```
 
-(„Als bezahlt markieren" ist eindeutig eine Aktion, kein Statement, dass es bereits passiert ist — der Kontext macht klar, dass jetzt erst gebucht wird.)
+**Desktop (`DesktopFilterBar`):** Zwischen den Status-Pillen und dem Such-Input zwei kompakte `Select`s (Jahr + Monat) einfügen — keine eigene umrandete Karte mehr, sondern als nahtlose Pills im selben Bar-Container. Optisch wie die Status-Pillen (h-9, rounded-full, border-border). Wenn ein Zeitraum gesetzt ist, ein kleines „×" zum Zurücksetzen anzeigen.
 
-### 2. `ZahlungErfassenDialog.tsx` umbauen — zweistufiger Mini-Dialog
+**Mobile (`MobileFilterBar`):** Das Sheet bekommt zwei Sektionen mit Trennlinie:
+- **Status** (wie bisher: Pill-Liste mit Check)
+- **Zeitraum** (neu): Jahr-Select + Monat-Select untereinander, plus „Zurücksetzen"-Link, wenn aktiv.
 
-**Stufe 1 — Frage (Default beim Öffnen):**
-- Zentriert, schmal (`sm:max-w-sm`).
-- Titel: „Bezahlt?"
-- Beschreibung: „Rechnung `{nummer}` · offen: **{formatEUR(offen)}**"
-- Drei Buttons untereinander auf Mobile, nebeneinander ab `sm`:
-  - Primary, groß, h-12: „Ja, voll bezahlt ({formatEUR(offen)})" → bucht sofort den vollen Betrag und schließt.
-  - Outline: „Nein, nur ein Teil" → wechselt zu Stufe 2.
-  - Ghost: „Abbrechen" → schließt.
+Das Filter-Icon-Button im Mobile-Header zeigt einen kleinen Punkt/Badge, wenn entweder ein Status ≠ „alle" **oder** ein Zeitraum aktiv ist — so sieht der User auf einen Blick, dass im Sheet etwas eingestellt ist.
 
-**Stufe 2 — Teilbetrag:**
-- Titel: „Wie viel wurde bezahlt?"
-- Großes Input-Feld (h-14, text-2xl, `inputMode="decimal"`), automatisch fokussiert, vorbelegt mit leer.
-- Hinweis darunter: „Offen: {formatEUR(offen)}".
-- Zwei Buttons:
-  - Primary: „Speichern" (disabled wenn betrag ≤ 0 oder > offen).
-  - Outline: „Zurück" → zurück zu Stufe 1.
-- Kein Datum, keine Methode, keine Notiz mehr sichtbar.
+### 3. `src/components/filters/ZeitraumFilter.tsx`
+- `passtInZeitraum`, `ZEITRAUM_ALLE`, `ZeitraumState` und die `MONATE`-Konstante bleiben als Exporte erhalten (werden weiterhin von beiden Routen + neu von `FilterBar` importiert).
+- Die `ZeitraumFilter`-Komponente selbst wird nicht mehr verwendet — kann gelöscht werden, oder als interne Hilfs-Komponente bleiben (lösche ich, um Tote Code zu vermeiden).
 
-**Backend-seitig:** Beim Submit immer `datum: todayISO()`, `methode: "ueberweisung"`, `notiz: undefined` an `useAddZahlung` übergeben (gleiche API wie heute, kein Backend-Change).
-
-### 3. State-Reset
-- `useEffect` setzt beim Öffnen Stufe immer auf `"frage"` zurück, Betrag auf `""`.
-
-## Was NICHT geändert wird
-- Datenmodell, Zahlungs-API, FlowBar-Status-Ableitung — alles unverändert.
-- Andere Dialoge / Routes bleiben gleich.
-- Keine Sparkles, keine Gradient-Hintergründe (`bg-background` bleibt).
+### 4. Mobile-Verhalten
+Auf 390px-Viewport: keine zweite Leiste mehr unter der FilterBar, dadurch kompakteres Layout, kein versehentliches Horizontal-Scrollen mehr durch die breiten Zeitraum-Pills.
 
 ## Ergebnis
-
-- Auf dem Handy klein, mittig, klar: ein Button für den Standardfall („voll bezahlt"), ein zweiter für Teilzahlung, ein Abbrechen.
-- Keine überladene Maske mehr für 90 % der Fälle.
-- Wer einen Teilbetrag tippen will, sieht nur ein einziges Eingabefeld.
+- Eine einzige, einheitliche Filter-Karte pro Liste.
+- Desktop: Zeitraum als zwei dezente Pills inline mit den Status-Pills.
+- Mobile: Zeitraum sauber im Filter-Sheet, Filter-Icon zeigt aktiven Zustand.
+- Keine doppelten Filter-Container mehr.

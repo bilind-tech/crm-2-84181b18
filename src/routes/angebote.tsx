@@ -18,11 +18,21 @@ import { AngebotForm } from "@/components/forms/AngebotForm";
 import { FlowBar } from "@/components/flow/FlowBar";
 import { angebotFlow } from "@/lib/flow/flows";
 import {
-  ZeitraumFilter,
   ZEITRAUM_ALLE,
+  MONATE_DE,
+  jahreAusDaten,
   passtInZeitraum,
+  zeitraumIstAktiv,
   type ZeitraumState,
 } from "@/components/filters/ZeitraumFilter";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { X } from "lucide-react";
 import type { Angebot } from "@/lib/api/types";
 import { useConfirm } from "@/hooks/useConfirm";
 
@@ -138,11 +148,8 @@ function Page() {
           { value: "angenommen", label: "Angenommen" },
         ]}
         placeholder="Suche nach Nummer, Titel, Kunde…"
-      />
-
-      <ZeitraumFilter
-        value={zeitraum}
-        onChange={setZeitraum}
+        zeitraum={zeitraum}
+        setZeitraum={setZeitraum}
         verfuegbareDaten={alle.map((a) => a.erstelltAm)}
       />
 
@@ -379,6 +386,9 @@ interface FilterBarProps {
   tabs: { value: string; label: string; count?: number }[];
   placeholder: string;
   extra?: React.ReactNode;
+  zeitraum?: ZeitraumState;
+  setZeitraum?: (v: ZeitraumState) => void;
+  verfuegbareDaten?: string[];
 }
 
 export function FilterBar(props: FilterBarProps) {
@@ -396,7 +406,72 @@ export function FilterBar(props: FilterBarProps) {
   );
 }
 
-function DesktopFilterBar({ filter, setFilter, q, setQ, tabs, placeholder, extra }: FilterBarProps) {
+function ZeitraumPills({
+  zeitraum,
+  setZeitraum,
+  verfuegbareDaten,
+}: {
+  zeitraum: ZeitraumState;
+  setZeitraum: (v: ZeitraumState) => void;
+  verfuegbareDaten: string[];
+}) {
+  const jahre = useMemo(() => jahreAusDaten(verfuegbareDaten), [verfuegbareDaten]);
+  const aktiv = zeitraumIstAktiv(zeitraum);
+  return (
+    <div className="flex items-center gap-1.5">
+      <Select
+        value={zeitraum.jahr}
+        onValueChange={(v) =>
+          setZeitraum({ jahr: v, monat: v === "alle" ? "alle" : zeitraum.monat })
+        }
+      >
+        <SelectTrigger className="h-9 w-[120px] rounded-full border-border bg-background text-sm">
+          <SelectValue placeholder="Jahr" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="alle">Alle Jahre</SelectItem>
+          {jahre.map((j) => (
+            <SelectItem key={j} value={j}>
+              {j}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <Select
+        value={zeitraum.monat}
+        onValueChange={(v) => setZeitraum({ ...zeitraum, monat: v })}
+        disabled={zeitraum.jahr === "alle"}
+      >
+        <SelectTrigger className="h-9 w-[140px] rounded-full border-border bg-background text-sm disabled:opacity-50">
+          <SelectValue placeholder="Monat" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="alle">Alle Monate</SelectItem>
+          {MONATE_DE.map((m, i) => {
+            const v = String(i + 1).padStart(2, "0");
+            return (
+              <SelectItem key={v} value={v}>
+                {m}
+              </SelectItem>
+            );
+          })}
+        </SelectContent>
+      </Select>
+      {aktiv && (
+        <button
+          type="button"
+          onClick={() => setZeitraum(ZEITRAUM_ALLE)}
+          className="inline-flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+          aria-label="Zeitraum-Filter zurücksetzen"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      )}
+    </div>
+  );
+}
+
+function DesktopFilterBar({ filter, setFilter, q, setQ, tabs, placeholder, extra, zeitraum, setZeitraum, verfuegbareDaten }: FilterBarProps) {
   return (
     <div className="flex w-full min-w-0 flex-wrap items-center gap-3 rounded-2xl border border-border bg-card p-2.5 shadow-sm">
       <div className="flex flex-wrap gap-1 rounded-full bg-muted p-1">
@@ -414,6 +489,13 @@ function DesktopFilterBar({ filter, setFilter, q, setQ, tabs, placeholder, extra
           </button>
         ))}
       </div>
+      {zeitraum && setZeitraum && verfuegbareDaten && (
+        <ZeitraumPills
+          zeitraum={zeitraum}
+          setZeitraum={setZeitraum}
+          verfuegbareDaten={verfuegbareDaten}
+        />
+      )}
       {extra}
       <div className="relative ml-auto w-full min-w-0 flex-1 sm:w-auto">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -428,9 +510,12 @@ function DesktopFilterBar({ filter, setFilter, q, setQ, tabs, placeholder, extra
   );
 }
 
-function MobileFilterBar({ filter, setFilter, q, setQ, tabs, placeholder }: FilterBarProps) {
+function MobileFilterBar({ filter, setFilter, q, setQ, tabs, placeholder, zeitraum, setZeitraum, verfuegbareDaten }: FilterBarProps) {
   const [sheetOpen, setSheetOpen] = useState(false);
   const aktiv = tabs.find((t) => t.value === filter);
+  const jahre = useMemo(() => jahreAusDaten(verfuegbareDaten ?? []), [verfuegbareDaten]);
+  const zAktiv = zeitraum ? zeitraumIstAktiv(zeitraum) : false;
+  const irgendwasAktiv = filter !== "alle" || zAktiv;
   return (
     <>
       <div className="flex w-full min-w-0 items-center gap-2">
@@ -446,11 +531,14 @@ function MobileFilterBar({ filter, setFilter, q, setQ, tabs, placeholder }: Filt
         <button
           type="button"
           onClick={() => setSheetOpen(true)}
-          className="flex h-11 shrink-0 items-center gap-1.5 rounded-xl border border-border bg-card px-3 text-sm font-medium hover:bg-muted"
+          className="relative flex h-11 shrink-0 items-center gap-1.5 rounded-xl border border-border bg-card px-3 text-sm font-medium hover:bg-muted"
           aria-label="Filter wählen"
         >
           <SlidersHorizontal className="h-4 w-4" />
           <span className="max-w-[7rem] truncate">{aktiv?.label ?? "Alle"}</span>
+          {irgendwasAktiv && (
+            <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-primary" />
+          )}
         </button>
       </div>
 
@@ -463,7 +551,10 @@ function MobileFilterBar({ filter, setFilter, q, setQ, tabs, placeholder }: Filt
           <SheetHeader className="px-5 pb-2 pt-3 text-left">
             <SheetTitle className="text-base">Filter</SheetTitle>
           </SheetHeader>
-          <div className="px-2 pb-[max(1rem,env(safe-area-inset-bottom))]">
+          <div className="max-h-[70vh] overflow-y-auto px-2 pb-[max(1rem,env(safe-area-inset-bottom))]">
+            <div className="px-3 pb-1 pt-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              Status
+            </div>
             {tabs.map((t) => {
               const istAktiv = t.value === filter;
               return (
@@ -472,7 +563,6 @@ function MobileFilterBar({ filter, setFilter, q, setQ, tabs, placeholder }: Filt
                   type="button"
                   onClick={() => {
                     setFilter(t.value);
-                    setSheetOpen(false);
                   }}
                   className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm transition ${
                     istAktiv ? "bg-primary/10 text-primary" : "hover:bg-muted"
@@ -492,6 +582,75 @@ function MobileFilterBar({ filter, setFilter, q, setQ, tabs, placeholder }: Filt
                 </button>
               );
             })}
+
+            {zeitraum && setZeitraum && (
+              <>
+                <div className="mt-3 flex items-center justify-between border-t border-border px-3 pb-2 pt-4">
+                  <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    Zeitraum
+                  </div>
+                  {zAktiv && (
+                    <button
+                      type="button"
+                      onClick={() => setZeitraum(ZEITRAUM_ALLE)}
+                      className="text-xs text-muted-foreground hover:text-foreground"
+                    >
+                      Zurücksetzen
+                    </button>
+                  )}
+                </div>
+                <div className="space-y-2 px-3 pb-2">
+                  <Select
+                    value={zeitraum.jahr}
+                    onValueChange={(v) =>
+                      setZeitraum({ jahr: v, monat: v === "alle" ? "alle" : zeitraum.monat })
+                    }
+                  >
+                    <SelectTrigger className="h-11 w-full rounded-xl border-border bg-card text-sm">
+                      <SelectValue placeholder="Jahr" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="alle">Alle Jahre</SelectItem>
+                      {jahre.map((j) => (
+                        <SelectItem key={j} value={j}>
+                          {j}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select
+                    value={zeitraum.monat}
+                    onValueChange={(v) => setZeitraum({ ...zeitraum, monat: v })}
+                    disabled={zeitraum.jahr === "alle"}
+                  >
+                    <SelectTrigger className="h-11 w-full rounded-xl border-border bg-card text-sm disabled:opacity-50">
+                      <SelectValue placeholder="Monat" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="alle">Alle Monate</SelectItem>
+                      {MONATE_DE.map((m, i) => {
+                        const v = String(i + 1).padStart(2, "0");
+                        return (
+                          <SelectItem key={v} value={v}>
+                            {m}
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </>
+            )}
+
+            <div className="px-3 pb-2 pt-3">
+              <Button
+                type="button"
+                className="h-11 w-full rounded-xl"
+                onClick={() => setSheetOpen(false)}
+              >
+                Anwenden
+              </Button>
+            </div>
           </div>
         </SheetContent>
       </Sheet>
