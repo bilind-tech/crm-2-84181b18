@@ -9,6 +9,10 @@ function defaultUrl(): string {
   // Build-Env hat Vorrang, falls explizit gesetzt
   const fromEnv = (import.meta.env.VITE_API_BASE_URL ?? "").toString().trim();
   if (fromEnv) return fromEnv.replace(/\/$/, "");
+  // Production-Build (vom Pi-Backend ausgeliefert): API liegt am gleichen Origin.
+  if (typeof window !== "undefined" && import.meta.env.PROD) {
+    return window.location.origin.replace(/\/$/, "");
+  }
   return "http://localhost:8787";
 }
 
