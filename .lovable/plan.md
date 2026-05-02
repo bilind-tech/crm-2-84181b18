@@ -1,209 +1,102 @@
-# Step 13 — Mahn-Automatik & Steuern-Store ans Backend
 
-Nach Step 12 sind alle großen Daten-Bereiche (Belege, Dokumente, Email, Drive, Backups, System) auf dem Pi. **Zwei Lücken bleiben:**
+# Step 14 — Frontend-Cleanup Mahnwesen
 
-1. **Mahnwesen läuft nur „auf Knopfdruck"** — `MahnSektion` zeigt zwar die nächste empfohlene Stufe, aber niemand drückt auf Pi-Seite den Knopf. Sobald der Pi 24/7 läuft, soll Mahnung **automatisch** rausgehen (oder zumindest als Vorschlag in der Benachrichtigung landen).
-2. **Steuer-Termine + Konfiguration leben noch in `localStorage`** (`src/lib/steuern/store.ts`) — gerätegebunden, nicht synchron, kein Backup. Muss in SQLite.
+Backend-Mahn-Automatik aus Step 13 läuft, aber Frontend rechnet weiter alles
+selbst (`bestimmeMahnZustand` clientseitig pro Rechnung) und sendet Mahnungen
+über den alten Direkt-Email-Pfad statt über die neue Backend-Route. Step 14
+zieht das gerade.
 
-Step 13 schließt beides ab.
+## Ziele
 
----
+1. **Single Source of Truth = Backend.** Frontend zeigt Backend-Berechnung an, rechnet nur noch für reine UI-Hilfen (z.B. „in 3 Tagen empfohlen").
+2. **Manueller Versand geht über `POST /rechnungen/:id/mahnung-versenden`** — Email-Worker übernimmt, Mahnungs-Eintrag wird transaktional gesetzt.
+3. **Sichtbare Lauf-Historie** im Mahnwesen-Tab und Drill-Down.
+4. **Dashboard-Aufgaben** ziehen Mahnvorschläge aus `/mahnung/status`.
 
-## Teil A — Mahn-Automatik im Backend
+## Umfang
 
-### Datenmodell — Migration `014_mahn_automatik.sql`
+### A — Frontend-Regeln zu Anzeige-Helfern degradieren
 
-```sql
-CREATE TABLE mahn_laeufe (
-  id TEXT PRIMARY KEY,
-  gestartet_am TEXT NOT NULL DEFAULT (datetime('now')),
-  beendet_am TEXT,
-  geprueft INTEGER NOT NULL DEFAULT 0,    -- Anzahl Rechnungen
-  vorschlaege INTEGER NOT NULL DEFAULT 0, -- nur als Hinweis erzeugt
-  versendet INTEGER NOT NULL DEFAULT 0,   -- automatisch verschickt
-  fehler INTEGER NOT NULL DEFAULT 0,
-  ausgeloest_durch TEXT NOT NULL CHECK (ausgeloest_durch IN ('cron','manuell'))
-);
+`src/lib/mahnung/regeln.ts`:
+- `bestimmeMahnZustand` bleibt als Fallback / Live-Vorschau (Detailseite vor erstem Backend-Refresh), wird aber nicht mehr für Aktionsentscheidungen genutzt.
+- Neue Helper: `formatEmpfehlung(zustand)`, `dringlichkeitsToken(zustand)` — pure Display-Mapping.
+- JSDoc-Hinweis: „Kanonische Werte liefert `/mahnung/status`."
 
-CREATE TABLE mahn_lauf_eintraege (
-  id TEXT PRIMARY KEY,
-  lauf_id TEXT NOT NULL REFERENCES mahn_laeufe(id) ON DELETE CASCADE,
-  rechnung_id TEXT NOT NULL,
-  stufe INTEGER NOT NULL,
-  aktion TEXT NOT NULL CHECK (aktion IN ('vorschlag','versendet','uebersprungen','fehler')),
-  grund TEXT,
-  email_versand_id TEXT,
-  erstellt_am TEXT NOT NULL DEFAULT (datetime('now'))
-);
-CREATE INDEX idx_mahnlauf_rechnung ON mahn_lauf_eintraege(rechnung_id);
-```
+### B — Hooks erweitern
 
-Plus Erweiterung der bestehenden `MahnEinstellungen` (settings-Tabelle, Key `mahnung`):
+`src/hooks/useApi.ts`:
+- `useMahnungVersenden(rechnungId)` → `POST /rechnungen/:id/mahnung-versenden { stufe }`. Invalidiert `qk.rechnung(id)`, `qk.rechnungen()`, `qk.email.versand()`, `["mahnung","status"]`, `["mahnung","laeufe"]`.
+- `useMahnLauf(id)` für Drill-Down.
+- QueryKeys: `qk.mahnung = { status, laeufe, lauf(id) }`.
 
-```ts
-{
-  // bisher:
-  autoVorschlagAktiv: boolean,
-  stufen: MahnStufeConfig[],
-  // NEU:
-  modus: "aus" | "vorschlag" | "auto",        // auto = direkt versenden
-  cronZeit: string,                            // "08:30" Pi-Zeit
-  nurAnWerktagen: boolean,                     // Mo–Fr
-  pauseNachStufe1Tage: number,                 // Mindestabstand zwischen autoversendeten Stufen
-  benachrichtigungBeiVorschlag: boolean,       // Push-Notification + SSE
-  benachrichtigungBeiAutoversand: boolean,
-}
-```
+### C — `MahnSektion` umbauen
 
-Default-Migration: bestehende User → `modus: "vorschlag"` (kein Überraschungs-Versand).
+- Versand-Pfad: statt `EmailVersandDialog` → kleiner Confirm-Dialog („Mahnung Stufe N senden? E-Mail wird vom Backend versendet."). Bei OK → `useMahnungVersenden`.
+- `EmailVersandDialog` bleibt nur als Eskalations-Option („Mit eigener Vorlage senden …" Link → öffnet weiterhin den freien Editor + ruft alten Pfad).
+- Status-/Empfehlungsanzeige liest primär aus neuem Hook `useRechnungMahnState(id)` (dünner Wrapper, der Backend-Berechnung über Rechnungs-Detail oder `/mahnung/status` mappt). Fallback: lokale `bestimmeMahnZustand`.
 
-### Logik — `backend/src/mahnung/`
+### D — `MahnwesenTab` erweitern: Lauf-Historie
 
-| Datei | Zweck |
-|---|---|
-| `regeln.ts` | 1:1-Port von `src/lib/mahnung/regeln.ts` (Frontend-Datei wird zur Anzeigelogik degradiert oder importiert via `useApi`-Hook ein Result vom Backend). |
-| `repo.ts` | `mahn_laeufe` + `mahn_lauf_eintraege` CRUD; `letzterLaufFuer(rechnungId)`. |
-| `automatik.ts` | Hauptjob: lädt offene Rechnungen, ruft `bestimmeMahnZustand`, entscheidet je `modus`. Bei `auto`: erzeugt `EmailVersand`-Eintrag (existierender Worker übernimmt Versand) + neuen `mahnungen[]`-Eintrag in der Rechnung + `aktivitaet`-Log + SSE `mahnung:erstellt`. Bei `vorschlag`: nur Benachrichtigung. |
-| `cron.ts` | `node-cron`-Schedule, Zeit aus Settings, Werktagsfilter. Defensive: `if (running) return`. |
+Neue Karte „Letzte Läufe" (unter `AutomatikKarte`):
+- Liste der letzten 10 Läufe aus `useMahnLaeufe()`: Datum, Auslöser (cron/manuell), geprüft / vorschlaege / versendet / fehler, kleines Badge bei Fehlern.
+- Klick → Sheet/Dialog mit `useMahnLauf(id)` → Tabelle der Einträge (Rechnungs-Nr, Stufe, Aktion, Grund). Rechnungs-Nr = Link zu `/rechnungen/$id`.
+- Empty-State: „Noch keine Läufe."
 
-### Routen — `backend/src/routes/mahnung.ts`
+### E — `NaechsteSchritteCard` ans Backend anschließen
 
-| Method | Pfad | Zweck |
-|---|---|---|
-| GET | `/mahnung/status` | nächster Cron-Lauf, letzter Lauf, aktuelle Vorschläge |
-| GET | `/mahnung/laeufe` | Liste der letzten 30 Läufe |
-| GET | `/mahnung/laeufe/:id` | Detail mit Einträgen |
-| POST | `/mahnung/jetzt-pruefen` | Lauf manuell triggern (mit `modus`-Override für Dry-Run) |
-| POST | `/rechnungen/:id/mahnung-versenden` | Stufe X manuell senden (ersetzt heutigen Frontend-Pfad — Email-Worker macht den Rest) |
+`src/lib/dashboard/naechsteSchritte.ts`:
+- Funktion `berechneMahnSchritte` rausziehen.
+- Neue Implementierung in `NaechsteSchritteCard`: ruft `useMahnStatus()`, mappt `letzterLauf.eintraege` mit `aktion === "vorschlag"` zu `NaechsterSchritt`-Items (Typ `mahnung_senden`).
+- Übrige Schritt-Typen (Angebot nachfassen, Rechnung erstellen, Versenden) bleiben unverändert clientseitig.
+- `mahnung_senden`-CTA navigiert weiter zu Rechnung (oder direkt versenden via Hook — bewusst Navigate, damit Stufe sichtbar bestätigt wird).
 
-Letzteres ist die Backend-Variante des heutigen `MahnSektion → EmailVersandDialog`-Flows: Frontend baut Email zusammen, Backend speichert Versand + erzeugt sofort den `mahnungen`-Eintrag in der Rechnung (Stufe + Frist) **transaktional**.
+### F — Live-Events
 
-### Cron-Integration
+`src/hooks/useLiveEvents.ts`:
+- Neue Events `mahnung:lauf-fertig`, `mahnung:vorschlag` → invalidieren `qk.mahnung.status`, `qk.mahnung.laeufe`, betroffene `qk.rechnung()`.
+- Dezenter Toast bei `lauf-fertig` mit `auto`-Modus: „N Mahnungen versendet".
 
-`backend/src/server.ts` startet den neuen Scheduler analog zu `startFristenScheduler`. Beim Speichern der Settings (`PUT /einstellungen/mahnung`) wird der Cron neu registriert (`reloadMahnCron(zeit, werktagsFilter)`).
+### G — `useMahnZaehler` & andere Aufrufer
 
----
+`src/hooks/useMahnZaehler.ts`: jetzt aus `useMahnStatus().letzterLauf.vorschlaege` lesen (Fallback: 0). Keine Client-Berechnung mehr.
 
-## Teil B — Frontend-Anpassung Mahnwesen
+Alle verbleibenden direkten `bestimmeMahnZustand`-Aufrufer (Listen-Routes `rechnungen.tsx`, `angebote.$id.tsx`) prüfen — wo möglich durch Backend-Daten/Status-Felder ersetzen, sonst als Fallback belassen mit JSDoc-Kommentar.
 
-- **`src/lib/mahnung/regeln.ts`**: bleibt als reine Anzeige-Hilfsfunktion (zeigt im UI „Empfehlung Stufe 2 in 3 Tagen"), nutzt aber Backend-Daten für Historie.
-- **`src/components/mahnung/MahnwesenTab.tsx`**: neuer Bereich „Automatik-Status"
-  - aktueller Modus, nächster Cron-Lauf, letzter Lauf-Bericht
-  - Toggle Modus aus/vorschlag/auto, Zeit-Picker, Werktagsfilter
-  - „Jetzt prüfen"-Button → `POST /mahnung/jetzt-pruefen`
-  - Liste „Letzte 5 Läufe" mit Drill-Down
-- **`src/components/dashboard/NaechsteSchritteCard.tsx`**: zieht Mahnvorschläge aus `/mahnung/status` statt clientseitig zu rechnen.
-- **`src/components/mahnung/MahnSektion.tsx`**: „Senden"-Button ruft jetzt `POST /rechnungen/:id/mahnung-versenden` (Email-Worker übernimmt) statt direktem `EmailVersandDialog`-Submit.
-- **`src/lib/api/types.ts`**: neue Types `MahnLauf`, `MahnLaufEintrag`, erweiterte `MahnEinstellungen`.
-- **`src/hooks/useApi.ts`**: `useMahnStatus`, `useMahnLaeufe`, `useMahnJetztPruefen`, `useMahnungVersenden`.
-- **`src/hooks/useLiveEvents.ts`**: SSE `mahnung:lauf-fertig`, `mahnung:vorschlag` → Query-Invalidations + Toast.
+### H — Aufräumen
 
----
+- `src/lib/dashboard/naechsteSchritte.ts`: Mahn-Logik entfernen, verbleibender Code dokumentiert „Backend-only für Mahnungen".
+- Tote Imports raus.
 
-## Teil C — Steuern-Store ans Backend
+## Was NICHT in Step 14
 
-### Migration `015_steuern_store.sql`
+- Backend-Änderungen (Step 13 fertig).
+- Inkasso-Workflow-Erweiterung.
+- Eigene Mahn-Mail-Vorschau im UI vor Versand.
 
-```sql
-CREATE TABLE steuer_termine (
-  id TEXT PRIMARY KEY,
-  art TEXT NOT NULL,                -- 'umsatzsteuer'|'koerperschaftsteuer'|'gewerbesteuer'|'sonstige'
-  zeitraum TEXT NOT NULL,           -- 'YYYY-MM' oder 'YYYY-Qn' oder 'YYYY'
-  faellig_am TEXT NOT NULL,
-  betrag_eur REAL,
-  bezahlt_am TEXT,
-  notiz TEXT,
-  bezeichnung TEXT,                 -- für 'sonstige' (Mietsteuer, Lohnsteuer manuell etc.)
-  erstellt_am TEXT NOT NULL DEFAULT (datetime('now')),
-  geaendert_am TEXT NOT NULL DEFAULT (datetime('now'))
-);
-CREATE INDEX idx_steuer_termine_faellig ON steuer_termine(faellig_am) WHERE bezahlt_am IS NULL;
+## Akzeptanzkriterien
 
-CREATE TABLE steuer_ruecklagen (
-  id TEXT PRIMARY KEY,
-  monat TEXT NOT NULL UNIQUE,       -- 'YYYY-MM'
-  gewinn_eur REAL NOT NULL,
-  zurueckgelegt_eur REAL NOT NULL,
-  notiz TEXT,
-  erstellt_am TEXT NOT NULL DEFAULT (datetime('now'))
-);
-```
+1. Im `/einstellungen` → Mahnwesen-Tab erscheint unter „Automatik" eine Lauf-Historie. Klick öffnet Drill-Down mit Einträgen.
+2. „Mahnung senden"-Button auf Rechnungs-Detailseite zeigt Mini-Confirm und erzeugt nach Klick: neuen `mahnungen[]`-Eintrag, Email-Versand-Eintrag, ohne dass der Email-Editor geöffnet werden muss.
+3. „Mit eigener Vorlage senden …" weiterhin verfügbar (Power-User-Pfad).
+4. Dashboard „Nächste Schritte" zeigt Mahnvorschläge identisch zum Backend-Lauf — kein Drift mehr zwischen Cockpit und Mahn-Cron.
+5. SSE-Event `mahnung:lauf-fertig` triggert Refresh ohne manuelle Reload.
+6. Keine Regression: `useMahnEinstellungen`, Pausieren, Inkasso, Stufen-Config funktionieren wie bisher.
 
-Settings-Key `steuern.config` (Hebesatz, Standard-Rücklage-%, Disclaimer-Bestätigt, Firmenstammsitz) bekommt eine Default-Initialisierung beim ersten Start (Sankt Augustin GmbH-Werte aus dem Memory).
-
-### Backend — `backend/src/steuern/`
-
-`repo.ts`, `mappers.ts`, `validation.ts` (Skelett existiert) werden ausgebaut um:
-- Termine-CRUD
-- Rücklagen-CRUD
-- Berechnungs-Endpoint `POST /steuern/berechne` (1:1-Port von `src/lib/steuern/berechnung.ts`) — lokale Frontend-Datei bleibt für Live-Vorschau, Backend liefert die kanonische Berechnung.
-
-### Routen — `backend/src/routes/steuern.ts`
-
-| Method | Pfad | Zweck |
-|---|---|---|
-| GET | `/steuern/termine?jahr=` | Liste |
-| POST | `/steuern/termine` | neuen Termin |
-| PATCH | `/steuern/termine/:id` | bezahlt-Marker, Notiz |
-| DELETE | `/steuern/termine/:id` | löschen |
-| GET | `/steuern/ruecklagen?von=&bis=` | Liste |
-| POST | `/steuern/ruecklagen` | upsert per Monat |
-| POST | `/steuern/berechne` | Schätzung für gegebenen Gewinn |
-| POST | `/steuern/termine/auto-anlegen` | erzeugt USt-Voranmeldungen für Folgejahr (Idempotent) |
-
-### Fristen-Cron Erweiterung
-
-Existierender Dokument-Fristen-Cron prüft zusätzlich `steuer_termine.faellig_am` und erzeugt die gleichen „heute / 7 Tage / überfällig"-Benachrichtigungen.
-
-### Frontend
-
-- **`src/lib/steuern/store.ts`**: localStorage-Pfade entfernt, alle Funktionen zu Hooks (`useSteuerTermine`, `useSteuerRuecklagen`, `useSteuerConfig`).
-- **One-Time-Migration** beim ersten Mount der `/steuern`-Route: liest verbleibende localStorage-Daten und postet sie in die neuen Endpoints, setzt Marker `mcc_steuern_migrated_v2`.
-- **`src/routes/steuern.tsx`** + Komponenten in `src/components/steuern/*` rufen die neuen Hooks.
-- **`src/lib/steuern/berechnung.ts`**: bleibt für Live-Vorschau; bei „Speichern" wird Backend-Endpoint genutzt.
-
----
-
-## Teil D — Tests
-
-- `backend/test/mahn-automatik.spec.ts` — Modus aus/vorschlag/auto, Werktagsfilter, Pause-Erkennung, Inkasso-Schwelle, Lauf-Idempotenz (zweiter Cron im selben Slot tut nichts).
-- `backend/test/mahn-routen.spec.ts` — Auth-Pflicht, Versand-Endpoint erzeugt Mahnungs-Eintrag + Email-Versand transaktional, Settings-Reload re-registriert Cron.
-- `backend/test/steuern-termine.spec.ts` — CRUD, Filter, Auto-Anlegen Idempotenz, Fristen-Cron-Trigger.
-- `backend/test/steuern-berechnung.spec.ts` — fixe Eingaben → erwartete USt/KSt/Soli/GewSt-Werte (Sankt-Augustin-Hebesatz 525 %, GmbH-Effektivsatz 34,2 %).
-
-Ziel: alle 4 grün, Gesamtzahl Backend-Tests ≥ 110.
-
----
-
-## Was bewusst NICHT in diesem Step ist
-
-- Lohnsteuer-Voranmeldung — Mitarbeiter-Modul ist out-of-scope MVP.
-- Mehrjahres-Steuerbescheid-Import (PDF-Parsing) — separater Step.
-- Mahnung Stufe 4 / Inkasso-Übergabe-Brief-Generator — bleibt manuell.
-
----
-
-## Geänderte / neue Dateien (Übersicht)
-
-**Neu:**
-- `backend/src/db/migrations/014_mahn_automatik.sql`, `015_steuern_store.sql`
-- `backend/src/mahnung/{regeln,repo,automatik,cron}.ts`
-- `backend/src/routes/mahnung.ts`
-- `backend/src/steuern/{termine-repo,ruecklagen-repo,berechnung,cron-erweiterung}.ts`
-- `backend/test/mahn-automatik.spec.ts`, `mahn-routen.spec.ts`, `steuern-termine.spec.ts`, `steuern-berechnung.spec.ts`
-- `mem/features/mahn-automatik.md`, `mem/features/steuern-backend.md`
+## Geänderte / neue Dateien
 
 **Editiert:**
-- `backend/src/server.ts` (Mahn-Cron + erweiterter Steuer-Termine-Cron)
-- `backend/src/routes/{steuern,einstellungen,belege}.ts` (Versand-Endpoint, Settings-Hot-Reload)
-- `backend/src/dokumente/fristen-cron.ts` (auch Steuertermine prüfen)
-- `src/lib/api/types.ts`, `src/hooks/useApi.ts`, `src/hooks/useLiveEvents.ts`
-- `src/lib/mahnung/regeln.ts` (Anzeige-only)
-- `src/lib/steuern/{store,berechnung}.ts` (Hooks statt localStorage)
-- `src/components/mahnung/{MahnwesenTab,MahnSektion}.tsx`
-- `src/components/dashboard/NaechsteSchritteCard.tsx`
-- `src/components/steuern/*` (auf Hooks umgestellt)
-- `src/routes/steuern.tsx`
-- `mem/index.md`
+- `src/hooks/useApi.ts` (neue Hooks + qk.mahnung)
+- `src/hooks/useLiveEvents.ts` (neue Events)
+- `src/hooks/useMahnZaehler.ts` (Backend-Quelle)
+- `src/lib/mahnung/regeln.ts` (Display-Helper, JSDoc)
+- `src/lib/dashboard/naechsteSchritte.ts` (Mahn-Pfad raus)
+- `src/components/mahnung/MahnSektion.tsx` (Confirm-Dialog + Backend-Versand)
+- `src/components/mahnung/MahnwesenTab.tsx` (Lauf-Historie-Karte + Drill-Down)
+- `src/components/dashboard/NaechsteSchritteCard.tsx` (Mahn-Pfad via `useMahnStatus`)
 
-**Sag „weiter", dann setze ich Step 13 um.**
+**Neu:**
+- `src/components/mahnung/MahnLaeufeListe.tsx`
+- `src/components/mahnung/MahnLaufDetailDialog.tsx`
+- `src/hooks/useRechnungMahnState.ts` (dünner Wrapper)
+
+**Sag „los Step 14", dann setze ich um.**
