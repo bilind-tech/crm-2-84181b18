@@ -153,6 +153,27 @@ export const useKundenZaehler = (id: string) =>
     enabled: !!id,
   });
 
+/**
+ * Live-Verfügbarkeitsprüfung für Kunden-Kürzel.
+ * Aktiviert sobald `kuerzel` mindestens 3 Zeichen hat. Mit `exceptId`
+ * wird der eigene Datensatz beim Bearbeiten ignoriert.
+ */
+export const useKuerzelFrei = (kuerzel: string, exceptId?: string) => {
+  const norm = (kuerzel ?? "").trim().toUpperCase();
+  return useQuery({
+    queryKey: ["kunden", "kuerzel-frei", norm, exceptId ?? "neu"],
+    queryFn: () => {
+      const params = new URLSearchParams({ kuerzel: norm });
+      if (exceptId) params.set("exceptId", exceptId);
+      return api.get<{ frei: boolean; kunde?: { id: string; nummer: string; name: string } }>(
+        `/kunden/kuerzel-frei?${params.toString()}`,
+      );
+    },
+    enabled: norm.length >= 3,
+    staleTime: 10_000,
+  });
+};
+
 export const useDeleteKunde = () => {
   const qc = useQueryClient();
   return useMutation({
