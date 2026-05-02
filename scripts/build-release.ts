@@ -26,9 +26,39 @@ import {
   writeFileSync,
 } from "node:fs";
 import { createHash } from "node:crypto";
+
 import path from "node:path";
 import os from "node:os";
-import { signManifest } from "../backend/src/system/manifest.js";
+import { createHmac } from "node:crypto";
+
+interface ManifestPayload {
+  appVersion: string;
+  schemaVersion: number;
+  createdAt: string;
+  minBackendVersion: string;
+  hinweise?: string;
+}
+
+/**
+ * Identische Signatur-Logik wie backend/src/system/manifest.ts → signManifest.
+ * Wenn die Backend-Logik sich ändert, muss diese Funktion mitgezogen werden.
+ * Test backend/test/release-bundle.spec.ts prüft Kompatibilität.
+ */
+function canonicalJson(obj: Record<string, unknown>): string {
+  const sorted: Record<string, unknown> = {};
+  Object.keys(obj)
+    .filter((k) => obj[k] !== undefined)
+    .sort()
+    .forEach((k) => (sorted[k] = obj[k]));
+  return JSON.stringify(sorted);
+}
+
+function signManifest(payload: ManifestPayload, key: Buffer): ManifestPayload & { signature: string } {
+  const sig = createHmac("sha256", key)
+    .update(canonicalJson({ ...payload, signature: undefined } as Record<string, unknown>))
+    .digest("hex");
+  return { ...payload, signature: sig };
+}
 
 interface Args {
   out: string;
