@@ -23,7 +23,9 @@ import {
 import { OptionenBlock, defaultOptionen, type OptionenState } from "./OptionenBlock";
 import { formatWiederkehrend } from "./DauerauftragKonfig";
 import { AnsprechpartnerPicker } from "./AnsprechpartnerPicker";
-import { Repeat } from "lucide-react";
+import { Repeat, Check } from "lucide-react";
+import { DateInput } from "@/components/ui/date-input";
+import { PrimaryAction } from "@/components/layout/PrimaryAction";
 
 interface Props {
   onClose: () => void;
@@ -178,13 +180,13 @@ export function RechnungForm({ onClose, defaultKundeId, defaultObjektId }: Props
 
       <div className="grid gap-4 sm:grid-cols-3">
         <Field label="Rechnungsdatum">
-          <Input type="date" value={rechnungsdatum} onChange={(e) => setRechnungsdatumAndFrist(e.target.value)} />
+          <DateInput value={rechnungsdatum} onChange={setRechnungsdatumAndFrist} />
         </Field>
         <Field label="Zahlungsfrist (Tage)">
-          <Input type="number" value={frist} onChange={(e) => setFristTage(Number(e.target.value) || 0)} />
+          <Input type="number" value={frist} onChange={(e) => setFristTage(Number(e.target.value) || 0)} className="h-12 text-base" />
         </Field>
         <Field label="Fällig am">
-          <Input type="date" value={faellig} onChange={(e) => setFaellig(e.target.value)} />
+          <DateInput value={faellig} onChange={setFaellig} />
         </Field>
       </div>
 
@@ -212,9 +214,12 @@ export function RechnungForm({ onClose, defaultKundeId, defaultObjektId }: Props
 
       <div className="sticky bottom-0 -mx-4 -mb-6 mt-2 flex flex-col-reverse items-stretch gap-2 border-t border-border bg-background px-4 py-3 sm:-mx-8 sm:px-8 sm:flex-row sm:items-center sm:justify-end ">
         <Button variant="outline" onClick={onClose}>Abbrechen</Button>
-        <Button disabled={create.isPending} onClick={submit} className="rounded-md px-6">
-          {create.isPending ? "Speichere…" : "Rechnung anlegen"}
-        </Button>
+        <PrimaryAction
+          icon={Check}
+          label={create.isPending ? "Speichere…" : "Rechnung anlegen"}
+          onClick={submit}
+          disabled={create.isPending}
+        />
       </div>
     </div>
   );

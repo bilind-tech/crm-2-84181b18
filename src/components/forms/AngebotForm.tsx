@@ -23,7 +23,9 @@ import {
 import { OptionenBlock, defaultOptionen, type OptionenState } from "./OptionenBlock";
 import { formatWiederkehrend } from "./DauerauftragKonfig";
 import { AnsprechpartnerPicker } from "./AnsprechpartnerPicker";
-import { Repeat } from "lucide-react";
+import { Repeat, Check } from "lucide-react";
+import { DateInput } from "@/components/ui/date-input";
+import { PrimaryAction } from "@/components/layout/PrimaryAction";
 
 interface Props {
   onClose: () => void;
@@ -182,7 +184,7 @@ export function AngebotForm({ onClose, defaultKundeId, defaultObjektId }: Props)
 
       <div>
         <Field label="Gültig bis">
-          <Input type="date" value={gueltigBis} onChange={(e) => setGueltigBis(e.target.value)} />
+          <DateInput value={gueltigBis} onChange={setGueltigBis} />
         </Field>
       </div>
       <div>
@@ -193,9 +195,12 @@ export function AngebotForm({ onClose, defaultKundeId, defaultObjektId }: Props)
 
       <div className="sticky bottom-0 -mx-4 -mb-6 mt-2 flex flex-col-reverse items-stretch gap-2 border-t border-border bg-background px-4 py-3 sm:-mx-8 sm:px-8 sm:flex-row sm:items-center sm:justify-end ">
         <Button variant="outline" onClick={onClose}>Abbrechen</Button>
-        <Button disabled={create.isPending} onClick={submit} className="rounded-md px-6">
-          {create.isPending ? "Speichere…" : "Angebot anlegen"}
-        </Button>
+        <PrimaryAction
+          icon={Check}
+          label={create.isPending ? "Speichere…" : "Angebot anlegen"}
+          onClick={submit}
+          disabled={create.isPending}
+        />
       </div>
     </div>
   );
