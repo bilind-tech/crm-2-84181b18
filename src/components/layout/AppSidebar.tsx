@@ -5,6 +5,7 @@ import {
   FileText,
   Receipt,
   FolderClosed,
+  Calculator,
   Settings,
   Lock,
 } from "lucide-react";
@@ -53,6 +54,7 @@ export function AppSidebar() {
     { title: "Angebote", url: "/angebote", icon: FileText },
     { title: "Rechnungen", url: "/rechnungen", icon: Receipt },
     { title: "Dokumente", url: "/dokumente", icon: FolderClosed },
+    { title: "Steuern", url: "/steuern", icon: Calculator },
   ];
   const system: NavItem[] = [
     { title: "Einstellungen", url: "/einstellungen", icon: Settings },
