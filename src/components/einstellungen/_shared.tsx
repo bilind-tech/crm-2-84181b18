@@ -6,17 +6,22 @@ import { Save as SaveIcon } from "lucide-react";
 export function Section({
   title,
   description,
+  action,
   children,
 }: {
   title: string;
   description?: string;
+  action?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
     <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
-      <div className="mb-5">
-        <h2 className="text-lg font-semibold">{title}</h2>
-        {description && <p className="text-sm text-muted-foreground">{description}</p>}
+      <div className="mb-5 flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold">{title}</h2>
+          {description && <p className="text-sm text-muted-foreground">{description}</p>}
+        </div>
+        {action}
       </div>
       {children}
     </div>
