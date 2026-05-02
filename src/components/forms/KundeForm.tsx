@@ -280,6 +280,7 @@ export function KundeForm({ onClose, onCreated }: Props) {
           <TabsTrigger value="adresse" className="shrink-0 rounded-full px-3 text-sm sm:px-5">Adresse</TabsTrigger>
           <TabsTrigger value="steuer" className="shrink-0 rounded-full px-3 text-sm sm:px-5">Steuer & Zahlung</TabsTrigger>
           <TabsTrigger value="notizen" className="shrink-0 rounded-full px-3 text-sm sm:px-5">Notizen</TabsTrigger>
+          <TabsTrigger value="dauerauftrag" className="shrink-0 rounded-full px-3 text-sm sm:px-5">Dauerauftrag</TabsTrigger>
         </TabsList>
 
         <TabsContent value="basis" className="mt-6 space-y-4">
@@ -325,19 +326,35 @@ export function KundeForm({ onClose, onCreated }: Props) {
                 maxLength={4}
                 className="font-mono uppercase tracking-wider"
               />
-              <div className="flex min-h-[1.25rem] items-center text-xs text-muted-foreground">
-                {vorschauNummer ? (
-                  <span
-                    key={vorschauNummer}
-                    className="animate-in fade-in slide-in-from-top-1 duration-200"
-                  >
+              <div className="min-h-[1.25rem] text-xs">
+                {kuerzelKonflikt ? (
+                  <span className="text-destructive">
+                    ✗ Bereits vergeben an {kuerzelKonflikt.nummer} • {kuerzelKonflikt.name}
+                  </span>
+                ) : f.kuerzel.length >= 3 && kuerzelFreiQ.isFetching ? (
+                  <span className="text-muted-foreground">Prüfe Verfügbarkeit…</span>
+                ) : f.kuerzel.length >= 3 && kuerzelFreiQ.data?.frei ? (
+                  <span className="text-emerald-600 dark:text-emerald-400">
+                    ✓ Kürzel frei{vorschauNummer && (
+                      <>
+                        {" • "}Vorschau:{" "}
+                        <span className="font-mono font-semibold text-foreground">
+                          {vorschauNummer}
+                        </span>
+                      </>
+                    )}
+                  </span>
+                ) : vorschauNummer ? (
+                  <span className="text-muted-foreground">
                     Vorschau:{" "}
                     <span className="font-mono font-semibold text-foreground">
                       {vorschauNummer}
                     </span>
                   </span>
                 ) : (
-                  <span>3–4 Zeichen. So beginnen alle Rechnungen & Angebote dieses Kunden.</span>
+                  <span className="text-muted-foreground">
+                    3–4 Zeichen. So beginnen alle Rechnungen & Angebote dieses Kunden.
+                  </span>
                 )}
               </div>
             </div>
@@ -428,12 +445,163 @@ export function KundeForm({ onClose, onCreated }: Props) {
             <Textarea rows={6} value={f.notizen} onChange={(e) => set("notizen", e.target.value)} placeholder="Interne Notizen zum Kunden…" />
           </Field>
         </TabsContent>
+
+        <TabsContent value="dauerauftrag" className="mt-6 space-y-4">
+          <button
+            type="button"
+            onClick={() => set("daAktiv", !f.daAktiv)}
+            className={cn(
+              "w-full rounded-xl border px-4 py-3 text-left transition",
+              f.daAktiv
+                ? "border-primary bg-primary/5"
+                : "border-border bg-background hover:bg-muted/50",
+            )}
+          >
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-semibold">
+                  Dauerauftrag für diesen Kunden anlegen
+                </div>
+                <div className="mt-0.5 text-xs text-muted-foreground">
+                  Erzeugt automatisch wiederkehrende Rechnungen nach gewähltem Rhythmus.
+                </div>
+              </div>
+              <div
+                className={cn(
+                  "h-5 w-9 shrink-0 rounded-full border transition",
+                  f.daAktiv ? "border-primary bg-primary" : "border-border bg-muted",
+                )}
+              >
+                <div
+                  className={cn(
+                    "mt-0.5 h-4 w-4 rounded-full bg-background shadow transition-transform",
+                    f.daAktiv ? "translate-x-4" : "translate-x-0.5",
+                  )}
+                />
+              </div>
+            </div>
+          </button>
+
+          {f.daAktiv && (
+            <div className="space-y-4 rounded-xl border border-border bg-muted/20 p-4">
+              <Field label="Bezeichnung *">
+                <Input
+                  value={f.daBezeichnung}
+                  onChange={(e) => set("daBezeichnung", e.target.value)}
+                  placeholder="z. B. Monatliche Unterhaltsreinigung"
+                />
+              </Field>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label="Frequenz">
+                  <Select
+                    value={f.daFrequenz}
+                    onValueChange={(v) => set("daFrequenz", v as DauerauftragFrequenz)}
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="monatlich">Monatlich</SelectItem>
+                      <SelectItem value="quartalsweise">Quartalsweise</SelectItem>
+                      <SelectItem value="halbjaehrlich">Halbjährlich</SelectItem>
+                      <SelectItem value="jaehrlich">Jährlich</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field label="Modus">
+                  <Select
+                    value={f.daModus}
+                    onValueChange={(v) => set("daModus", v as DauerauftragModus)}
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="entwurf">Entwurf (manuell freigeben)</SelectItem>
+                      <SelectItem value="vollautomatisch">Vollautomatisch (versenden)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </Field>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label="Stichtag">
+                  <Select
+                    value={f.daStichtagTyp}
+                    onValueChange={(v) => set("daStichtagTyp", v as "monatstag" | "monatsletzter")}
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="monatstag">Bestimmter Monatstag</SelectItem>
+                      <SelectItem value="monatsletzter">Letzter des Monats</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </Field>
+                {f.daStichtagTyp === "monatstag" && (
+                  <Field label="Tag (1–28)">
+                    <Input
+                      type="number"
+                      inputMode="numeric"
+                      min={1}
+                      max={28}
+                      value={f.daStichtagWert}
+                      onChange={(e) => set("daStichtagWert", Math.min(28, Math.max(1, Number(e.target.value) || 1)))}
+                      className="w-24 font-mono"
+                    />
+                  </Field>
+                )}
+              </div>
+              <Field label="Laufzeit-Beginn">
+                <Input
+                  type="date"
+                  value={f.daLaufzeitVon}
+                  onChange={(e) => set("daLaufzeitVon", e.target.value)}
+                  className="w-48"
+                />
+              </Field>
+
+              <div className="rounded-lg border border-dashed border-border bg-background/60 p-3">
+                <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Erste Position (optional)
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Kannst du auch später am Dauerauftrag ergänzen.
+                </p>
+                <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_5rem_8rem]">
+                  <Field label="Beschreibung">
+                    <Input
+                      value={f.daPosBezeichnung}
+                      onChange={(e) => set("daPosBezeichnung", e.target.value)}
+                      placeholder="z. B. Unterhaltsreinigung pauschal"
+                    />
+                  </Field>
+                  <Field label="Menge">
+                    <Input
+                      type="number"
+                      inputMode="decimal"
+                      value={f.daPosMenge}
+                      onChange={(e) => set("daPosMenge", Number(e.target.value) || 0)}
+                    />
+                  </Field>
+                  <Field label="Einzelpreis netto (€)">
+                    <Input
+                      type="number"
+                      inputMode="decimal"
+                      step="0.01"
+                      value={f.daPosEinzelpreis}
+                      onChange={(e) => set("daPosEinzelpreis", Number(e.target.value) || 0)}
+                    />
+                  </Field>
+                </div>
+              </div>
+            </div>
+          )}
+        </TabsContent>
       </Tabs>
 
       <div className="sticky bottom-0 -mx-4 -mb-5 mt-2 flex flex-col-reverse items-stretch gap-2 border-t border-border bg-background px-4 py-3 sm:-mx-8 sm:-mb-6 sm:px-8 sm:flex-row sm:items-center sm:justify-end ">
         <Button variant="outline" onClick={onClose}>Abbrechen</Button>
-        <Button disabled={create.isPending} onClick={submit} className="rounded-md px-6">
-          {create.isPending ? "Speichere…" : "Kunde anlegen"}
+        <Button
+          disabled={create.isPending || createDA.isPending || !!kuerzelKonflikt}
+          onClick={submit}
+          className="rounded-md px-6"
+        >
+          {create.isPending || createDA.isPending ? "Speichere…" : "Kunde anlegen"}
         </Button>
       </div>
     </div>
