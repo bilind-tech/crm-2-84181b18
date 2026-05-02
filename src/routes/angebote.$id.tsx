@@ -23,9 +23,16 @@ import { formatEUR, formatDate } from "@/lib/format";
 import { summenRechnung } from "@/lib/mock/backend";
 import { DauerauftragVerwaltungCard } from "@/components/dauerauftrag/DauerauftragVerwaltungCard";
 import { toast } from "sonner";
-import { useNavigate, Link } from "@tanstack/react-router";
+import { useNavigate, Link, Outlet, useMatches } from "@tanstack/react-router";
 
-export const Route = createFileRoute("/angebote/$id")({ component: Page });
+export const Route = createFileRoute("/angebote/$id")({ component: RouteShell });
+
+function RouteShell() {
+  const matches = useMatches();
+  const isChild = matches.some((m) => m.routeId === "/angebote/$id/bearbeiten");
+  if (isChild) return <Outlet />;
+  return <Page />;
+}
 
 function Page() {
   const navigate = useNavigate();
