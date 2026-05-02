@@ -264,14 +264,32 @@ export async function dokumenteRoutes(app: FastifyInstance): Promise<void> {
   // ---------- Upload-Sessions: Token-only ----------
   app.get<{ Params: { token: string } }>(
     "/upload-sessions/:token",
-    { config: { rateLimit: { max: 30, timeWindow: "1 minute" } } },
+    { config: { rateLimit: { max: 60, timeWindow: "1 minute" } } },
     async (req, reply) => {
       const s = getSessionByToken(req.params.token);
       if (!s) return reply.code(404).send({ error: "not-found" });
+      const dateien = s.dokumentIds
+        .map((id) => getDokument(id))
+        .filter((d): d is NonNullable<ReturnType<typeof getDokument>> => !!d);
       return {
+        id: s.id,
         token: s.token, kundeId: s.kundeId, objektId: s.objektId,
+        erstelltAm: s.erstelltAm,
         ablaufAm: s.ablaufAm, beendet: s.beendet, dokumentIds: s.dokumentIds,
+        dateien,
       };
+    },
+  );
+
+  // Beenden-Alias über Token (Frontend kennt nur den Token).
+  app.post<{ Params: { token: string } }>(
+    "/upload-sessions/:token/beenden",
+    { config: { rateLimit: { max: 30, timeWindow: "1 minute" } } },
+    async (req, reply) => {
+      const sess = getSessionByToken(req.params.token);
+      if (!sess) return reply.code(404).send({ error: "not-found" });
+      endSession(sess.id);
+      return reply.code(204).send();
     },
   );
 
