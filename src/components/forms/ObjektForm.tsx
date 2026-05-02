@@ -18,9 +18,11 @@ import type { Reinigungsfrequenz, ObjektTyp } from "@/lib/api/types";
 interface Props {
   onClose: () => void;
   defaultKundeId?: string;
+  /** Kompakte Schnell-Anlage: nur Bezeichnung. Wird im Kunden-Detail genutzt. */
+  kompakt?: boolean;
 }
 
-export function ObjektForm({ onClose, defaultKundeId }: Props) {
+export function ObjektForm({ onClose, defaultKundeId, kompakt }: Props) {
   const { data: kunden = [] } = useKunden();
   const create = useCreateObjekt();
   const navigate = useNavigate();
@@ -34,6 +36,8 @@ export function ObjektForm({ onClose, defaultKundeId }: Props) {
   const [frequenz, setFrequenz] = useState<Reinigungsfrequenz>("woechentlich");
   const [zugang, setZugang] = useState("");
 
+  const isKompakt = kompakt ?? false;
+
   async function submit() {
     if (!kundeId) {
       toast.error("Bitte Kunde wählen");
@@ -43,22 +47,57 @@ export function ObjektForm({ onClose, defaultKundeId }: Props) {
       toast.error("Name ist erforderlich");
       return;
     }
-    const o = await create.mutateAsync({
-      kundeId,
-      name,
-      typ,
-      strasse,
-      plz,
-      ort,
-      qmZuReinigen: typeof qmZuReinigen === "number" ? qmZuReinigen : undefined,
-      frequenz,
-      reinigungstage: [],
-      zugangsinfo: zugang || undefined,
-      status: "aktiv",
-    });
+    const o = await create.mutateAsync(
+      isKompakt
+        ? {
+            kundeId,
+            name,
+            typ: "buero",
+            frequenz: "auf_abruf",
+            reinigungstage: [],
+            status: "aktiv",
+          }
+        : {
+            kundeId,
+            name,
+            typ,
+            strasse,
+            plz,
+            ort,
+            qmZuReinigen: typeof qmZuReinigen === "number" ? qmZuReinigen : undefined,
+            frequenz,
+            reinigungstage: [],
+            zugangsinfo: zugang || undefined,
+            status: "aktiv",
+          }
+    );
     toast.success("Objekt angelegt", { description: `${o.nummer} • erfolgreich gespeichert.` });
     onClose();
     navigate({ to: "/objekte/$id", params: { id: o.id } });
+  }
+
+  if (isKompakt) {
+    return (
+      <div className="space-y-4">
+        <Field label="Bezeichnung *">
+          <Input
+            autoFocus
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="z. B. Bürogebäude Hauptsitz"
+          />
+        </Field>
+        <p className="text-xs text-muted-foreground">
+          Adresse, Frequenz und weitere Details kannst du später auf der Objekt-Detailseite ergänzen.
+        </p>
+        <div className="sticky bottom-0 -mx-4 -mb-6 mt-2 flex flex-col-reverse items-stretch gap-2 border-t border-border bg-background px-4 py-3 sm:-mx-8 sm:px-8 sm:flex-row sm:items-center sm:justify-end">
+          <Button variant="outline" onClick={onClose}>Abbrechen</Button>
+          <Button disabled={create.isPending} onClick={submit} className="rounded-md px-6">
+            {create.isPending ? "Speichere…" : "Objekt anlegen"}
+          </Button>
+        </div>
+      </div>
+    );
   }
 
   return (
