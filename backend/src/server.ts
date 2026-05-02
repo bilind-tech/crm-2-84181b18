@@ -14,7 +14,9 @@ import { einstellungenRoutes } from "./routes/einstellungen.js";
 import { backupRoutes } from "./routes/backup.js";
 import { stammdatenRoutes } from "./routes/stammdaten.js";
 import { belegeRoutes } from "./routes/belege.js";
+import { belegePdfRoutes } from "./routes/belege-pdf.js";
 import { startBelegeScheduler } from "./belege/scheduler.js";
+import { wirePdfCacheInvalidation } from "./pdf/wireup.js";
 import { purgeExpiredSessions, warmTouchCacheFromDb } from "./auth/sessions.js";
 import { purgeOldAuditEntries } from "./auth/audit.js";
 import { purgeOldLockouts } from "./auth/lockout.js";
@@ -115,6 +117,10 @@ async function main(): Promise<void> {
   await app.register(backupRoutes);
   await app.register(stammdatenRoutes);
   await app.register(belegeRoutes);
+  await app.register(belegePdfRoutes);
+
+  // PDF-Cache an Belege-Mutationen koppeln
+  wirePdfCacheInvalidation();
 
   // Touch-Throttle aus DB warmladen → kein Update-Sturm nach Restart
   const warmed = warmTouchCacheFromDb();
