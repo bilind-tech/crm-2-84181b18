@@ -1,5 +1,6 @@
 // Dashboard-Karte: priorisierte Aktionsliste mit Ein-Klick-CTAs.
-// Öffnet je nach Aufgabentyp einen Email-Dialog inline oder navigiert.
+// Mahn-Vorschläge stammen aus dem letzten Backend-Lauf (/mahnung/status +
+// /mahnung/laeufe/:id), übrige Schritte werden clientseitig berechnet.
 
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
@@ -17,6 +18,8 @@ import {
   useKunden,
   useKunde,
   useAngebotInRechnung,
+  useMahnStatus,
+  useMahnLauf,
 } from "@/hooks/useApi";
 import { useAngebotPdf, useRechnungPdf } from "@/hooks/useBelegPdf";
 import { EmailVersandDialog } from "@/components/email/EmailVersandDialog";
@@ -25,19 +28,58 @@ import {
   type NaechsterSchritt,
 } from "@/lib/dashboard/naechsteSchritte";
 import { toast } from "sonner";
-import type { Angebot, Rechnung } from "@/lib/api/types";
+import type { Angebot, Kunde, Rechnung } from "@/lib/api/types";
 
 const MAX_SICHTBAR = 5;
+
+function kundeName(k?: Kunde): string {
+  if (!k) return "Unbekannter Kunde";
+  if (k.firmenname) return k.firmenname;
+  const n = [k.vorname, k.nachname].filter(Boolean).join(" ");
+  return n || k.nummer || "Unbekannter Kunde";
+}
 
 export function NaechsteSchritteCard() {
   const { data: angebote = [] } = useAngebote();
   const { data: rechnungen = [] } = useRechnungen();
   const { data: kunden = [] } = useKunden();
+  const { data: status } = useMahnStatus();
+  const { data: lauf } = useMahnLauf(status?.letzterLauf?.id ?? null);
 
-  const schritte = useMemo(
-    () => berechneNaechsteSchritte(angebote, rechnungen, kunden),
-    [angebote, rechnungen, kunden],
-  );
+  const schritte = useMemo(() => {
+    // Nicht-Mahn-Schritte clientseitig
+    const nichtMahn = berechneNaechsteSchritte(angebote, rechnungen, kunden).filter(
+      (s) => s.typ !== "mahnung_senden",
+    );
+
+    // Mahn-Schritte aus Backend-Lauf (Vorschläge + auto-Versendete = Aktion-Indikator)
+    const kundeMap = new Map(kunden.map((k) => [k.id, k]));
+    const rechnungMap = new Map(rechnungen.map((r) => [r.id, r]));
+    const mahnSchritte: NaechsterSchritt[] = [];
+    if (lauf) {
+      for (const e of lauf.eintraege) {
+        if (e.aktion !== "vorschlag") continue;
+        const r = rechnungMap.get(e.rechnungId);
+        if (!r) continue;
+        const k = kundeMap.get(r.kundeId);
+        mahnSchritte.push({
+          id: `mahnung-${e.rechnungId}`,
+          typ: "mahnung_senden",
+          prioritaet: 95 + e.stufe * 5,
+          kundeId: r.kundeId,
+          kundeName: kundeName(k),
+          belegNummer: e.rechnungNr ?? r.nummer,
+          belegId: e.rechnungId,
+          ueberschrift: `Mahnung an ${kundeName(k)}`,
+          detail: `${e.rechnungNr ?? r.nummer} — Backend empfiehlt Stufe ${e.stufe}.`,
+          ctaLabel: "Mahnung öffnen",
+        });
+      }
+    }
+
+    return [...mahnSchritte, ...nichtMahn].sort((a, b) => b.prioritaet - a.prioritaet);
+  }, [angebote, rechnungen, kunden, lauf]);
+
   const sichtbar = schritte.slice(0, MAX_SICHTBAR);
 
   const [emailRechnung, setEmailRechnung] = useState<Rechnung | null>(null);
@@ -206,3 +248,5 @@ function RechnungEmailLauncher({
     />
   );
 }
+// useAngebotPdf bleibt importiert für mögliche Erweiterungen — derzeit nur RechnungPdf verwendet.
+void useAngebotPdf;
