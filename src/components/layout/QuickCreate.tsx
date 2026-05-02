@@ -1,5 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
-import { Building2, FileText, FolderClosed, Receipt, Users } from "lucide-react";
+import { FileText, FolderClosed, Receipt, Users } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -15,13 +15,6 @@ const ITEMS = [
     icon: Users,
     desc: "Neuen Kunden anlegen",
     tint: "bg-sky-500/10 text-sky-600 dark:text-sky-400",
-  },
-  {
-    label: "Objekt",
-    route: "/objekte/neu",
-    icon: Building2,
-    desc: "Neues Objekt anlegen",
-    tint: "bg-violet-500/10 text-violet-600 dark:text-violet-400",
   },
   {
     label: "Angebot",
