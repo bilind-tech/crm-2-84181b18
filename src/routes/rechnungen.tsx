@@ -258,7 +258,7 @@ function Page() {
                   {r.status !== "bezahlt" && r.status !== "storniert" && (
                     <button
                       onClick={(e) => { e.stopPropagation(); e.preventDefault(); setZahlungFuer(r); }}
-                      className="inline-flex h-9 items-center gap-1.5 rounded-md border border-success/30 bg-success/10 px-3 text-sm font-medium text-success hover:bg-success/20"
+                      className="inline-flex h-9 items-center gap-1.5 rounded-md border border-primary/30 bg-primary/5 px-3 text-sm font-medium text-primary hover:bg-primary/10"
                       title="Zahlung erfassen — voll oder teilweise"
                     >
                       <CheckCircle2 className="h-4 w-4" />
@@ -373,11 +373,11 @@ function Page() {
                       {r.status !== "bezahlt" && r.status !== "storniert" && (
                         <button
                           onClick={(e) => { e.stopPropagation(); e.preventDefault(); setZahlungFuer(r); }}
-                          className="inline-flex h-8 items-center gap-1 rounded-md border border-success/30 bg-success/10 px-2.5 text-xs font-medium text-success hover:bg-success/20"
+                          className="inline-flex h-8 items-center gap-1 rounded-md border border-primary/30 bg-primary/5 px-2.5 text-xs font-medium text-primary hover:bg-primary/10"
                           title="Zahlung erfassen — voll oder teilweise"
                         >
                           <CheckCircle2 className="h-3.5 w-3.5" />
-                          <span>Zahlung</span>
+                          <span>Zahlung erfassen</span>
                         </button>
                       )}
                       <button
