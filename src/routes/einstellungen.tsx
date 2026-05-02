@@ -76,15 +76,6 @@ type TabId =
   | "backend"
   | "verlauf";
 
-// Tabs, die nur für Owner sichtbar sind:
-const OWNER_ONLY: ReadonlyArray<TabId> = [
-  "drive",
-  "backup",
-  "system-update",
-  "sicherheit",
-  "steuern",
-];
-
 const tabs: { id: TabId; label: string; icon: typeof Building2; gruppe: string }[] = [
   { id: "firmendaten", label: "Firmendaten", icon: Building2, gruppe: "Stammdaten" },
   { id: "nummernkreise", label: "Nummernkreise", icon: Hash, gruppe: "Stammdaten" },
@@ -112,14 +103,13 @@ const tabs: { id: TabId; label: string; icon: typeof Building2; gruppe: string }
 const gruppen = Array.from(new Set(tabs.map((t) => t.gruppe)));
 
 function Page() {
-  const { istOwner } = useAuth();
-  const sichtbareTabs = tabs.filter((t) => istOwner || !OWNER_ONLY.includes(t.id));
-  const sichtbareGruppen = Array.from(new Set(sichtbareTabs.map((t) => t.gruppe)));
+  const sichtbareTabs = tabs;
+  const sichtbareGruppen = gruppen;
   const [tab, setTab] = useState<TabId>("firmendaten");
   const { data: firma } = useFirmendaten();
   const update = useUpdateFirmendaten();
 
-  // Falls aktiver Tab durch Rollenwechsel verboten wird, zurück auf "firmendaten"
+  // Falls aktiver Tab nicht existiert, zurück auf "firmendaten"
   useEffect(() => {
     if (!sichtbareTabs.find((t) => t.id === tab)) setTab("firmendaten");
   }, [sichtbareTabs, tab]);

@@ -270,7 +270,7 @@ function SessionsDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (
 }
 
 export function UserMenu() {
-  const { user, logout, istOwner } = useAuth();
+  const { user, logout } = useAuth();
   const [pwOpen, setPwOpen] = useState(false);
   const [recOpen, setRecOpen] = useState(false);
   const [sessOpen, setSessOpen] = useState(false);
@@ -288,10 +288,8 @@ export function UserMenu() {
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-60">
           <DropdownMenuLabel className="space-y-0.5">
-            <div className="text-sm font-semibold">{user.username}</div>
-            <div className="text-xs font-normal text-muted-foreground">
-              {istOwner ? "Owner" : "Mitarbeiter"}
-            </div>
+            <div className="text-sm font-semibold">Konto</div>
+            <div className="text-xs font-normal text-muted-foreground">Lokal angemeldet</div>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
           <DropdownMenuItem onSelect={() => setPwOpen(true)}>
