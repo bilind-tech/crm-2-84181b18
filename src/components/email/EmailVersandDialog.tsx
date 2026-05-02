@@ -1,17 +1,43 @@
-// E-Mail-Versand-Dialog mit Vorlagen, Signatur, HTML/Visuell-Editor,
-// Anhang-Verwaltung und sicherer iframe-Vorschau.
+// =============================================================================
+// E-Mail-Versand-Dialog
+// -----------------------------------------------------------------------------
+// FRONTEND-STUB-HINWEIS (wichtig für später):
 //
-// Nutzung:
-//   <EmailVersandDialog
-//      open={open} onOpenChange={setOpen}
-//      kontext="angebot"
-//      kunde={kunde} angebot={angebot}
-//      pdfBlobUrl={pdfUrl} pdfDateiname="AN-2025-001.pdf"
-//      onSent={() => …}
-//   />
+// Aktuell wird KEINE echte E-Mail verschickt. Der Aufruf läuft über
+// `useSendEmail()` → `POST /email/versand` ins Mock-Backend
+// (src/lib/mock/backend.ts). Das Backend simuliert lediglich den Versand
+// und legt einen `EmailVersand`-Eintrag an. Es geht nichts an einen echten
+// SMTP-Server (Strato/nodemailer) raus.
+//
+// Wenn das echte Pi-Backend (Node + Fastify + nodemailer + Strato-SMTP)
+// angebunden ist, MUSS dieser Dialog NICHT geändert werden — der Hook
+// `useSendEmail` ruft bereits den richtigen Endpunkt auf. Das Pi-Backend
+// muss bei `POST /email/versand` dann:
+//   1. SMTP-Transport (nodemailer) anwerfen
+//   2. PDF-Anhang aus Storage / Drive einbinden
+//   3. Bei Erfolg `status: "sent"` zurückgeben (sonst `status: "failed"`)
+//   4. Bei Mahnungen das Beleg-Status-Feld aktualisieren
+// Erst dann fließt aus diesem Dialog tatsächlich eine E-Mail raus.
+// Die UI ist hier so gebaut, dass sie ohne weitere Änderung sofort auf das
+// echte Backend umschwenkt, sobald der Endpunkt liefert.
+// =============================================================================
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Send, Mail, Paperclip, X, Loader2, AlertCircle, Code2, Eye, Pencil } from "lucide-react";
+import {
+  Send,
+  Mail,
+  MailOpen,
+  Paperclip,
+  X,
+  Loader2,
+  AlertCircle,
+  Code2,
+  Eye,
+  Pencil,
+  Check,
+  Plus,
+  Sparkles,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -76,6 +102,7 @@ interface Props {
 }
 
 type EditorMode = "visuell" | "html" | "vorschau";
+type SendPhase = "idle" | "sending" | "success";
 
 export function EmailVersandDialog({
   open,
@@ -112,6 +139,7 @@ export function EmailVersandDialog({
   const [pdfAnhangAktiv, setPdfAnhangAktiv] = useState(true);
   const [mode, setMode] = useState<EditorMode>("visuell");
   const [zeigeCcBcc, setZeigeCcBcc] = useState(false);
+  const [phase, setPhase] = useState<SendPhase>("idle");
   const visuellRef = useRef<HTMLDivElement>(null);
 
   const ctx: PlaceholderContext = useMemo(
@@ -136,6 +164,7 @@ export function EmailVersandDialog({
     setZeigeCcBcc(false);
     setPdfAnhangAktiv(true);
     setMode("visuell");
+    setPhase("idle");
 
     let standardVorlage: EmailVorlage | undefined;
     if (mahnStufe && mahnEinstellungen) {
@@ -153,8 +182,7 @@ export function EmailVersandDialog({
         passendeVorlagen.find((v) => v.kontext === kontext) ??
         passendeVorlagen[0];
     }
-    const standardSig =
-      signaturen.find((s) => s.istStandard) ?? signaturen[0];
+    const standardSig = signaturen.find((s) => s.istStandard) ?? signaturen[0];
 
     setVorlageId(standardVorlage?.id ?? "");
     setSignaturId(standardSig?.id ?? "");
@@ -197,6 +225,10 @@ export function EmailVersandDialog({
   const empfaengerListe = (s: string) =>
     s.split(/[,;]/).map((x) => x.trim()).filter(Boolean);
 
+  const anChips = empfaengerListe(an);
+  const ccChips = empfaengerListe(cc);
+  const bccChips = empfaengerListe(bcc);
+
   const istValide = an.trim().length > 0 && betreff.trim().length > 0;
 
   const handleSend = () => {
@@ -213,6 +245,14 @@ export function EmailVersandDialog({
           : "allgemein";
     const belegId = angebot?.id ?? rechnung?.id;
 
+    setPhase("sending");
+
+    // -----------------------------------------------------------------------
+    // FRONTEND-STUB: Aufruf geht aktuell an useSendEmail → /email/versand
+    // ins Mock-Backend (src/lib/mock/backend.ts). Es wird KEINE echte Mail
+    // verschickt. Sobald das Pi-Backend mit nodemailer + Strato läuft, wird
+    // hier automatisch eine echte Mail ausgelöst — keine UI-Änderung nötig.
+    // -----------------------------------------------------------------------
     send.mutate(
       {
         belegTyp,
@@ -234,43 +274,102 @@ export function EmailVersandDialog({
       {
         onSuccess: (res) => {
           if (res.status === "sent") {
-            toast.success("E-Mail versendet");
-            onSent?.();
-            onOpenChange(false);
+            setPhase("success");
+            // Erfolgs-Animation kurz zeigen, dann Toast + Dialog schließen
+            setTimeout(() => {
+              toast.success("E-Mail versendet", {
+                description: `An ${empfaenger.join(", ")}`,
+              });
+              onSent?.();
+              onOpenChange(false);
+              setPhase("idle");
+            }, 1100);
           } else {
-            toast.error(`Versand fehlgeschlagen: ${res.fehlerGrund ?? "Unbekannter Fehler"}`);
+            setPhase("idle");
+            toast.error(
+              `Versand fehlgeschlagen: ${res.fehlerGrund ?? "Unbekannter Fehler"}`,
+            );
           }
         },
         onError: (e: unknown) => {
+          setPhase("idle");
           toast.error(`Versand fehlgeschlagen: ${(e as Error)?.message ?? ""}`);
         },
       },
     );
   };
 
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[92vh] overflow-y-auto bg-background">
-        <DialogHeader>
-          <DialogTitle>E-Mail versenden</DialogTitle>
-          <DialogDescription>
-            Vorlage wählen, Inhalt prüfen, vor dem Versand in der Vorschau kontrollieren.
-          </DialogDescription>
-        </DialogHeader>
+  const empfaengerName =
+    kunde?.firmenname ||
+    `${kunde?.vorname ?? ""} ${kunde?.nachname ?? ""}`.trim() ||
+    "Empfänger";
 
-        <div className="space-y-4">
+  return (
+    <Dialog open={open} onOpenChange={(o) => phase === "idle" && onOpenChange(o)}>
+      <DialogContent className="max-w-3xl max-h-[92vh] overflow-y-auto bg-background p-0">
+        {/* Hero Header */}
+        <div className="relative overflow-hidden border-b border-border bg-gradient-to-br from-primary/8 via-background to-background px-6 pb-5 pt-6">
+          <div className="flex items-start gap-4">
+            <div className="grid h-14 w-14 shrink-0 place-content-center rounded-2xl bg-primary/10 ring-1 ring-primary/20">
+              <Mail className="h-7 w-7 text-primary" strokeWidth={1.75} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <DialogHeader className="space-y-1 text-left">
+                <DialogTitle className="text-xl font-semibold tracking-tight">
+                  E-Mail versenden
+                </DialogTitle>
+                <DialogDescription className="text-sm text-muted-foreground">
+                  An <span className="font-medium text-foreground">{empfaengerName}</span>
+                  {angebot && (
+                    <>
+                      {" · Angebot "}
+                      <span className="font-mono text-xs">{angebot.nummer}</span>
+                    </>
+                  )}
+                  {rechnung && (
+                    <>
+                      {" · Rechnung "}
+                      <span className="font-mono text-xs">{rechnung.nummer}</span>
+                    </>
+                  )}
+                  {mahnStufe && (
+                    <>
+                      {" · "}
+                      <span className="text-warning">Mahnstufe {mahnStufe}</span>
+                    </>
+                  )}
+                </DialogDescription>
+              </DialogHeader>
+            </div>
+          </div>
+        </div>
+
+        {/* Send-Overlay (Animation während Versand & nach Erfolg) */}
+        {phase !== "idle" && <SendOverlay phase={phase} empfaenger={anChips} />}
+
+        <div
+          className={cn(
+            "space-y-5 px-6 py-5 transition-opacity",
+            phase !== "idle" && "pointer-events-none opacity-30",
+          )}
+        >
           {/* Vorlage + Signatur */}
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Vorlage">
               <Select value={vorlageId} onValueChange={onVorlageChange}>
-                <SelectTrigger><SelectValue placeholder="Vorlage wählen" /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue placeholder="Vorlage wählen" />
+                </SelectTrigger>
                 <SelectContent>
                   {passendeVorlagen.length === 0 && (
-                    <SelectItem value="__none" disabled>Keine Vorlagen vorhanden</SelectItem>
+                    <SelectItem value="__none" disabled>
+                      Keine Vorlagen vorhanden
+                    </SelectItem>
                   )}
                   {passendeVorlagen.map((v) => (
                     <SelectItem key={v.id} value={v.id}>
-                      {v.name}{v.istStandard ? " · Standard" : ""}
+                      {v.name}
+                      {v.istStandard ? " · Standard" : ""}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -278,12 +377,15 @@ export function EmailVersandDialog({
             </Field>
             <Field label="Signatur">
               <Select value={signaturId} onValueChange={setSignaturId}>
-                <SelectTrigger><SelectValue placeholder="Signatur wählen" /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue placeholder="Signatur wählen" />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__none">Ohne Signatur</SelectItem>
                   {signaturen.map((s) => (
                     <SelectItem key={s.id} value={s.id}>
-                      {s.name}{s.istStandard ? " · Standard" : ""}
+                      {s.name}
+                      {s.istStandard ? " · Standard" : ""}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -291,41 +393,42 @@ export function EmailVersandDialog({
             </Field>
           </div>
 
-          {/* Empfänger */}
-          <Field label="An" required>
-            <Input
-              type="email"
+          {/* Empfänger-Block (visuell als zusammenhängende Karte) */}
+          <div className="rounded-xl border border-border bg-card/50">
+            <RecipientRow
+              label="An"
               value={an}
-              onChange={(e) => setAn(e.target.value)}
-              placeholder="kunde@example.com"
+              chips={anChips}
+              onChange={setAn}
+              required
             />
-          </Field>
-
-          {!zeigeCcBcc ? (
-            <button
-              type="button"
-              onClick={() => setZeigeCcBcc(true)}
-              className="text-xs font-medium text-muted-foreground hover:text-foreground"
-            >
-              + CC / BCC hinzufügen
-            </button>
-          ) : (
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Field label="CC">
-                <Input value={cc} onChange={(e) => setCc(e.target.value)} placeholder="Komma-getrennt" />
-              </Field>
-              <Field label="BCC">
-                <Input value={bcc} onChange={(e) => setBcc(e.target.value)} placeholder="Komma-getrennt" />
-              </Field>
-            </div>
-          )}
+            {!zeigeCcBcc ? (
+              <button
+                type="button"
+                onClick={() => setZeigeCcBcc(true)}
+                className="flex w-full items-center gap-1.5 border-t border-border px-4 py-2 text-xs font-medium text-muted-foreground transition hover:bg-muted/40 hover:text-foreground"
+              >
+                <Plus className="h-3 w-3" /> CC / BCC hinzufügen
+              </button>
+            ) : (
+              <>
+                <RecipientRow label="Cc" value={cc} chips={ccChips} onChange={setCc} />
+                <RecipientRow label="Bcc" value={bcc} chips={bccChips} onChange={setBcc} />
+              </>
+            )}
+          </div>
 
           {/* Betreff */}
           <Field label="Betreff" required>
-            <Input value={betreff} onChange={(e) => setBetreff(e.target.value)} />
+            <Input
+              value={betreff}
+              onChange={(e) => setBetreff(e.target.value)}
+              className="h-11 text-base"
+            />
             {betreff !== aufgelosterBetreff && (
               <p className="mt-1 text-xs text-muted-foreground">
-                Wird gesendet als: <span className="font-medium">{aufgelosterBetreff}</span>
+                Wird gesendet als:{" "}
+                <span className="font-medium text-foreground">{aufgelosterBetreff}</span>
               </p>
             )}
           </Field>
@@ -333,8 +436,10 @@ export function EmailVersandDialog({
           {/* Editor-Tabs */}
           <div>
             <div className="mb-2 flex items-center justify-between">
-              <Label className="text-xs font-medium">Inhalt</Label>
-              <div className="flex items-center gap-1 rounded-lg border border-border p-0.5">
+              <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                Inhalt
+              </Label>
+              <div className="flex items-center gap-1 rounded-full border border-border bg-muted/30 p-0.5">
                 <TabBtn active={mode === "visuell"} onClick={() => setMode("visuell")}>
                   <Pencil className="mr-1 h-3.5 w-3.5" /> Visuell
                 </TabBtn>
@@ -353,7 +458,7 @@ export function EmailVersandDialog({
                 contentEditable
                 suppressContentEditableWarning
                 onBlur={(e) => setBodyHtml(e.currentTarget.innerHTML)}
-                className="min-h-[260px] rounded-lg border border-input bg-background p-4 text-sm leading-relaxed prose prose-sm max-w-none focus:outline-none focus:ring-1 focus:ring-ring"
+                className="prose prose-sm min-h-[260px] max-w-none rounded-xl border border-input bg-background p-5 text-sm leading-relaxed transition focus:border-ring/50 focus:outline-none focus:ring-2 focus:ring-ring/30"
               />
             )}
             {mode === "html" && (
@@ -361,15 +466,15 @@ export function EmailVersandDialog({
                 value={bodyHtml}
                 onChange={(e) => setBodyHtml(e.target.value)}
                 rows={14}
-                className="font-mono text-xs"
+                className="rounded-xl font-mono text-xs"
               />
             )}
             {mode === "vorschau" && (
-              <div className="overflow-hidden rounded-lg border border-border bg-muted/30">
+              <div className="overflow-hidden rounded-xl border border-border bg-muted/30 shadow-inner">
                 <iframe
                   title="E-Mail Vorschau"
                   sandbox=""
-                  srcDoc={`<!doctype html><html><head><meta charset="utf-8"><style>body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:14px;line-height:1.6;color:#1a1a1a;padding:20px;margin:0;}img{max-width:100%;height:auto;}</style></head><body>${finaleBody}</body></html>`}
+                  srcDoc={`<!doctype html><html><head><meta charset="utf-8"><style>body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:14px;line-height:1.6;color:#1a1a1a;padding:24px;margin:0;background:#fff;}img{max-width:100%;height:auto;}a{color:#2563eb;}</style></head><body>${finaleBody}</body></html>`}
                   className="block h-[420px] w-full border-0 bg-white"
                 />
               </div>
@@ -384,34 +489,53 @@ export function EmailVersandDialog({
                 </span>
               </div>
             )}
+
+            {/* Signatur-Live-Vorschau (zeigt was unten dranhängt) */}
+            {signatur && mode !== "vorschau" && (
+              <div className="mt-3 rounded-xl border border-dashed border-border bg-muted/20 px-4 py-3">
+                <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                  <Pencil className="h-3 w-3" /> Signatur (wird automatisch angehängt)
+                </div>
+                <div
+                  className="prose prose-sm max-w-none text-sm text-foreground/80"
+                  dangerouslySetInnerHTML={{
+                    __html: replacePlaceholders(signatur.html, ctx),
+                  }}
+                />
+              </div>
+            )}
           </div>
 
           {/* Anhänge */}
           {pdfDateiname && (
             <Field label="Anhänge">
               {pdfAnhangAktiv ? (
-                <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-3 py-2 text-sm">
-                  <span className="flex items-center gap-2">
-                    {pdfStatus === "loading" ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
-                    ) : pdfStatus === "error" ? (
-                      <AlertCircle className="h-3.5 w-3.5 text-destructive" />
-                    ) : (
-                      <Paperclip className="h-3.5 w-3.5 text-muted-foreground" />
-                    )}
-                    <span className="font-medium">{pdfDateiname}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {pdfStatus === "loading"
-                        ? "PDF wird vorbereitet …"
-                        : pdfStatus === "error"
-                          ? "PDF konnte nicht erzeugt werden"
-                          : "PDF · automatisch"}
+                <div className="flex items-center justify-between rounded-xl border border-border bg-muted/30 px-4 py-3 text-sm">
+                  <span className="flex items-center gap-3">
+                    <span className="grid h-9 w-9 place-content-center rounded-lg bg-destructive/10 text-destructive">
+                      {pdfStatus === "loading" ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : pdfStatus === "error" ? (
+                        <AlertCircle className="h-4 w-4" />
+                      ) : (
+                        <Paperclip className="h-4 w-4" />
+                      )}
+                    </span>
+                    <span>
+                      <span className="block font-medium">{pdfDateiname}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {pdfStatus === "loading"
+                          ? "PDF wird vorbereitet …"
+                          : pdfStatus === "error"
+                            ? "PDF konnte nicht erzeugt werden"
+                            : "PDF · automatisch angehängt"}
+                      </span>
                     </span>
                   </span>
                   <button
                     type="button"
                     onClick={() => setPdfAnhangAktiv(false)}
-                    className="text-muted-foreground hover:text-destructive"
+                    className="rounded-full p-1.5 text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive"
                     aria-label="Anhang entfernen"
                   >
                     <X className="h-4 w-4" />
@@ -421,35 +545,45 @@ export function EmailVersandDialog({
                 <button
                   type="button"
                   onClick={() => setPdfAnhangAktiv(true)}
-                  className="text-xs font-medium text-primary hover:underline"
+                  className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
                 >
-                  + PDF wieder anhängen
+                  <Plus className="h-3 w-3" /> PDF wieder anhängen
                 </button>
               )}
             </Field>
           )}
         </div>
 
-        <DialogFooter className="gap-2 sm:gap-2">
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={send.isPending}>
+        <DialogFooter className="gap-2 border-t border-border bg-muted/20 px-6 py-4 sm:gap-2">
+          <Button
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={send.isPending || phase !== "idle"}
+          >
             Abbrechen
           </Button>
           <Button
             onClick={handleSend}
-            disabled={!istValide || send.isPending || (pdfAnhangAktiv && pdfStatus === "loading")}
-            className="min-w-[140px]"
+            disabled={
+              !istValide ||
+              send.isPending ||
+              phase !== "idle" ||
+              (pdfAnhangAktiv && pdfStatus === "loading")
+            }
+            className="min-w-[160px] gap-1.5 shadow-sm"
+            size="lg"
           >
-            {send.isPending ? (
+            {send.isPending || phase === "sending" ? (
               <>
-                <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> Wird gesendet …
+                <Loader2 className="h-4 w-4 animate-spin" /> Wird gesendet …
               </>
             ) : pdfAnhangAktiv && pdfStatus === "loading" ? (
               <>
-                <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> PDF wird vorbereitet …
+                <Loader2 className="h-4 w-4 animate-spin" /> PDF wird vorbereitet …
               </>
             ) : (
               <>
-                <Mail className="mr-1.5 h-4 w-4" /> E-Mail senden
+                <Send className="h-4 w-4" /> E-Mail senden
               </>
             )}
           </Button>
@@ -458,6 +592,171 @@ export function EmailVersandDialog({
     </Dialog>
   );
 }
+
+/* -------------------------------------------------------------------------- */
+/* Send-Overlay — schöne Animation während Versand & Erfolg                   */
+/* -------------------------------------------------------------------------- */
+
+function SendOverlay({
+  phase,
+  empfaenger,
+}: {
+  phase: SendPhase;
+  empfaenger: string[];
+}) {
+  return (
+    <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4 bg-background/95 backdrop-blur-sm animate-in fade-in duration-300">
+      <style>{`
+        @keyframes email-fly {
+          0% { transform: translate(0, 0) rotate(0deg); }
+          50% { transform: translate(8px, -8px) rotate(15deg); }
+          100% { transform: translate(0, 0) rotate(0deg); }
+        }
+        @keyframes email-pop {
+          0% { transform: scale(0.4); opacity: 0; }
+          60% { transform: scale(1.15); opacity: 1; }
+          100% { transform: scale(1); opacity: 1; }
+        }
+        @keyframes spark-out {
+          0% { transform: translate(-50%, -50%) scale(0); opacity: 0; }
+          30% { opacity: 1; }
+          100% { transform: translate(calc(-50% + var(--tx)), calc(-50% + var(--ty))) scale(0.6); opacity: 0; }
+        }
+      `}</style>
+
+      {phase === "sending" ? (
+        <>
+          <div className="relative">
+            <div
+              className="absolute inset-0 -z-10 animate-ping rounded-full bg-primary/20"
+              style={{ animationDuration: "1.6s" }}
+            />
+            <div className="grid h-20 w-20 place-content-center rounded-full bg-primary/10 ring-2 ring-primary/30">
+              <Send
+                className="h-9 w-9 text-primary"
+                style={{ animation: "email-fly 1.4s ease-in-out infinite" }}
+              />
+            </div>
+          </div>
+          <div className="text-center">
+            <p className="text-base font-semibold">E-Mail wird versendet …</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {empfaenger.length === 1
+                ? "An " + empfaenger[0]
+                : `An ${empfaenger.length} Empfänger`}
+            </p>
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="relative">
+            {/* Sparkle-Burst — funktionale Erfolgs-Mikroanimation */}
+            {[...Array(8)].map((_, i) => {
+              const angle = (i / 8) * 2 * Math.PI;
+              const tx = Math.cos(angle) * 55;
+              const ty = Math.sin(angle) * 55;
+              return (
+                <Sparkles
+                  key={i}
+                  className="pointer-events-none absolute left-1/2 top-1/2 h-3 w-3 text-primary"
+                  style={
+                    {
+                      animation: "spark-out 0.9s ease-out forwards",
+                      "--tx": `${tx}px`,
+                      "--ty": `${ty}px`,
+                    } as React.CSSProperties
+                  }
+                />
+              );
+            })}
+            <div
+              className="grid h-20 w-20 place-content-center rounded-full bg-success/15 ring-2 ring-success/40"
+              style={{
+                animation:
+                  "email-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards",
+              }}
+            >
+              <MailOpen className="h-9 w-9 text-success" strokeWidth={2} />
+            </div>
+            <div
+              className="absolute -bottom-1 -right-1 grid h-8 w-8 place-content-center rounded-full bg-success text-white shadow-lg"
+              style={{
+                animation:
+                  "email-pop 0.6s 0.15s cubic-bezier(0.34, 1.56, 0.64, 1) backwards",
+              }}
+            >
+              <Check className="h-4 w-4" strokeWidth={3} />
+            </div>
+          </div>
+          <div className="text-center">
+            <p className="text-base font-semibold text-success">E-Mail versendet</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {empfaenger.length === 1
+                ? empfaenger[0]
+                : `${empfaenger.length} Empfänger`}
+            </p>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Empfänger-Zeile mit Chip-Anzeige                                           */
+/* -------------------------------------------------------------------------- */
+
+function RecipientRow({
+  label,
+  value,
+  chips,
+  onChange,
+  required,
+}: {
+  label: string;
+  value: string;
+  chips: string[];
+  onChange: (v: string) => void;
+  required?: boolean;
+}) {
+  return (
+    <div className="flex items-start gap-3 border-b border-border px-4 py-2.5 last:border-b-0">
+      <Label className="mt-2 w-10 shrink-0 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        {label}
+        {required && <span className="text-destructive">*</span>}
+      </Label>
+      <div className="min-w-0 flex-1">
+        {chips.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5 pt-1.5">
+            {chips.map((c, i) => (
+              <span
+                key={`${c}-${i}`}
+                className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary"
+              >
+                {c}
+              </span>
+            ))}
+          </div>
+        )}
+        <Input
+          type="email"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={
+            chips.length === 0
+              ? "name@firma.de  (mehrere mit Komma trennen)"
+              : "Weitere Adresse hinzufügen …"
+          }
+          className="h-8 border-0 bg-transparent px-0 text-sm shadow-none focus-visible:ring-0"
+        />
+      </div>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Standard-Helfer                                                            */
+/* -------------------------------------------------------------------------- */
 
 function Field({
   label,
@@ -470,7 +769,7 @@ function Field({
 }) {
   return (
     <div className="space-y-1.5">
-      <Label className="text-xs font-medium">
+      <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
         {label} {required && <span className="text-destructive">*</span>}
       </Label>
       {children}
@@ -492,8 +791,10 @@ function TabBtn({
       type="button"
       onClick={onClick}
       className={cn(
-        "inline-flex items-center rounded-md px-2.5 py-1 text-xs font-medium transition",
-        active ? "bg-card shadow-sm ring-1 ring-border" : "text-muted-foreground hover:text-foreground",
+        "inline-flex items-center rounded-full px-3 py-1 text-xs font-medium transition",
+        active
+          ? "bg-card text-foreground shadow-sm ring-1 ring-border"
+          : "text-muted-foreground hover:text-foreground",
       )}
     >
       {children}
