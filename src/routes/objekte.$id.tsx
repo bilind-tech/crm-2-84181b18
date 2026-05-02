@@ -3,15 +3,18 @@ import { useState } from "react";
 import { Pencil } from "lucide-react";
 import { DetailSkeleton } from "@/components/layout/DetailSkeleton";
 import { NotFoundState } from "@/components/layout/NotFoundState";
-import { useObjekt } from "@/hooks/useApi";
+import { useObjekt, useDokumente } from "@/hooks/useApi";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ObjektBearbeitenDialog } from "@/components/forms/ObjektBearbeitenDialog";
+import { DokumentUploadPanel } from "@/components/dokumente/DokumentUploadPanel";
+import { DokumentThumb } from "@/components/dokumente/DokumentThumb";
 
 export const Route = createFileRoute("/objekte/$id")({ component: Page });
 function Page() {
   const { id } = Route.useParams();
   const { data: o, isLoading } = useObjekt(id);
+  const { data: dokumente = [] } = useDokumente({ objektId: id });
   const [editOpen, setEditOpen] = useState(false);
 
   if (isLoading) return <DetailSkeleton variant="objekt" />;
@@ -48,6 +51,33 @@ function Page() {
             <span className="text-muted-foreground">Status: </span>
             <span className="capitalize">{o.status}</span>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Belege & Dokumente</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <DokumentUploadPanel kundeId={o.kundeId} objektId={o.id} compact />
+          {dokumente.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Noch keine Dokumente. Dateien aufs Fenster ziehen oder oben hochladen.</p>
+          ) : (
+            <ul className="divide-y divide-border rounded-2xl border border-border">
+              {dokumente.map((d) => (
+                <li key={d.id} className="flex items-center gap-3 p-3">
+                  <DokumentThumb dokument={d} className="h-12 w-12 shrink-0 rounded-lg" />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-medium">{d.titel}</p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {d.dateiname} · {(d.groesseBytes / 1024).toFixed(0)} KB
+                    </p>
+                  </div>
+                  <span className="shrink-0 text-xs capitalize text-muted-foreground">{d.typ}</span>
+                </li>
+              ))}
+            </ul>
+          )}
         </CardContent>
       </Card>
 

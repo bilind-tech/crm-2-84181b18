@@ -17,6 +17,8 @@ import { formatEUR, formatDate } from "@/lib/format";
 import { summenRechnung } from "@/lib/mock/backend";
 import { FlowBar } from "@/components/flow/FlowBar";
 import { angebotFlow, rechnungFlow } from "@/lib/flow/flows";
+import { DokumentUploadPanel } from "@/components/dokumente/DokumentUploadPanel";
+import { DokumentThumb } from "@/components/dokumente/DokumentThumb";
 
 export const Route = createFileRoute("/kunden/$id")({ component: Page });
 
@@ -301,20 +303,22 @@ function Page() {
           )}
         </TabsContent>
 
-        <TabsContent value="belege" className="mt-6">
+        <TabsContent value="belege" className="mt-6 space-y-4">
+          <DokumentUploadPanel kundeId={k.id} compact />
           {k.dokumente.length === 0 ? (
             <Empty text="Noch keine Belege/Dokumente." />
           ) : (
             <ul className="divide-y divide-border rounded-2xl border border-border bg-card">
               {k.dokumente.map((d) => (
-                <li key={d.id} className="flex items-center justify-between p-4">
-                  <div>
-                    <p className="font-medium">{d.titel}</p>
-                    <p className="text-xs text-muted-foreground">
+                <li key={d.id} className="flex items-center gap-3 p-4">
+                  <DokumentThumb dokument={d} className="h-12 w-12 shrink-0 rounded-lg" />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-medium">{d.titel}</p>
+                    <p className="truncate text-xs text-muted-foreground">
                       {d.dateiname} · {(d.groesseBytes / 1024).toFixed(0)} KB
                     </p>
                   </div>
-                  <span className="text-xs text-muted-foreground capitalize">{d.typ}</span>
+                  <span className="shrink-0 text-xs capitalize text-muted-foreground">{d.typ}</span>
                 </li>
               ))}
             </ul>

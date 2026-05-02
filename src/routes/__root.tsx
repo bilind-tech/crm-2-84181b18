@@ -13,6 +13,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { startScheduler } from "@/lib/mock/scheduler";
 import { UeberfaelligPopup } from "@/components/notifications/UeberfaelligPopup";
 import { BackendStatusIndicator } from "@/components/layout/BackendStatusIndicator";
+import { GlobalDropZone } from "@/components/dokumente/GlobalDropZone";
 import { useLiveEvents } from "@/hooks/useLiveEvents";
 import { isBackendUrlExplicit } from "@/lib/api/backendUrl";
 
@@ -126,6 +127,7 @@ function Shell() {
       </div>
       <UeberfaelligPopup />
       <BackendStatusIndicator />
+      <GlobalDropZone />
     </SidebarProvider>
   );
 }

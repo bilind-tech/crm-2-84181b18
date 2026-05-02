@@ -6,7 +6,7 @@ import { formatEUR, formatDate } from "@/lib/format";
 import { PageHeader, KpiCard } from "@/components/layout/PageHeader";
 import { PrimaryAction } from "@/components/layout/PrimaryAction";
 import { FilterBar } from "@/routes/angebote";
-import { DokumentUploader } from "@/components/dokumente/DokumentUploader";
+import { DokumentUploadPanel } from "@/components/dokumente/DokumentUploadPanel";
 import { HandyScanDialog } from "@/components/dokumente/HandyScanDialog";
 import { DokumentBearbeitenDialog } from "@/components/dokumente/DokumentBearbeitenDialog";
 import { DokumentViewer } from "@/components/dokumente/DokumentViewer";
@@ -128,7 +128,7 @@ function Page() {
               label="Vom Handy scannen"
               onClick={() => setScanOpen(true)}
             />
-            <DokumentUploader compact />
+            <DokumentUploadPanel compact />
           </div>
         }
       />
@@ -140,7 +140,7 @@ function Page() {
         <KpiCard label={`Steuerrelevant ${jahr}`} value={counts.steuerrelevant} tone="success" sublabel={formatEUR(counts.summe)} />
       </div>
 
-      <DokumentUploader />
+      <DokumentUploadPanel />
 
       <FilterBar
         filter={filter}
