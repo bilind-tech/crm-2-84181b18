@@ -564,32 +564,6 @@ export interface SicherheitsEinstellungen {
   autoLockMinuten: number;
 }
 
-export type BenutzerRolle = "owner" | "mitarbeiter";
-
-export interface BenutzerEintrag {
-  id: string;
-  username: string;
-  rolle: BenutzerRolle;
-  aktiv: number;
-  createdAt: string;
-  updatedAt: string;
-  letzteAktivitaet: string | null;
-  recoveryGesetzt: number;
-}
-
-export interface BenutzerAnlegenResponse {
-  id: string;
-  username: string;
-  rolle: BenutzerRolle;
-  recoveryCode: string;
-  initialPasswort: string;
-}
-
-export interface BenutzerResetResponse {
-  ok: true;
-  initialPasswort: string;
-  recoveryCode: string;
-}
 
 export interface AppearanceEinstellungen {
   theme: "system" | "hell" | "dunkel";

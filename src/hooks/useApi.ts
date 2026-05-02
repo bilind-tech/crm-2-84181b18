@@ -37,10 +37,6 @@ import type {
   UpdatePackageInfo,
   Warnung,
   Zahlung,
-  BenutzerEintrag,
-  BenutzerRolle,
-  BenutzerAnlegenResponse,
-  BenutzerResetResponse,
 } from "@/lib/api/types";
 
 export const qk = {
@@ -71,7 +67,7 @@ export const qk = {
     backupHistorie: ["einstellungen", "backup", "historie"] as const,
     googleDrive: ["einstellungen", "googleDrive"] as const,
     sitzungen: ["einstellungen", "sitzungen"] as const,
-    benutzer: ["einstellungen", "benutzer"] as const,
+    
     positionsvorlagen: ["einstellungen", "positionsvorlagen"] as const,
     textvorlagen: ["einstellungen", "textvorlagen"] as const,
     systemInfo: ["system", "info"] as const,
@@ -1075,49 +1071,6 @@ export const useAlleSitzungenBeenden = () => {
   });
 };
 
-
-// ---------- Benutzer-Verwaltung (Owner-only) ----------
-
-export const useBenutzer = () =>
-  useQuery({
-    queryKey: qk.einstellungen.benutzer,
-    queryFn: () => api.get<{ benutzer: BenutzerEintrag[] }>("/benutzer").then((r) => r.benutzer),
-  });
-
-export const useBenutzerAnlegen = () => {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (data: { username: string; rolle: BenutzerRolle; initialPasswort?: string }) =>
-      api.post<BenutzerAnlegenResponse>("/benutzer", data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: qk.einstellungen.benutzer }),
-  });
-};
-
-export const useBenutzerPatch = () => {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: ({ id, ...data }: { id: string; rolle?: BenutzerRolle; aktiv?: boolean }) =>
-      api.patch<{ ok: true }>(`/benutzer/${id}`, data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: qk.einstellungen.benutzer }),
-  });
-};
-
-export const useBenutzerPasswortReset = () => {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (id: string) =>
-      api.post<BenutzerResetResponse>(`/benutzer/${id}/passwort-zuruecksetzen`, {}),
-    onSuccess: () => qc.invalidateQueries({ queryKey: qk.einstellungen.benutzer }),
-  });
-};
-
-export const useBenutzerLoeschen = () => {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (id: string) => api.delete<{ ok: true }>(`/benutzer/${id}`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: qk.einstellungen.benutzer }),
-  });
-};
 
 // ---------- System & Updates ----------
 
