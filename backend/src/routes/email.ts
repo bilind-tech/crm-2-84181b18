@@ -30,17 +30,34 @@ const SignaturSchema = z.object({
   html: z.string().max(20_000).default(""),
   istStandard: z.boolean().default(false),
 });
+// Adapter-Schema: nimmt sowohl die UI-Schreibweise (`empfaenger[]`, `koerperHtml`,
+// `belegTyp`, `mahnStufe`) als auch das Repo-interne Schema entgegen. Genau ein
+// Eintrag aus jedem Paar muss gesetzt sein. `idempotenzKey` ist optional und
+// wird sonst deterministisch aus Empfänger+Betreff+Beleg gehasht (verhindert
+// Doppelklick-Sends auch ohne Mitarbeit der UI).
 const VersandSchema = z.object({
-  empfaengerTo: z.string().trim().email().max(320),
+  // Empfänger
+  empfaengerTo: z.string().trim().email().max(320).optional(),
+  empfaenger: z.array(z.string().trim().email().max(320)).max(50).optional(),
   empfaengerCc: z.string().trim().max(2000).optional(),
+  cc: z.array(z.string().trim().email().max(320)).max(50).optional(),
   empfaengerBcc: z.string().trim().max(2000).optional(),
-  betreff: z.string().trim().max(500),
-  bodyHtml: z.string().max(100_000),
+  bcc: z.array(z.string().trim().email().max(320)).max(50).optional(),
+  // Inhalt
+  betreff: z.string().trim().min(1).max(500),
+  bodyHtml: z.string().max(100_000).optional(),
+  koerperHtml: z.string().max(100_000).optional(),
+  // Beleg
   belegArt: z.enum(["angebot", "rechnung"]).optional(),
-  belegId: z.string().optional(),
-  vorlageId: z.string().optional(),
-  signaturId: z.string().optional(),
-  idempotenzKey: z.string().min(1).max(200),
+  belegTyp: z.enum(["angebot", "rechnung", "allgemein"]).optional(),
+  belegId: z.string().max(64).optional(),
+  kundeId: z.string().max(64).optional(),
+  vorlageId: z.string().max(64).optional(),
+  signaturId: z.string().max(64).optional(),
+  mahnStufe: z.union([z.literal(1), z.literal(2), z.literal(3)]).optional(),
+  // Anhänge: Frontend-Hinweis, hier nur tolerant ignoriert (PDF wird im sendNow gerendert).
+  anhaenge: z.array(z.unknown()).optional(),
+  idempotenzKey: z.string().min(1).max(200).optional(),
 });
 
 export async function emailRoutes(app: FastifyInstance): Promise<void> {
