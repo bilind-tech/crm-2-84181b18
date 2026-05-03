@@ -250,16 +250,6 @@ export async function dokumenteRoutes(app: FastifyInstance): Promise<void> {
     return reply.code(201).send(sess);
   });
 
-  app.post<{ Params: { id: string } }>(
-    "/upload-sessions/:id/beenden",
-    { preHandler: requireAuth },
-    async (req, reply) => {
-      const ok = endSession(req.params.id);
-      if (!ok) return reply.code(404).send({ error: "not-found" });
-      return reply.code(204).send();
-    },
-  );
-
   // ---------- Upload-Sessions: Token-only ----------
   app.get<{ Params: { token: string } }>(
     "/upload-sessions/:token",
