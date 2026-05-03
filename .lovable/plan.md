@@ -1,38 +1,43 @@
-# PDF-Viewer reparieren (Versions-Mismatch)
+Ich werde das jetzt nicht weiter über die fehleranfällige PDF.js/react-pdf-Anzeige für den normalen „PDF ansehen“-Dialog lösen, sondern den Rechnungs-PDF-Viewer robuster umbauen.
 
-## Ursache
-Die Konsole zeigt eindeutig:
-> The API version "5.4.296" does not match the Worker version "5.7.284".
+Wichtig: Das muss auch in der Lovable-Preview funktionieren. Es ist nicht erst auf dem Raspberry Pi möglich. Der Pi ist später für echte Datenbank/Backend-PDFs wichtig, aber die aktuelle PDF-Erzeugung läuft bereits im Browser und kann in der Preview angezeigt werden.
 
-- `react-pdf@10.4.1` bringt intern **pdfjs-dist 5.4.296** mit (das ist die "API").
-- In `package.json` ist zusätzlich `"pdfjs-dist": "^5.7.284"` gepinnt — daraus lädt unser `pdfjsWorker.ts` den **Worker 5.7.284**.
-- API ≠ Worker → PDF.js verweigert das Rendern, der Viewer zeigt „PDF kann nicht angezeigt werden". Mit dem Backend / Raspberry hat das nichts zu tun.
+Plan:
 
-Auch die Detailseite zeigt nur „PDF bereit" statt der eigentlichen Vorschau, weil dort dasselbe Viewer-Komponenten-Setup darunter liegt und derselbe Fehler auftritt.
+1. Hauptproblem beheben: „PDF ansehen“ muss immer sichtbar rendern
+- `PdfViewerDialog` wird für den normalen Anzeigen-Dialog auf eine native Browser-PDF-Anzeige per `iframe`/`object` umgestellt.
+- Dadurch umgehen wir die bisherige Fehlerquelle mit PDF.js-Worker, Versionen und leerem Canvas.
+- Der Dialog zeigt nicht mehr einfach eine leere Fläche, wenn intern etwas nicht lädt.
+- Es gibt weiterhin Download und „PDF bearbeiten“ im Dialogkopf.
+- Wenn der Browser die eingebettete PDF-Anzeige blockiert oder nicht lädt, bleibt eine klare Fallback-Fläche sichtbar mit:
+  - „PDF in neuem Tab öffnen“
+  - „PDF herunterladen“
 
-## Fix
+2. Detailseite verbessern: PDF-Karte soll echte Vorschau zeigen
+- `PdfPreviewCard` soll nicht nur „PDF bereit“ anzeigen.
+- Sobald `pdf.url` vorhanden ist, wird in der Karte eine kleine echte Vorschau der PDF eingebettet.
+- Der Button „PDF ansehen“ öffnet weiterhin den großen Dialog.
+- Wenn die Vorschau nicht geladen werden kann, sieht man eine klare Meldung statt einer leeren Fläche.
 
-1. **`pdfjs-dist` auf exakt `5.4.296` pinnen** (die Version, die react-pdf 10.4.1 erwartet). In `package.json`:
-   ```
-   "pdfjs-dist": "5.4.296"
-   ```
-   Danach `bun install`, damit Worker + API identisch sind.
+3. Übersicht/Auge-Icon absichern
+- Der bestehende `PdfViewButton` in der Rechnungsübersicht bleibt der Einstieg.
+- Da er denselben `PdfViewerDialog` nutzt, funktioniert das Auge-Icon danach ebenfalls mit der robusten nativen Anzeige.
+- Klicks bleiben sauber vom Tabellenzeilen-Klick getrennt.
 
-2. **Worker-URL absichern** in `src/lib/pdf/pdfjsWorker.ts`:
-   - Zusätzlich die Version aus `pdfjs.version` loggen (einmalig, dev-only), damit künftige Mismatches sofort sichtbar sind.
-   - Optional Fallback: wenn `new URL(...)` aus irgendeinem Grund scheitert, auf den unpkg-CDN-Worker passend zu `pdfjs.version` zurückfallen.
+4. Live-Editor nicht kaputt machen
+- Der Live-Editor kann vorerst weiter `react-pdf` nutzen, weil dort Seiten-Hotspots/Overlays gebraucht werden.
+- Ich werde aber den Fehlerzustand dort verbessern: Wenn PDF.js wieder zickt, soll es nicht nur rot/leer wirken, sondern immer mindestens „Öffnen/Download“ anbieten.
+- Der Fokus bleibt jetzt: normale Rechnungsanzeige und PDF ansehen müssen zuverlässig funktionieren.
 
-3. **Inline-Vorschau auf der Rechnungs-/Angebots-Detailseite tatsächlich rendern.** Aktuell zeigt `PdfPreviewCard` nur den Status „PDF bereit". Wir lassen darin direkt die erste Seite via `<Document><Page pageNumber={1} /></Document>` (klein, ohne Toolbar) rendern, sobald die Blob-URL verfügbar ist. Bei Fehler: Hinweis + Download-Link (gleiche UX wie im Live-Editor).
+5. PDF-Erzeugung selbst absichern
+- `useBelegPdf` bleibt mit Browser-Generator-Fallback bestehen.
+- Ich werde prüfen, dass alte Blob-URLs sauber aufgeräumt werden und beim erneuten Öffnen nicht eine kaputte/alte URL hängen bleibt.
+- Status „ready“ wird nur genutzt, wenn wirklich eine Blob-URL vorhanden ist.
 
-4. **Keine Backend-/Raspberry-Abhängigkeit.** Die PDF-Generierung läuft komplett im Browser (pdfmake → Blob → react-pdf). Funktioniert in der Preview genauso wie später auf dem Pi.
+6. Danach prüfen
+- Rechnung-Detailseite: PDF-Karte zeigt Vorschau statt nur „PDF bereit“.
+- Klick auf „PDF ansehen“: großer Dialog zeigt die PDF sichtbar.
+- Klick auf Auge-Icon in der Rechnungsübersicht: Dialog zeigt dieselbe PDF sichtbar.
+- Download-Link bleibt funktional.
 
-## Dateien
-- `package.json` — Version pinnen
-- `src/lib/pdf/pdfjsWorker.ts` — Diagnose + Fallback
-- `src/components/pdf/PdfPreviewCard.tsx` — echte Inline-Vorschau
-
-## Erwartetes Ergebnis
-- Live-Editor zeigt die PDF.
-- Detailseite (Karte unten rechts) zeigt die erste Seite als Vorschau.
-- Augen-Icon in der Übersicht öffnet den Viewer-Dialog mit korrekt gerenderter PDF.
-- Keine Mismatch-Fehler mehr in der Konsole.
+Ergebnis: Erst Funktionalität stabil. Das Design der PDF selbst fasse ich jetzt nur minimal an bzw. nicht als Hauptthema an; das können wir danach gezielt schöner machen.
