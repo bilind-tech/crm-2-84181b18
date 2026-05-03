@@ -11,7 +11,18 @@ import {
 } from "@/components/ui/command";
 import { useSearch } from "@/hooks/useApi";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { ArrowLeft, Building2, FileText, FolderClosed, Receipt, Search, StickyNote, Users, X } from "lucide-react";
+import {
+  ArrowLeft,
+  Building2,
+  ClipboardList,
+  FileText,
+  FolderClosed,
+  Receipt,
+  Search,
+  StickyNote,
+  Users,
+  X,
+} from "lucide-react";
 
 const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   kunde: Users,
@@ -19,6 +30,7 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   angebot: FileText,
   rechnung: Receipt,
   dokument: FolderClosed,
+  protokoll: ClipboardList,
   notiz: StickyNote,
 };
 
@@ -28,8 +40,18 @@ const GROUP_LABEL: Record<string, string> = {
   angebot: "Angebote",
   rechnung: "Rechnungen",
   dokument: "Dokumente",
+  protokoll: "Protokolle",
   notiz: "Notizen",
 };
+
+function useDebounced<T>(value: T, delay = 200): T {
+  const [v, setV] = useState(value);
+  useEffect(() => {
+    const t = setTimeout(() => setV(value), delay);
+    return () => clearTimeout(t);
+  }, [value, delay]);
+  return v;
+}
 
 export function GlobalSearch({
   open,
@@ -41,7 +63,8 @@ export function GlobalSearch({
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   const [q, setQ] = useState("");
-  const { data = [] } = useSearch(q);
+  const debouncedQ = useDebounced(q, 200);
+  const { data = [] } = useSearch(debouncedQ);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Cmd/Ctrl+K
@@ -80,18 +103,24 @@ export function GlobalSearch({
   const handleSelect = (t: (typeof data)[number]) => {
     onOpenChange(false);
     setQ("");
+    if (t.typ === "dokument") {
+      navigate({ to: "/dokumente", search: { focus: t.id } as never });
+      return;
+    }
     const route = t.link.route as
       | "/kunden/$id"
       | "/objekte/$id"
       | "/angebote/$id"
       | "/rechnungen/$id"
-      | "/dokumente";
+      | "/protokolle/$id";
     navigate({ to: route, params: t.link.params as never });
   };
 
   const resultsList = (
     <>
-      <CommandEmpty>{q ? "Nichts gefunden." : "Tippe zum Suchen …"}</CommandEmpty>
+      <CommandEmpty>
+        {debouncedQ ? "Nichts gefunden." : "Tippe zum Suchen — Name, Nummer, Adresse, Titel oder Inhalt."}
+      </CommandEmpty>
       {Object.entries(grouped).map(([typ, items]) => {
         const Icon = ICONS[typ] ?? FileText;
         return (
@@ -174,10 +203,10 @@ export function GlobalSearch({
     );
   }
 
-  // Desktop: zentraler Command-Dialog wie bisher
+  // Desktop: zentraler Command-Dialog. shouldFilter=false, sonst frisst cmdk Backend-Treffer.
   return (
-    <CommandDialog open={open} onOpenChange={onOpenChange}>
-      <CommandInput placeholder="Suche überall …" value={q} onValueChange={setQ} />
+    <CommandDialog open={open} onOpenChange={onOpenChange} shouldFilter={false}>
+      <CommandInput placeholder="Suche überall — Name, Nummer, Adresse, Titel oder Inhalt …" value={q} onValueChange={setQ} />
       <CommandList>{resultsList}</CommandList>
     </CommandDialog>
   );

@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { Smartphone, Receipt, AlertTriangle, X, Upload } from "lucide-react";
 import { useDokumente, useKunden, useObjekte } from "@/hooks/useApi";
 import { formatEUR, formatDate } from "@/lib/format";
@@ -24,9 +24,15 @@ import {
 import { Button } from "@/components/ui/button";
 import type { Dokument } from "@/lib/api/types";
 
-export const Route = createFileRoute("/dokumente")({ component: Page });
+export const Route = createFileRoute("/dokumente")({
+  component: Page,
+  validateSearch: (s: Record<string, unknown>): { focus?: string } => ({
+    focus: typeof s.focus === "string" ? s.focus : undefined,
+  }),
+});
 
 function Page() {
+  const { focus } = Route.useSearch();
   const { data: alle = [] } = useDokumente();
   const { data: kunden = [] } = useKunden();
   const [filter, setFilter] = useState("alle");
@@ -42,6 +48,13 @@ function Page() {
   const jahr = new Date().getFullYear();
   const uploadRef = useRef<DokumentUploadPanelHandle>(null);
   const uploadPanelRef = useRef<HTMLDivElement>(null);
+
+  // Aus globaler Suche: gewünschtes Dokument öffnen, sobald die Liste geladen ist.
+  useEffect(() => {
+    if (!focus || alle.length === 0) return;
+    const dok = alle.find((d) => d.id === focus);
+    if (dok) setViewing(dok);
+  }, [focus, alle]);
 
   const handlePickFiles = () => {
     uploadPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
