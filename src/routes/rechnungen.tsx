@@ -78,7 +78,7 @@ function bezahlt(r: Rechnung) {
 }
 function istVollBezahlt(r: Rechnung) {
   if (r.status === "bezahlt") return true;
-  if (r.status === "storniert" || r.status === "entwurf") return false;
+  if (r.status === "storniert") return false;
   const offen = brutto(r) - bezahlt(r);
   return offen <= 0.005 && bezahlt(r) > 0;
 }
