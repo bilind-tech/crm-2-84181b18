@@ -360,6 +360,7 @@ function Page() {
         <RechnungForm onClose={() => setOpenRechnung(false)} defaultKundeId={k.id} />
       </SlideOver>
       <KundeBearbeitenDialog kunde={k} open={openEdit} onOpenChange={setOpenEdit} />
+      <KundeLoeschenDialog kunde={k} open={openDelete} onOpenChange={setOpenDelete} />
     </div>
   );
 }
