@@ -43,7 +43,7 @@ export function ProtokollEditorLayout({ protokoll }: Props) {
     try {
       await editor.save(true);
       const blob = await generateProtokollPdf(draft, kundeQ.data, objekt, firmaQ.data);
-      const dateiname = protokollDateiname(draft, kundeQ.data);
+      const dateiname = protokollDateiname(draft, kundeQ.data, objekt);
       const url = await blobToDataUrl(blob);
       await abschliessen.mutateAsync({ dateiname, mimeType: "application/pdf", groesseBytes: blob.size, url });
       toast.success("Abgeschlossen — in Dokumenten gespeichert");
