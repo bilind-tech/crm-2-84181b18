@@ -5,31 +5,60 @@
 // + WAL bringen sie in Reihe.
 
 import { getDatabase } from "../db/index.js";
+import type { BelegArt } from "../belege/nummer-format.js";
 
-/** Liefert die nächste laufende Nummer für (kunde, periodeMMYY). */
-export function nextBelegNummer(kundeId: string, periodeMMYY: string): number {
+export { periodeMMYY } from "../belege/nummer-format.js";
+
+/** Liefert die nächste laufende Nummer für (kunde, belegart, periodeMMYY).
+ *  Atomar: UPSERT + RETURNING in einer SQL-Anweisung. */
+export function nextBelegNummer(
+  kundeId: string,
+  belegart: BelegArt,
+  periodeMMYY: string,
+): number {
   const row = getDatabase()
     .prepare(
-      `INSERT INTO belegnummer_zaehler (kunde_id, periode, naechster_start)
-       VALUES (?, ?, 2)
-       ON CONFLICT(kunde_id, periode) DO UPDATE SET naechster_start = naechster_start + 1
+      `INSERT INTO belegnummer_zaehler (kunde_id, belegart, periode, naechster_start)
+       VALUES (?, ?, ?, 2)
+       ON CONFLICT(kunde_id, belegart, periode)
+         DO UPDATE SET naechster_start = naechster_start + 1
        RETURNING naechster_start`,
     )
-    .get(kundeId, periodeMMYY) as { naechster_start: number };
-  // Bei INSERT (kein Conflict) liefert RETURNING den eingefügten Wert (=2).
-  // Die tatsächlich verwendete Nummer ist also (rückwärts gerechnet) start - 1.
-  // Wenn UPDATE: zurückgelieferter Wert ist der NEUE start; die vergebene
-  // Nummer ist start - 1.
+    .get(kundeId, belegart, periodeMMYY) as { naechster_start: number };
   return row.naechster_start - 1;
 }
 
-/** Vorschau ohne Vergabe — fürs Frontend (`/kunden/:id/zaehler`). */
-export function peekBelegNummer(kundeId: string, periodeMMYY: string): number {
+/** Setzt den Zähler mindestens auf `mindestens` hoch (z.B. nach Import).
+ *  Idempotent. */
+export function bumpBelegNummerMindestens(
+  kundeId: string,
+  belegart: BelegArt,
+  periodeMMYY: string,
+  mindestens: number,
+): void {
+  // mindestens = nächste freie NN, also "naechster_start" muss = mindestens sein.
+  getDatabase()
+    .prepare(
+      `INSERT INTO belegnummer_zaehler (kunde_id, belegart, periode, naechster_start)
+       VALUES (?, ?, ?, ?)
+       ON CONFLICT(kunde_id, belegart, periode)
+         DO UPDATE SET naechster_start = MAX(naechster_start, excluded.naechster_start)`,
+    )
+    .run(kundeId, belegart, periodeMMYY, Math.max(1, mindestens));
+}
+
+/** Vorschau ohne Vergabe. */
+export function peekBelegNummer(
+  kundeId: string,
+  belegart: BelegArt,
+  periodeMMYY: string,
+): number {
   const row = getDatabase()
     .prepare(
-      `SELECT naechster_start FROM belegnummer_zaehler WHERE kunde_id=? AND periode=?`,
+      `SELECT naechster_start FROM belegnummer_zaehler
+       WHERE kunde_id=? AND belegart=? AND periode=?`,
     )
-    .get(kundeId, periodeMMYY) as { naechster_start: number } | undefined;
+    .get(kundeId, belegart, periodeMMYY) as { naechster_start: number } | undefined;
   return row ? row.naechster_start : 1;
 }
 
@@ -59,17 +88,9 @@ export function nextObjektNummer(jahr: number): number {
   return row.naechster - 1;
 }
 
-/** Format "K-YYYY-NNN". */
 export function formatKundeNummer(jahr: number, n: number): string {
   return `K-${jahr}-${String(n).padStart(3, "0")}`;
 }
 export function formatObjektNummer(jahr: number, n: number): string {
   return `O-${jahr}-${String(n).padStart(3, "0")}`;
-}
-
-/** "MMYY" für ein Datum (default: jetzt). */
-export function periodeMMYY(date: Date = new Date()): string {
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const y = String(date.getFullYear()).slice(-2);
-  return `${m}${y}`;
 }
