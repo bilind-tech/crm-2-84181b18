@@ -1,58 +1,66 @@
-## Problem
+## Ziel
 
-Wenn man im EmailVersandDialog auf „Senden" klickt, meldet die App „E-Mail versendet" — auch wenn in den Einstellungen noch gar kein SMTP-Server, Benutzer oder Passwort hinterlegt ist. Grund: Das Mock-Backend (`src/lib/mock/backend.ts`, Route `POST /email/versand`) simuliert blind ~90 % Erfolg und ignoriert komplett, ob SMTP überhaupt konfiguriert ist. Das echte Backend (Pi/Fastify) prüft das ebenfalls nicht hart genug vor dem Senden.
+PDF-Vorschau auf Detailseiten (Angebote/Rechnungen) lädt nur **einmal** beim ersten Öffnen, danach sofort aus dem Cache — und wird nach Editor-Änderungen sauber durch die neue Version ersetzt. Wording: „erstellt" statt „erzeugt".
 
-Bei einem Feature, über das aktiv mit Kunden kommuniziert wird, ist das ein No-Go. Es darf nie eine Erfolgsmeldung erscheinen, wenn nichts gesendet wurde.
+## Status-Check (was schon stimmt)
 
-## Lösung — drei Verteidigungslinien
+Das Backend macht das bereits richtig:
+- `backend/src/pdf/cache.ts` legt PDFs unter `{dataDir}/pdf-cache/{art}/{id}-{hash}.pdf` ab, atomar via `rename`, und **löscht beim Schreiben automatisch alle alten Hash-Dateien zur selben ID**. Es gibt also nie zwei Versionen pro Beleg.
+- `wirePdfCacheInvalidation` invalidiert den Cache automatisch beim `beleg:mutated`-Event (das der Editor-Save bereits feuert).
+- Die Route `/rechnungen/:id/pdf` liefert ETag + `X-Pdf-Cache: hit/miss` und unterstützt 304.
 
-### 1. UI: Versand-Button prüft SMTP vor dem Klick
+Das Problem liegt **rein im Frontend**:
+1. `useBelegPdf` ruft bei jedem Mount erneut `fetchBackendPdf` auf, ohne React-Query — d.h. Detail-Seite zu/auf = neuer Fetch + neuer Loader.
+2. Der Hook zeigt „loading" auch bei Cache-Hits (sub-100 ms), was als Flackern wirkt.
+3. Im Mock-Modus (Lovable-Preview) wird jedes Mal komplett neu im Browser gebaut — daher der lange Spinner.
+4. Wording „erzeugt" statt „erstellt".
 
-Im `EmailVersandDialog.tsx`:
-- `useSmtp()` mitladen.
-- Senden-Button deaktivieren, wenn `!(smtp?.server && smtp?.benutzer && smtp?.passwortGesetzt)`.
-- Klar sichtbarer Warn-Banner oben im Dialog mit Link zu Einstellungen → E-Mail, sobald SMTP unvollständig.
-- Auch dort, wo der Dialog geöffnet wird (z. B. auf Rechnungs-/Angebot-Detailseite), wird zusätzlich kein „Erfolg" mehr suggeriert, falls Versand technisch nicht möglich.
+## Umsetzung
 
-### 2. Mock-Backend: liefert echten Fehler zurück, statt Erfolg vorzutäuschen
+### 1. PDF-Hook auf React Query umbauen (`src/hooks/useBelegPdf.ts`)
 
-In `src/lib/mock/backend.ts` (Route `POST /email/versand`):
-- Vor jeder Simulation prüfen: `d.smtp.server`, `d.smtp.benutzer`, `d.smtp.passwortGesetzt`. Wenn etwas fehlt → sofort `EmailVersand` mit `status: "failed"` und konkretem `fehlerGrund` zurückgeben („SMTP nicht konfiguriert. Bitte unter Einstellungen → E-Mail Server, Benutzer und Passwort hinterlegen."). Kein Aktivitäts-Log, kein Statuswechsel am Beleg.
-- Die existierende 90/10-Zufallssimulation bleibt nur für den Fall, dass SMTP vollständig konfiguriert ist (so bleibt das Mock-Verhalten realistisch, aber niemals fälschlich „grün").
+`useAngebotPdf` / `useRechnungPdf` werden zu `useQuery`-basierten Hooks:
 
-### 3. Echtes Backend (Fastify): hartes Pre-Check vor `enqueueVersand`
+- QueryKey: `["pdf", art, id]` — pro Beleg nur **eine** Query, geräteweit gecached.
+- `staleTime: Infinity`, `gcTime: 30 min` → solange App offen, nie nachladen.
+- `queryFn`:
+  - Backend-Modus: `fetch /{art}/:id/pdf` → `Blob` + ETag aus Header lesen, beides zurückgeben.
+  - Mock-Modus: `generateRechnungPdf/...` aufrufen, Blob zurückgeben.
+- Rückgabe: stabiler `blobUrl` — wird in `useMemo` aus dem Blob gebaut und beim Unmount via `URL.revokeObjectURL` freigegeben (über einen `useEffect`-Cleanup, der den vorigen Blob revoked, sobald ein neuer kommt).
+- `status` mappt von Query-State: `idle | loading | ready | error`. **„loading" wird nur beim allerersten Fetch gezeigt** — jeder weitere Mount derselben ID liefert sofort `data` und damit `ready`.
 
-In `backend/src/routes/email.ts` (POST `/email/versand`):
-- Vor dem Enqueue die SMTP-Settings laden (`AREAS.smtp` + `SENSITIVE_KEYS.smtpPassword`).
-- Wenn `host`, `user` oder `password` fehlen → mit HTTP 412 (Precondition Failed) und `{ error: "smtp-not-configured", message: "..." }` antworten. Kein Datenbank-Eintrag, kein Logging als „pending".
-- Damit ist garantiert, dass auch bei direkter API-Nutzung keine Mail in den Versand-Queue rutscht, solange SMTP nicht steht.
+### 2. Cache-Invalidation nach Editor-Speichern
 
-### 4. Frontend reagiert sauber auf den Fehler
+- In `useBelegEditor` (Save-Mutation) nach erfolgreichem PATCH: `queryClient.invalidateQueries({ queryKey: ["pdf", art, id] })`.
+- Zusätzlich im `useLiveEvents`-Handler für `beleg:mutated`: gleiche Invalidation. Damit greift der Refresh auch auf anderen Geräten/Tabs.
+- Backend überschreibt physisch beim nächsten Render — alte Datei verschwindet (passiert schon in `writeCached`).
 
-`useSendEmail`/`EmailVersandDialog`:
-- Wenn der Server `status: "failed"` (Mock) oder HTTP 412 (echtes Backend) liefert, zeigt der Toast den exakten `fehlerGrund` („SMTP nicht konfiguriert …") und bietet einen direkten Link in die SMTP-Einstellungen.
-- Der bisherige `toast.success("E-Mail versendet")` läuft nur noch, wenn `status === "sent"`.
-- Dialog bleibt offen, damit der Nutzer korrigieren kann.
+### 3. Mock-Backend: PDF-Cache im Speicher
 
-## Technische Details
+Im Mock-Modus (Lovable-Preview) gibt es keinen Pi. Damit das Verhalten gleich aussieht:
+- Modul-lokale `Map<string, Blob>` keyed auf `${art}:${id}:${semantischer-hash}` in `src/lib/pdf/belegPdf.ts`.
+- Vor `generateAngebotPdf/...` Cache prüfen, nach Build füllen. Bei semantischer Änderung des Belegs entsteht neuer Key, alter Blob darf garbage-collected werden (wir behalten max. 50 Einträge LRU).
 
-| Datei | Änderung |
-|---|---|
-| `src/components/email/EmailVersandDialog.tsx` | SMTP-Prüfung hinzufügen, Warn-Banner, Senden-Button-Disable, Link zu Einstellungen, Erfolgstoast nur bei `sent`. |
-| `src/lib/mock/backend.ts` (`POST /email/versand`) | Vorab-Check auf `d.smtp.server/benutzer/passwortGesetzt`. Bei Fehlen: `failed`-Antwort mit klarem `fehlerGrund`, ohne Statuswechsel/Aktivitätslog. |
-| `backend/src/routes/email.ts` | Vor `enqueueVersand` SMTP-Settings prüfen → bei fehlender Konfig HTTP 412 mit `smtp-not-configured`. |
-| (optional) `src/components/email/EmailEinstellungen.tsx` | Kleiner Hinweis: „Solange SMTP nicht vollständig ist, kann nichts versendet werden." |
+### 4. Wording & Loader-Politik
 
-## Was nicht geändert wird
+- `PdfPreviewCard.tsx`: „PDF wird erzeugt …" → „PDF wird erstellt …".
+- Loader (Spinner + Text) **nur** zeigen, wenn `status === "loading"` UND kein vorheriger Blob für diese ID existiert (also wirklich erster Build). Bei Re-Mount mit Cache-Hit: kein Loader, direkt PDF.
+- Spinner nicht mit künstlichem Delay aus-/einblenden — mit React-Query-Cache entsteht das Flackern gar nicht erst.
 
-- Bestehende Idempotenz-Logik (Doppelklick-Schutz) bleibt unverändert.
-- Mahnstufen-Bestätigungs-Flow bleibt unverändert.
-- Auto-E-Mail-Verbot (Memory-Regel) bleibt vollständig erhalten — Versand weiterhin nur per direktem User-Klick.
-- Keine SMTP-Anbieter-Wahl: Strato/Nodemailer-Setup bleibt wie geplant.
+### 5. Garantien (Anti-Bug-Leitplanken)
 
-## Ergebnis
+- Live-Editor → Detailseite: Editor-Save-Mutation invalidiert Query, Detailseite holt neue PDF (1× Loader, dann fest).
+- Backend stellt sicher, dass im Cache-Verzeichnis pro `id` immer nur **eine** `.pdf` existiert (`writeCached` löscht andere Hashes derselben ID atomar **nach** erfolgreichem `rename`).
+- Bei Render-Fehler bleibt die alte Cache-Datei erhalten (kein Datenverlust), Frontend zeigt Fehler.
+- ETag-Header bleibt erhalten — Browser-Reload nutzt 304.
+- Drive-Upload-Pfad bleibt unberührt (orthogonal zum Cache).
 
-Nach dem Update:
-- „E-Mail versendet" erscheint **nur noch**, wenn die Mail tatsächlich rausging.
-- Ohne SMTP-Konfiguration: Senden-Button ist aus, Banner erklärt warum, Klick (falls doch erzwungen) → klare Fehlermeldung mit direktem Sprung in die Einstellungen.
-- Drei voneinander unabhängige Schichten (UI, Mock, echtes Backend) verhindern, dass je wieder ein falsches Erfolgs-Signal entsteht.
+## Geänderte Dateien
+
+- `src/hooks/useBelegPdf.ts` — komplette Umstellung auf React Query
+- `src/lib/pdf/belegPdf.ts` — kleine LRU-Cache-Map für Mock-Modus
+- `src/hooks/useBelegEditor.ts` — Query-Invalidation nach Save
+- `src/hooks/useLiveEvents.ts` — Invalidation bei `beleg:mutated`
+- `src/components/pdf/PdfPreviewCard.tsx` — Wording „erstellt", Loader-Logik
+
+Backend und Cache-Disk-Layout bleiben unverändert.
