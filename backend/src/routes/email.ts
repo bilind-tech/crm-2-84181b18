@@ -128,6 +128,20 @@ export async function emailRoutes(app: FastifyInstance): Promise<void> {
       const p = VersandSchema.safeParse(req.body);
       if (!p.success) { reply.status(422); return { error: "validation", issues: p.error.issues }; }
 
+      // ---- Pre-Check: SMTP MUSS vollständig konfiguriert sein ----
+      // Verhindert, dass eine Mail in die Versand-Tabelle wandert, obwohl der Versand
+      // technisch unmöglich ist. Sonst würde im UI fälschlich „erfolgreich" stehen.
+      const rt = loadSmtpRuntime();
+      if (!rt || !rt.smtp?.host || !rt.smtp?.user || !rt.passwordIsSet) {
+        audit({ userId: req.user?.id, action: "email.send.smtp-fehlt", ip: req.ip });
+        reply.status(412);
+        return {
+          error: "smtp-not-configured",
+          message:
+            "SMTP ist nicht vollständig konfiguriert. Bitte unter Einstellungen → E-Mail Server, Benutzer und Passwort hinterlegen.",
+        };
+      }
+
       // ---- Normalisierung: UI-Aliasse -> Repo-Schema ----
       const d = p.data;
       const toList = d.empfaenger ?? (d.empfaengerTo ? [d.empfaengerTo] : []);
