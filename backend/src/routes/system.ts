@@ -38,8 +38,6 @@ import type { UpdateLauf } from "../system/types.js";
 const rollbackFails = new Map<string, { count: number; until: number }>();
 
 function adaptLauf(l: UpdateLauf): unknown {
-  // Frontend erwartet (src/lib/api/types.ts UpdateLauf):
-  // { id, von, zu, startetAm, beendetAm, status: "laeuft"|"erfolg"|"fehler"|"rollback", steps[] }
   return {
     id: l.id,
     von: l.vorherigeVersion,
@@ -48,6 +46,8 @@ function adaptLauf(l: UpdateLauf): unknown {
     beendetAm: l.beendetAm,
     status: l.status,
     fehlgeschlagenBei: l.steps.find((s) => s.status === "fehler")?.stepId,
+    safetyBackupId: l.safetyBackupId,
+    quelle: l.quelle,
     steps: l.steps.map((s) => ({
       id: s.stepId,
       label: s.label,
