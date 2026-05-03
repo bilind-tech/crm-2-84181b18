@@ -14,7 +14,7 @@ import {
   RadioGroupItem,
 } from "@/components/ui/radio-group";
 import { KundenObjektPicker, kundenAnzeige } from "@/components/werkzeuge/KundenObjektPicker";
-import { useFirmendaten } from "@/hooks/useApi";
+import { useFirmendaten, useCreateDokument } from "@/hooks/useApi";
 import type { Kunde, Objekt } from "@/lib/api/types";
 import {
   downloadBlob,
@@ -23,6 +23,7 @@ import {
   type SchluesselRichtung,
   type SchluesselZeile,
 } from "@/lib/pdf/werkzeugePdf";
+import { blobToDataUrl } from "@/lib/dokumente/blobToDataUrl";
 
 export const Route = createFileRoute("/werkzeuge/schluesseluebergabe")({
   component: Page,
@@ -34,6 +35,7 @@ function leereZeile(): SchluesselZeile {
 
 function Page() {
   const firmaQ = useFirmendaten();
+  const createDokument = useCreateDokument();
   const [kunde, setKunde] = useState<Kunde | undefined>();
   const [objekt, setObjekt] = useState<Objekt | undefined>();
   const [richtung, setRichtung] = useState<SchluesselRichtung>("ausgabe");
@@ -106,6 +108,27 @@ function Page() {
       const fname = `Schluesseluebergabe_${safeFilename(kundenAnzeige(kunde))}_${datum}.pdf`;
       downloadBlob(blob, fname);
       toast.success("PDF wurde heruntergeladen");
+      try {
+        const richtungLabel = richtung === "ausgabe" ? "Ausgabe" : "Rücknahme";
+        await createDokument.mutateAsync({
+          titel: `Schlüsselübergabe (${richtungLabel}) – ${kundenAnzeige(kunde)} – ${datum}`,
+          typ: "protokoll",
+          kundeId: kunde.id,
+          objektId: objekt?.id,
+          dateiname: fname,
+          mimeType: "application/pdf",
+          groesseBytes: blob.size,
+          url: await blobToDataUrl(blob),
+          dokumentdatum: datum,
+          steuerrelevant: false,
+          hochgeladenAm: new Date().toISOString(),
+          quelle: "upload",
+        });
+        toast.success("Im Bereich „Dokumente" gespeichert");
+      } catch (e) {
+        console.error(e);
+        toast.warning("Konnte nicht in „Dokumente" gespeichert werden — PDF ist heruntergeladen.");
+      }
       if (!downloadOnly) {
         toast.message("E-Mail-Versand", {
           description:

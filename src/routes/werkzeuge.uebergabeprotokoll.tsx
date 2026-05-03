@@ -15,7 +15,7 @@ import {
   RadioGroupItem,
 } from "@/components/ui/radio-group";
 import { KundenObjektPicker, kundenAnzeige } from "@/components/werkzeuge/KundenObjektPicker";
-import { useFirmendaten } from "@/hooks/useApi";
+import { useFirmendaten, useCreateDokument } from "@/hooks/useApi";
 import type { Kunde, Objekt } from "@/lib/api/types";
 import {
   downloadBlob,
@@ -23,13 +23,23 @@ import {
   safeFilename,
   type ProtokollArt,
 } from "@/lib/pdf/werkzeugePdf";
+import { blobToDataUrl } from "@/lib/dokumente/blobToDataUrl";
 
 export const Route = createFileRoute("/werkzeuge/uebergabeprotokoll")({
   component: Page,
 });
 
+function artLabel(a: ProtokollArt): string {
+  return a === "uebergabe"
+    ? "Übergabeprotokoll"
+    : a === "abnahme"
+      ? "Abnahmeprotokoll"
+      : "Übergabe- & Abnahmeprotokoll";
+}
+
 function Page() {
   const firmaQ = useFirmendaten();
+  const createDokument = useCreateDokument();
   const [kunde, setKunde] = useState<Kunde | undefined>();
   const [objekt, setObjekt] = useState<Objekt | undefined>();
   const [art, setArt] = useState<ProtokollArt>("uebergabe");
@@ -99,6 +109,26 @@ function Page() {
       }_${safeFilename(kundenAnzeige(kunde))}_${datum}.pdf`;
       downloadBlob(blob, fname);
       toast.success("PDF wurde heruntergeladen");
+      try {
+        await createDokument.mutateAsync({
+          titel: `${artLabel(art)} – ${kundenAnzeige(kunde)} – ${datum}`,
+          typ: "protokoll",
+          kundeId: kunde.id,
+          objektId: objekt?.id,
+          dateiname: fname,
+          mimeType: "application/pdf",
+          groesseBytes: blob.size,
+          url: await blobToDataUrl(blob),
+          dokumentdatum: datum,
+          steuerrelevant: false,
+          hochgeladenAm: new Date().toISOString(),
+          quelle: "upload",
+        });
+        toast.success("Im Bereich „Dokumente" gespeichert");
+      } catch (e) {
+        console.error(e);
+        toast.warning("Konnte nicht in „Dokumente" gespeichert werden — PDF ist heruntergeladen.");
+      }
       if (!downloadOnly) {
         toast.message("E-Mail-Versand", {
           description:
