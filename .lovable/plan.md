@@ -1,83 +1,60 @@
-# Plan 6 — „Drucken"-Button überall
+# Plan 7 — Dokumente-Upload mobil reparieren + Drucken im Viewer
 
-Ziel: Auf jeder Seite, die ein PDF erzeugt (Angebot, Rechnung, Übergabeprotokoll, Schlüsselübergabe), gibt es genau **einen** Button „Drucken", der **mit einem Klick** den Druck-Dialog öffnet — egal wie viele Seiten das PDF hat. Schnell, kein zusätzlicher Download-Schritt für den Nutzer, kein Tab-Wirrwarr.
+Zwei zusammenhängende Probleme im `/dokumente`-Bereich:
 
-## Strategie (technisch)
+## Problem 1 — Upload auf dem Handy unsichtbar
 
-Browser können **PDF-Blobs nicht direkt drucken** — `window.print()` druckt immer das gerade aktive Dokument. Robuster, browserübergreifender Weg:
+Aktuell rendert die Seite **zweimal** das Upload-Panel:
 
-1. PDF als **Blob** erzeugen / besorgen (haben wir schon: `useAngebotPdf`, `useRechnungPdf`, `generateUebergabeprotokollPdf`, `generateSchluesseluebergabePdf`).
-2. Blob → `URL.createObjectURL(blob)`.
-3. **Verstecktes `<iframe>`** in den DOM hängen (`position: fixed; left: -9999px`), `src = blobUrl`, `onload` → `iframe.contentWindow.print()`.
-4. Nach `print()` wird der native Druck-Dialog des Browsers geöffnet (Vorschau + alle Seiten).
-5. Cleanup: nach `afterprint` (oder Timeout fallback) iframe entfernen + `revokeObjectURL`.
+1. `<DokumentUploadPanel compact />` in der **Header-Actions-Zeile** (rechts oben, neben „Vom Handy scannen").
+2. `<DokumentUploadPanel />` (Vollform mit Drop-Zone) **unter den KPI-Kacheln**.
 
-**Fallback**, falls der Browser Drucken aus einem Cross-Origin/blob-iframe verbietet (Safari iOS):
-- `window.open(blobUrl, "_blank")` → neuer Tab → User klickt dort einmal auf Drucken.
-- Vorher per Feature-Detection erkennen (User-Agent ist Mist; wir versuchen iframe-Print, fangen Fehler ab und fallen automatisch auf neuer Tab zurück).
+Das sind **zwei voneinander unabhängige Instanzen mit eigenem State**. Wenn der Nutzer auf dem Handy den kompakten „Dateien wählen"-Button im Header antippt, landen die ausgewählten Dateien im **State der Header-Instanz**. Diese rendert dann die Datei-Liste + „Alle hochladen"-Button innerhalb der Header-Actions-`flex-wrap`-Zeile — auf Mobile gequetscht zwischen den anderen Header-Buttons und vom Nutzer faktisch nicht auffindbar (er sieht weder die ausgewählte Datei noch den Hochladen-Button).
 
-Das deckt alle Browser ab und respektiert genau deine Vorgabe: erste Wahl gleicher Tab, Fallback neuer Tab — beides funktioniert auch bei mehrseitigen PDFs.
+### Fix
 
-## Zentrale Hilfsfunktion
+- Den **kompakten Panel-Aufruf in `PageHeader.actions` entfernen**.
+- Stattdessen ein **gemeinsames `useRef<DokumentUploadPanelHandle>`** in `dokumente.tsx` halten und einen schlichten **„Datei wählen"-Button** in den Header packen, der `inputRef.current.click()` der **einzigen** Vollform-Panel-Instanz auslöst. Dazu wird `DokumentUploadPanelHandle` um eine Methode `openPicker()` erweitert (`useImperativeHandle`).
+- Beim Klick zusätzlich smooth zur Panel-Position scrollen, damit auf Mobile der Stapel + Hochladen-Button sofort im Viewport ist.
+- Ergebnis: Genau **eine** State-Quelle. Datei-Liste, Status-Zeilen, „Alle hochladen"-Button erscheinen verlässlich im großen Panel unter den KPIs — sowohl mobil als auch Desktop. Das gleiche gilt automatisch für den Klick auf die Drop-Zone selbst (funktioniert auf Mobile als Tap).
 
-Eine neue Datei `src/lib/pdf/printBlob.ts`:
+Kein Verhalten der Kunden- und Objekt-Detail-Seiten ändert sich (die nutzen das Vollpanel ohnehin direkt).
 
-- `printPdfBlob(blob: Blob, opts?: { fileName?: string }): Promise<void>`
-- Versucht **iframe-Drucken**. Bei Fehler oder Safari-iOS automatisch `window.open` Fallback.
-- Räumt URL und iframe in `afterprint` / nach 60s sicher auf, damit der Speicher nicht voll läuft.
+## Problem 2 — Dokumente öffnen & drucken
 
-## Wo der Button hinkommt
+Der `DokumentViewer` zeigt heute Bilder und PDFs an, hat aber **keinen Druck-Button**. Wir wollen Konsistenz mit dem Plan-6-„Drucken"-Verhalten.
 
-| Stelle | Komponente | Vorgehen |
-|---|---|---|
-| Angebot-Detail (`/angebote/$id`) | `src/routes/angebote.$id.tsx` | „Drucken"-Button neben dem bestehenden „PDF"-Button. Holt Blob aus `useAngebotPdf(a)` und ruft `printPdfBlob`. |
-| Rechnung-Detail (`/rechnungen/$id`) | `src/routes/rechnungen.$id.tsx` | analog mit `useRechnungPdf(r)`. |
-| Übergabe-/Abnahmeprotokoll (`/werkzeuge/uebergabeprotokoll`) | `src/routes/werkzeuge.uebergabeprotokoll.tsx` | Neuer dritter Action-Button „Drucken" — erzeugt Blob via `generateUebergabeprotokollPdf` und ruft `printPdfBlob` direkt (kein Download). |
-| Schlüsselübergabe (`/werkzeuge/schluesseluebergabe`) | `src/routes/werkzeuge.schluesseluebergabe.tsx` | analog. |
-| `PdfViewerDialog` (Vorschau-Dialog für Beleg-PDFs) | `src/components/pdf/PdfViewerDialog.tsx` | Bestehender Dialog bekommt zusätzlich „Drucken" — wer schon im Vorschau-Dialog ist, kann von dort direkt drucken. |
-| Listen (`/angebote`, `/rechnungen`) | optional Folge-PR | **Bewusst NICHT in diesem Plan** — Liste hat schon den Eye-Button, mehr Druck-Eintritte erhöhen Klickfehler. Sag Bescheid, wenn du es trotzdem dort willst. |
+### Fix
 
-Ein gemeinsamer kleiner Wrapper `src/components/pdf/PrintButton.tsx`:
-- Props: `getBlob: () => Promise<Blob>`, optional `label`, `variant`, `size`.
-- Zeigt einen Button mit Drucker-Icon (`Printer` aus lucide-react).
-- Klick → Loader-Spinner anzeigen, `getBlob()` awaiten, `printPdfBlob` rufen.
-- Toast bei Fehler („Drucken fehlgeschlagen").
-- Disabled solange Blob nicht bereit.
+- In `src/components/dokumente/DokumentViewer.tsx` neben „Download" und „Bearbeiten" einen **„Drucken"**-Button.
+- Bei **PDFs** und **Bildern** funktioniert der bestehende `printPdfBlobUrl`-Mechanismus aus `src/lib/pdf/printBlob.ts` direkt (versteckter `<iframe>`, Fallback neuer Tab) — das iframe-Print funktioniert für Bilder ebenso wie für PDFs, weil der Browser im iframe nur die Datei rendert.
+- Für **andere MIME-Types** (z. B. heic, sonstige) wird der Drucken-Button ausgeblendet (genauso wie heute schon „Vorschau nicht verfügbar" greift).
+- Re-Use: einfach den vorhandenen `<PrintButton url={dateiUrl} />` aus `src/components/pdf/PrintButton.tsx` einbinden — kein neuer Code, nur Verdrahtung.
 
-Damit hat jede der oben genannten Seiten **eine Zeile**, die den Button einsetzt — keine doppelte Logik, kein doppelter Cleanup.
+### Pop-up-Blocker-Fix (kleiner Nebeneffekt aus Plan 6)
 
-## UX-Details
+Der Console-Fehler „Pop-up blockiert" tauchte auf, weil der iframe-Pfad fehlschlug und unser Fallback `window.open` synchron, aber zu spät innerhalb eines async `onload`-Callbacks aufgerufen wird → Browser werten das nicht mehr als User-Gesture. Behebung in `printBlob.ts`:
 
-- Beleg-Detailseiten: Beim ersten Aufruf von `useAngebotPdf` wird der Blob ohnehin gebaut/geladen. Der Print-Button kann den **bereits gecachten Blob** wiederverwenden — Druck ist quasi instantan, sobald die Seite geladen hat.
-- Werkzeuge: Bisher erzeugt der „PDF erstellen"-Button den Blob, lädt ihn herunter und ist fertig. Der neue „Drucken"-Button erzeugt den Blob **und ruft direkt Druck**, ohne Download-Datei im Downloads-Ordner abzulegen. Der Download bleibt als separater Button erhalten.
-- Visuell: Drucker-Icon + Text „Drucken". Variant `outline` wie die anderen Sekundär-Aktionen in der Header-Action-Bar, damit es sich konsistent einreiht. Keine Sparkles, keine Gradients (wie in Memory festgehalten).
-- Loading: kleiner Spinner im Button, solange Blob baut (max ~1–2 s im Mock, instant aus Cache).
+- Fallback NICHT mehr werfen, sondern **soft erkennen**: wenn `window.open` `null` liefert → Toast „Pop-ups blockiert — PDF wird stattdessen heruntergeladen", parallel den Blob als Download anbieten (a-Tag mit `download`-Attribut, programmatischer Klick — funktioniert auch ohne Gesture).
+- Damit gibt es nie mehr eine ungefangene Exception, und der Nutzer hat IMMER eine Aktion: entweder Druck-Dialog (Standardfall), neuer Tab (Fallback), oder Download (letzter Fallback).
 
 ## Geänderte / neue Dateien
 
 | Datei | Änderung |
 |---|---|
-| `src/lib/pdf/printBlob.ts` | **neu** — `printPdfBlob` mit iframe-Strategie + Fallback |
-| `src/components/pdf/PrintButton.tsx` | **neu** — wiederverwendbarer Button-Wrapper |
-| `src/components/pdf/PdfViewerDialog.tsx` | „Drucken"-Action ergänzen |
-| `src/routes/angebote.$id.tsx` | PrintButton in Header-Actions |
-| `src/routes/rechnungen.$id.tsx` | PrintButton in Header-Actions |
-| `src/routes/werkzeuge.uebergabeprotokoll.tsx` | PrintButton in Sticky-Bar |
-| `src/routes/werkzeuge.schluesseluebergabe.tsx` | PrintButton in Sticky-Bar |
+| `src/routes/dokumente.tsx` | kompakten Panel-Aufruf entfernen; einen schlichten „Datei wählen"-Button im Header, der ein Ref des einzigen Panels triggert; smoothScrollIntoView auf Klick |
+| `src/components/dokumente/DokumentUploadPanel.tsx` | `DokumentUploadPanelHandle` um `openPicker()` erweitern |
+| `src/components/dokumente/DokumentViewer.tsx` | `<PrintButton url={dateiUrl} />` neben Download (sichtbar nur wenn isImage oder isPdf) |
+| `src/lib/pdf/printBlob.ts` | Pop-up-Fallback ohne Throw, mit Download-Toast als finale Eskalation |
 
-Keine neuen Backend-Routen, keine Migrations, keine neuen Dependencies — `lucide-react` hat `Printer` schon.
+Keine neuen Dependencies, keine Backend-Änderungen, keine Migration.
 
 ## Akzeptanzkriterien
 
-1. Auf `/angebote/:id` und `/rechnungen/:id` erscheint ein **„Drucken"**-Button neben „PDF". Ein Klick öffnet ohne Tab-Wechsel den nativen Druck-Dialog mit allen Seiten des PDFs.
-2. Auf `/werkzeuge/uebergabeprotokoll` und `/werkzeuge/schluesseluebergabe` ist der Button in der Sticky-Action-Bar verfügbar — ein Klick erzeugt das PDF und öffnet sofort den Druck-Dialog (kein Download nötig).
-3. Funktioniert in Chrome, Edge, Firefox **im selben Tab** über das versteckte iframe.
-4. In Safari (insbesondere iOS), wo iframe-Druck eingeschränkt ist, fällt es automatisch auf einen **neuen Tab** zurück, der den nativen Druck-Dialog des Geräts öffnet.
-5. Mehrseitige PDFs werden vollständig gedruckt (kein Abschneiden).
-6. Nach dem Druck: keine zurückbleibenden iframes/Object-URLs (Speicher sauber).
+1. **Mobil**: Klick auf „Datei wählen" im Header öffnet den Datei-Picker. Nach Auswahl ist die Datei sichtbar in einem Stapel mit Vorschau-Thumbnail, daneben sichtbar der Button **„Alle hochladen (n)"**. Der Stapel ist im Viewport.
+2. Identisches Verhalten beim Tap auf die Drop-Zone selbst.
+3. Nach erfolgreichem Upload erscheint das Dokument sofort in der Liste / Karten-Ansicht (bestehende `qc.invalidate` greift bereits).
+4. Im Dokument-Viewer ist neben Download/Bearbeiten ein **„Drucken"**-Button. Klick öffnet bei Bildern und PDFs den nativen Druck-Dialog (gleiche Strategie wie Plan 6).
+5. Pop-up-Blocker führt nicht mehr zu ungefangener Exception; statt dessen erfolgt ein Toast + automatischer Download.
 
-## Risiko
-
-Niedrig. Reine Frontend-Erweiterung. Bestehende Download-/Mail-/Bearbeiten-Buttons bleiben unverändert. Maximaler Schaden bei Bugs: Druck öffnet sich nicht — der Nutzer hat noch immer den vorhandenen „PDF"-Download-Button als Alternative.
-
-Sag „Go", dann setze ich Plan 6 um.
+Sag „Go", dann setze ich Plan 7 um.

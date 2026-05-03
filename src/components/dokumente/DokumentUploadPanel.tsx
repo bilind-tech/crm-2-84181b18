@@ -72,6 +72,8 @@ export interface DokumentUploadPanelProps {
 export interface DokumentUploadPanelHandle {
   /** Externe API: Dateien (z. B. aus GlobalDropZone) hinzufügen. */
   addFiles: (files: FileList | File[]) => void;
+  /** Externe API: Datei-Picker öffnen (z. B. aus Header-Button). */
+  openPicker: () => void;
 }
 
 function uid(): string {
@@ -143,7 +145,10 @@ export const DokumentUploadPanel = forwardRef<DokumentUploadPanelHandle, Dokumen
       setItems((prev) => [...prev, ...neu]);
     }
 
-    useImperativeHandle(ref, () => ({ addFiles }));
+    useImperativeHandle(ref, () => ({
+      addFiles,
+      openPicker: () => inputRef.current?.click(),
+    }));
 
     function entferne(id: string): void {
       setItems((prev) => {
