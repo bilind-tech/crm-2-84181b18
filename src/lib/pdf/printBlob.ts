@@ -21,20 +21,6 @@ function isLikelyIosSafari(): boolean {
   return isIos && isSafari;
 }
 
-function downloadAsFallback(url: string): void {
-  try {
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "";
-    a.rel = "noreferrer";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-  } catch {
-    /* noop */
-  }
-}
-
 function openInNewTab(url: string): boolean {
   try {
     const win = window.open(url, "_blank", "noopener,noreferrer");
@@ -42,13 +28,10 @@ function openInNewTab(url: string): boolean {
   } catch {
     /* noop */
   }
-  // Pop-up blockiert → als Download anbieten, leise Toast
-  downloadAsFallback(url);
   try {
-    // sonner ist global verfügbar; dynamischer Import vermeidet harte Kopplung
     import("sonner").then(({ toast }) => {
-      toast.message("Druck-Dialog konnte nicht geöffnet werden", {
-        description: "Datei wurde stattdessen heruntergeladen.",
+      toast.error("Druck-Dialog konnte nicht geöffnet werden", {
+        description: "Bitte Pop-ups für diese Seite zulassen.",
       });
     }).catch(() => { /* noop */ });
   } catch { /* noop */ }
