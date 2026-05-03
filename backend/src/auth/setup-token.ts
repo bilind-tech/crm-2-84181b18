@@ -31,6 +31,10 @@ export function userCount(): number {
 
 export function markSetupComplete(): void {
   setupCompleteCache = true;
+  // Setup-Token-Datei nach erfolgreicher Einrichtung sofort von der Platte entfernen.
+  if (existsSync(tokenPath())) {
+    try { unlinkSync(tokenPath()); } catch { /* ignore */ }
+  }
 }
 
 export function invalidateSetupCache(): void {

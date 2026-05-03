@@ -3,7 +3,8 @@
 
 import { getDatabase } from "../db/index.js";
 
-export const MAX_FAILS = 5;
+// LAN-Single-User: alle Geräte hinter derselben IP. 10 Versuche statt 5.
+export const MAX_FAILS = 10;
 const LOCK_MINUTES = 15;
 
 function nowMs(): number {

@@ -228,7 +228,7 @@ async function runInstall(laufId: string, opts: InstallOptions): Promise<void> {
       try {
         const { stdout } = await execFileP("npm", ["ci", "--omit=dev"], {
           cwd: targetVersionDir,
-          timeout: 5 * 60_000,
+          timeout: 10 * 60_000, // Pi + USB-SSD: 5 min war knapp
           maxBuffer: 50 * 1024 * 1024,
         });
         return stdout.split("\n").slice(-3).join(" ");

@@ -10,13 +10,18 @@ User=mycleancenter
 Group=mycleancenter
 WorkingDirectory=/opt/mycleancenter/current/backend
 Environment=NODE_ENV=production
+Environment=TZ=Europe/Berlin
 Environment=DATA_DIR=/var/lib/mycleancenter
 Environment=PORT=8787
 Environment=HOST=0.0.0.0
 Environment=FRONTEND_DIR=/opt/mycleancenter/current/dist
 # CORS muss in Production explizit gesetzt werden — kommagetrennte Liste der erlaubten Origins.
-# Beispiel: http://mycleancenter.local,https://mycleancenter.local
-Environment=CORS_ORIGINS=http://mycleancenter.local,http://mycleancenter.local:80
+# Frontend wird vom Backend auf Port 8787 ausgeliefert; bei Zugriff per LAN-IP ergänzen, z. B.:
+#   http://mycleancenter.local:8787,http://192.168.1.50:8787
+Environment=CORS_ORIGINS=http://mycleancenter.local:8787
+# Google-OAuth-Redirect wird hart gesetzt, damit Google-Whitelist (exact match) funktioniert,
+# egal ob Aufruf via mDNS oder LAN-IP erfolgt.
+Environment=GOOGLE_OAUTH_REDIRECT=http://mycleancenter.local:8787/einstellungen/google-drive/callback
 ExecStart=/usr/bin/node dist/server.js
 Restart=on-failure
 RestartSec=3

@@ -29,6 +29,7 @@ import { startFristenScheduler } from "./dokumente/fristen-cron.js";
 import { mahnungRoutes } from "./routes/mahnung.js";
 import { startMahnScheduler } from "./mahnung/cron.js";
 import { driveRoutes } from "./routes/drive.js";
+import { emailRoutes } from "./routes/email.js";
 import { startDriveWorker } from "./drive/upload-worker.js";
 import { wireDriveAutoEnqueue } from "./drive/auto-enqueue.js";
 import { wireDokumenteDriveAutoEnqueue } from "./dokumente/drive-wireup.js";
@@ -109,7 +110,22 @@ async function main(): Promise<void> {
     bodyLimit: 10 * 1024 * 1024, // normale Routes; Backup-Upload nutzt Multipart-Stream
   });
 
-  await app.register(helmet, { contentSecurityPolicy: false });
+  await app.register(helmet, {
+    contentSecurityPolicy: {
+      useDefaults: true,
+      directives: {
+        "default-src": ["'self'"],
+        "img-src": ["'self'", "data:", "blob:"],
+        "style-src": ["'self'", "'unsafe-inline'"],
+        "script-src": ["'self'"],
+        "font-src": ["'self'", "data:"],
+        "connect-src": ["'self'"],
+        "frame-ancestors": ["'none'"],
+        "object-src": ["'none'"],
+        "base-uri": ["'self'"],
+      },
+    },
+  });
   await app.register(cookie);
   await app.register(cors, {
     origin: config.corsOrigins.includes("*") ? true : config.corsOrigins,
@@ -160,6 +176,7 @@ async function main(): Promise<void> {
   await app.register(protokolleRoutes);
   await app.register(mahnungRoutes);
   await app.register(driveRoutes);
+  await app.register(emailRoutes);
 
   // Frontend-Statics — nur wenn FRONTEND_DIR existiert (Prod / Pi-Bundle).
   // Im Dev läuft das Frontend separat über Vite, daher hier kein Fehler.

@@ -151,9 +151,16 @@ export function listSessions(userId: string): Array<{
 }
 
 export function purgeExpiredSessions(): number {
-  return getDatabase()
+  const db = getDatabase();
+  // Tokens vor dem DELETE einsammeln, damit der Touch-Cache mit aufgeräumt wird.
+  const expired = db
+    .prepare(`SELECT token FROM auth_session WHERE expires_at < ? OR hard_expires_at < ?`)
+    .all(nowIso(), nowIso()) as Array<{ token: string }>;
+  const res = db
     .prepare(`DELETE FROM auth_session WHERE expires_at < ? OR hard_expires_at < ?`)
-    .run(nowIso(), nowIso()).changes;
+    .run(nowIso(), nowIso());
+  for (const r of expired) lastTouchedAt.delete(r.token);
+  return res.changes;
 }
 
 /**
