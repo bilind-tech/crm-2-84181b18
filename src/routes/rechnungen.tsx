@@ -61,13 +61,26 @@ function statusBadge(status: string) {
 }
 
 function brutto(r: Rechnung) {
-  return (
-    r.positionen.reduce((a, p) => a + p.menge * p.einzelpreisNetto * (1 - p.rabatt / 100), 0) *
-    (1 + r.steuersatz / 100)
-  );
+  // Spiegelt summenRechnung im Backend: Brutto pro Position mit pos.steuersatz,
+  // dann Gesamtrabatt anteilig auf netto+steuer angewendet.
+  let netto = 0;
+  let steuer = 0;
+  for (const p of r.positionen) {
+    const linie = p.menge * p.einzelpreisNetto * (1 - p.rabatt / 100);
+    netto += linie;
+    steuer += linie * (p.steuersatz / 100);
+  }
+  const faktor = 1 - r.rabattGesamt / 100;
+  return (netto + steuer) * faktor;
 }
 function bezahlt(r: Rechnung) {
   return r.zahlungen.reduce((a, z) => a + z.betrag, 0);
+}
+function istVollBezahlt(r: Rechnung) {
+  if (r.status === "bezahlt") return true;
+  if (r.status === "storniert" || r.status === "entwurf") return false;
+  const offen = brutto(r) - bezahlt(r);
+  return offen <= 0.005 && bezahlt(r) > 0;
 }
 
 function Page() {
