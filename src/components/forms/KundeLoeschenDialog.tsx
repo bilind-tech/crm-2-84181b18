@@ -23,10 +23,19 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useDeleteKunde } from "@/hooks/useApi";
-import type { Kunde } from "@/lib/api/types";
+import type { Kunde, Ansprechpartner, Objekt, Angebot, Rechnung, Dokument, Notiz } from "@/lib/api/types";
+
+type KundeDetail = Kunde & {
+  ansprechpartner: Ansprechpartner[];
+  objekte: Objekt[];
+  angebote: Angebot[];
+  rechnungen: Rechnung[];
+  dokumente: Dokument[];
+  notizen: Notiz[];
+};
 
 interface Props {
-  kunde: Kunde;
+  kunde: KundeDetail;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
