@@ -92,7 +92,7 @@ async function processDokument(row: DriveUpload): Promise<void> {
   // Sonderbehandlung: Protokolle landen in eigene Unterordner mit eigenem Dateinamen.
   const protokoll = dok.typ === "protokoll" ? getProtokollByDokumentId(row.belegId) : null;
 
-  const dateStr = (protokoll?.datum ? `${protokoll.datum}T12:00:00Z` : null) ?? dok.erstelltAm ?? new Date().toISOString();
+  const dateStr = (protokoll?.datum ? `${protokoll.datum}T12:00:00Z` : null) ?? dok.hochgeladenAm ?? new Date().toISOString();
   const d = new Date(dateStr);
   const objektName = protokoll?.objektId ? (getObjekt(protokoll.objektId)?.name ?? "") : "";
   const ctx: NamingContext = {

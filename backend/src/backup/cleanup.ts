@@ -8,7 +8,7 @@
 // =============================================================================
 import { existsSync, readdirSync, rmSync, statSync, unlinkSync } from "node:fs";
 import path from "node:path";
-import cron from "node-cron";
+import cron, { type ScheduledTask } from "node-cron";
 import { config } from "../config.js";
 import { audit } from "../auth/audit.js";
 import { reconcileDiskState } from "./rotation.js";
@@ -65,7 +65,7 @@ export function cleanupOldUploads(): number {
   return removed;
 }
 
-let reconcileTask: cron.ScheduledTask | null = null;
+let reconcileTask: ScheduledTask | null = null;
 
 /** Startet den täglichen Reconcile-Cron um 03:30 Europe/Berlin. */
 export function startBackupReconcileCron(): void {

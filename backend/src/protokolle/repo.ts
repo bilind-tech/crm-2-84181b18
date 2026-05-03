@@ -205,7 +205,7 @@ export function abschliessenProtokoll(id: string, input: AbschliessenInput): Pro
       if (old && !old.geloescht_am) {
         softDeleteDokument(cur.dokumentId);
         const refs = refsForSha(old.sha256);
-        if (refs.length === 0) deleteFile(old.storage_path);
+        if (refs === 0) deleteFile(old.storage_path);
       }
     }
 

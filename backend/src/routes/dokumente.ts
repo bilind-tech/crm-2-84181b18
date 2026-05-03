@@ -20,7 +20,7 @@ import { requireAuth } from "../auth/middleware.js";
 import { audit } from "../auth/audit.js";
 import { emit } from "../events/bus.js";
 import {
-  createDokument, deleteFile as _unused, // typecheck
+  createDokument,
   endSession, getDokument, getDokumentRaw, getSessionById, getSessionByToken,
   isSessionUploadable, listDokumente, refsForSha, softDeleteDokument, updateDokument,
   createSession,
@@ -34,7 +34,6 @@ import { isAllowedMime, MAX_UPLOAD_BYTES } from "../dokumente/types.js";
 import type { DokumentTyp, DokumentQuelle } from "../dokumente/types.js";
 import { runFristCheck } from "../dokumente/fristen-cron.js";
 // Avoid unused
-void _unused;
 
 interface ParsedUpload {
   buffer: Buffer;
