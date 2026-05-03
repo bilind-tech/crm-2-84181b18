@@ -398,11 +398,76 @@ export const useSendeRechnung = (id: string) => {
     onSuccess: () => invalidateRechnungScope(qc, id),
   });
 };
+/**
+ * Spiegelt rechnungStatusAuto im Backend, damit das optimistische Update den
+ * Status sofort korrekt hochstuft (versendet/teilbezahlt → bezahlt).
+ */
+function berechneRechnungStatus(r: Rechnung): Rechnung["status"] {
+  if (r.status === "storniert" || r.status === "entwurf") return r.status;
+  let netto = 0;
+  let steuer = 0;
+  for (const p of r.positionen) {
+    const linie = p.menge * p.einzelpreisNetto * (1 - p.rabatt / 100);
+    netto += linie;
+    steuer += linie * (p.steuersatz / 100);
+  }
+  const brutto = (netto + steuer) * (1 - r.rabattGesamt / 100);
+  const bezahlt = r.zahlungen.reduce((s, z) => s + z.betrag, 0);
+  if (bezahlt >= brutto - 0.005) return "bezahlt";
+  if (bezahlt > 0) return "teilbezahlt";
+  if (new Date(r.faelligkeitsdatum) < new Date()) return "ueberfaellig";
+  return r.status;
+}
+
+function patchRechnungInCache(
+  qc: QueryClient,
+  rechnungId: string,
+  patcher: (r: Rechnung) => Rechnung,
+) {
+  const detail = qc.getQueryData<Rechnung>(qk.rechnung(rechnungId));
+  if (detail) qc.setQueryData<Rechnung>(qk.rechnung(rechnungId), patcher(detail));
+  const listEntries = qc.getQueriesData<Rechnung[]>({ queryKey: ["rechnungen"] });
+  for (const [key, list] of listEntries) {
+    if (!Array.isArray(list)) continue;
+    const next = list.map((r) => (r.id === rechnungId ? patcher(r) : r));
+    qc.setQueryData(key, next);
+  }
+}
+
 export const useAddZahlung = (rechnungId: string) => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (data: Partial<Zahlung>) => api.post<Zahlung>(`/rechnungen/${rechnungId}/zahlungen`, data),
-    onSuccess: () => invalidateRechnungScope(qc, rechnungId),
+    onMutate: async (data) => {
+      await qc.cancelQueries({ queryKey: ["rechnungen"] });
+      await qc.cancelQueries({ queryKey: qk.rechnung(rechnungId) });
+      const snapshotDetail = qc.getQueryData<Rechnung>(qk.rechnung(rechnungId));
+      const snapshotLists = qc.getQueriesData<Rechnung[]>({ queryKey: ["rechnungen"] });
+      const tempId = `tmp-${Date.now()}`;
+      patchRechnungInCache(qc, rechnungId, (r) => {
+        const neu: Zahlung = {
+          id: tempId,
+          rechnungId,
+          datum: data.datum ?? new Date().toISOString().slice(0, 10),
+          betrag: data.betrag ?? 0,
+          methode: data.methode ?? "ueberweisung",
+          referenz: data.referenz,
+          notiz: data.notiz,
+        };
+        const next: Rechnung = { ...r, zahlungen: [...r.zahlungen, neu] };
+        next.status = berechneRechnungStatus(next);
+        return next;
+      });
+      return { snapshotDetail, snapshotLists };
+    },
+    onError: (_err, _vars, ctx) => {
+      if (!ctx) return;
+      if (ctx.snapshotDetail) qc.setQueryData(qk.rechnung(rechnungId), ctx.snapshotDetail);
+      for (const [key, value] of ctx.snapshotLists) {
+        qc.setQueryData(key, value);
+      }
+    },
+    onSettled: () => invalidateRechnungScope(qc, rechnungId),
   });
 };
 export const useDeleteZahlung = (rechnungId: string) => {
