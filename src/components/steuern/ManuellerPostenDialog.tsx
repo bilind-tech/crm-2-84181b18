@@ -112,7 +112,7 @@ export function ManuellerPostenDialog({ open, onOpenChange, editPosten }: Props)
                 id="faellig"
                 type="date"
                 value={faelligAm}
-                min={todayISO()}
+                /* Vergangene Termine erlaubt im Edit-Modus */
                 onChange={(e) => setFaelligAm(e.target.value)}
               />
             </div>
