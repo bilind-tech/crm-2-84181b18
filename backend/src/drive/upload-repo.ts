@@ -115,6 +115,10 @@ export function markErfolg(id: string, fileId: string, webLink?: string): void {
     id, status: "erfolg",
     belegArt: cur?.belegArt ?? null, belegId: cur?.belegId ?? null, fehlerText: null,
   });
+  emit("drive:hochgeladen", {
+    id, belegArt: cur?.belegArt ?? null, belegId: cur?.belegId ?? null,
+    fileId, webLink: webLink ?? null,
+  });
 }
 
 export function markFehler(id: string, error: string): void {
@@ -135,6 +139,10 @@ export function markFehler(id: string, error: string): void {
     id, status: finalFail ? "manuell" : "pending",
     belegArt: cur.belegArt, belegId: cur.belegId,
     fehlerText: error.slice(0, 1000),
+  });
+  emit("drive:fehler", {
+    id, belegArt: cur.belegArt, belegId: cur.belegId,
+    fehlerText: error.slice(0, 1000), final: finalFail,
   });
 }
 
