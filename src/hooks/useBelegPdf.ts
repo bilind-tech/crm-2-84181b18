@@ -150,7 +150,7 @@ export function useRechnungPdf(rechnung?: Rechnung): UsePdfResult {
     refetchOnReconnect: false,
   });
 
-  const url = useBlobUrl(query.data?.blob);
+  const url = useBlobUrl(query.data?.blob, rechnung?.id ?? "noop");
   const status: Status = !enabled ? "idle"
     : query.isError ? "error"
     : query.data ? "ready"
