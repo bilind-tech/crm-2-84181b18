@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useNavigate } from "@tanstack/react-router";
 import { Download, Loader2, AlertCircle, Pencil, ExternalLink } from "lucide-react";
 import { DriveStatusBadge } from "./DriveStatusBadge";
+import { PdfCanvasViewer } from "./PdfCanvasViewer";
 import type { DriveSyncInfo } from "@/lib/api/types";
 
 interface Props {
@@ -30,11 +30,6 @@ export function PdfViewerDialog({
   editTarget,
 }: Props) {
   const navigate = useNavigate();
-  const [iframeFailed, setIframeFailed] = useState(false);
-
-  useEffect(() => {
-    setIframeFailed(false);
-  }, [pdfUrl]);
 
   const isLoading = status === "loading" || (status === "ready" && !pdfUrl);
   const isError = status === "error";
@@ -117,47 +112,12 @@ export function PdfViewerDialog({
             </div>
           )}
 
-          {!isLoading && !isError && pdfUrl && !iframeFailed && (
-            <object
-              data={pdfUrl}
-              type="application/pdf"
-              className="h-full w-full"
-              aria-label={title}
-            >
-              <iframe
-                src={pdfUrl}
-                title={title}
-                className="h-full w-full border-0"
-                onError={() => setIframeFailed(true)}
-              />
-            </object>
-          )}
-
-          {!isLoading && !isError && pdfUrl && iframeFailed && (
-            <div className="flex h-full min-h-[60vh] flex-col items-center justify-center gap-3 px-6 text-center">
-              <AlertCircle className="h-6 w-6 text-muted-foreground" />
-              <div className="text-sm font-medium">Vorschau nicht verfügbar</div>
-              <p className="max-w-md text-xs text-muted-foreground">
-                Der Browser konnte die PDF nicht eingebettet anzeigen. Bitte öffnen oder herunterladen.
-              </p>
-              <div className="flex gap-2">
-                <a
-                  href={pdfUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex h-9 items-center gap-1.5 rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-accent"
-                >
-                  <ExternalLink className="h-4 w-4" /> In neuem Tab öffnen
-                </a>
-                <a
-                  href={pdfUrl}
-                  download={fileName}
-                  className="inline-flex h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground hover:opacity-90"
-                >
-                  <Download className="h-4 w-4" /> Herunterladen
-                </a>
-              </div>
-            </div>
+          {!isLoading && !isError && pdfUrl && (
+            <PdfCanvasViewer
+              pdfUrl={pdfUrl}
+              fileName={fileName}
+              className="h-full w-full overflow-y-auto bg-muted/30"
+            />
           )}
         </div>
       </DialogContent>
