@@ -27,7 +27,8 @@ export interface FlowResult {
 
 export function angebotFlow(a: Angebot, hatRechnung = false): FlowResult {
   const status = a.status;
-  const versendet = status !== "entwurf";
+  // Nur „echt versendet": versendetAm wird ausschließlich beim realen Sende-Vorgang gesetzt.
+  const versendet = !!a.versendetAm;
   const angenommen = status === "angenommen";
   const abgelehnt = status === "abgelehnt";
   const abgelaufen = status === "abgelaufen";
