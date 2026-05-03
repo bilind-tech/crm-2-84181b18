@@ -62,6 +62,30 @@ export function DokumentViewer({ dokument, open, onOpenChange, onEdit }: Props) 
           {(isImage || isPdf) && (
             <PrintButton url={dateiUrl || null} variant="outline" size="sm" className="h-9 px-2 sm:px-3" />
           )}
+          {protokoll && protokoll.status !== "abgeschlossen" && (
+            <Button variant="outline" size="sm" asChild className="rounded-lg" aria-label="Im Editor öffnen">
+              <Link
+                to="/protokolle/$id/bearbeiten"
+                params={{ id: protokoll.id }}
+                onClick={() => onOpenChange(false)}
+              >
+                <FileCheck2 className="h-4 w-4 sm:mr-1.5" />
+                <span className="hidden sm:inline">Im Editor öffnen</span>
+              </Link>
+            </Button>
+          )}
+          {protokoll && protokoll.status === "abgeschlossen" && (
+            <Button variant="outline" size="sm" asChild className="rounded-lg" aria-label="Zum Protokoll">
+              <Link
+                to="/protokolle/$id"
+                params={{ id: protokoll.id }}
+                onClick={() => onOpenChange(false)}
+              >
+                <FileCheck2 className="h-4 w-4 sm:mr-1.5" />
+                <span className="hidden sm:inline">Zum Protokoll</span>
+              </Link>
+            </Button>
+          )}
           <Button
             variant="outline"
             size="sm"
