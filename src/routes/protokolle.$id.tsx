@@ -141,17 +141,15 @@ function Page() {
             <Button variant="ghost" size="sm" asChild>
               <Link to="/protokolle"><ArrowLeft className="mr-1.5 h-4 w-4" />Zurück</Link>
             </Button>
-            <Button variant="outline" onClick={onDownload} disabled={!pdf.blob} className="rounded-lg">
+            <Button variant="outline" onClick={onDownload} disabled={!pdf.url && !pdf.blob} className="rounded-lg">
               <Download className="mr-1.5 h-4 w-4" />PDF
             </Button>
             <PrintButton url={pdf.url} variant="outline" size="default" />
-            {istEntwurf && (
-              <Button variant="outline" asChild className="rounded-lg">
-                <Link to="/protokolle/$id/bearbeiten" params={{ id }}>
-                  <Pencil className="mr-1.5 h-4 w-4" />Bearbeiten
-                </Link>
-              </Button>
-            )}
+            <Button variant="outline" asChild className="rounded-lg">
+              <Link to="/protokolle/$id/bearbeiten" params={{ id }}>
+                <Pencil className="mr-1.5 h-4 w-4" />Bearbeiten
+              </Link>
+            </Button>
             {istEntwurf && (
               <Button onClick={onAbschliessen} disabled={busy || !p.kundeId || !pdf.blob} className="rounded-lg">
                 {busy ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-1.5 h-4 w-4" />}
