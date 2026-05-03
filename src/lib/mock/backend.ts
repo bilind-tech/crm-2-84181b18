@@ -200,6 +200,55 @@ function now(): string {
   return new Date().toISOString();
 }
 
+// Mock-Singleton für Drive-Upload-Queue. Wird einmal beim ersten Lesen gefüllt
+// und bleibt im Speicher (kein localStorage — pro Tab).
+interface MockDriveUploadEntry {
+  id: string;
+  belegArt: "angebot" | "rechnung" | "dokument";
+  belegId: string;
+  dateiName: string;
+  pdfSha256: string;
+  idempotenzKey: string;
+  status: "pending" | "running" | "erfolg" | "fehler" | "manuell";
+  versuche: number;
+  naechsterVersuchAt: string | null;
+  driveFileId: string | null;
+  driveWebLink: string | null;
+  fehlerText: string | null;
+  abgeschlossenAm: string | null;
+  erstelltAm: string;
+  geaendertAm: string;
+}
+let _mockDriveUploads: MockDriveUploadEntry[] | null = null;
+function mockDriveUploads(): MockDriveUploadEntry[] {
+  if (_mockDriveUploads) return _mockDriveUploads;
+  const t = new Date();
+  const iso = (offsetMin: number) => new Date(t.getTime() - offsetMin * 60_000).toISOString();
+  _mockDriveUploads = [
+    {
+      id: "mock-up-1", belegArt: "rechnung", belegId: "mock-r-1",
+      dateiName: "RE-2026-0042 Mustermann GmbH 05-2026.pdf",
+      pdfSha256: "abc", idempotenzKey: "k1",
+      status: "erfolg", versuche: 1, naechsterVersuchAt: null,
+      driveFileId: "mock-file-1",
+      driveWebLink: "https://drive.google.com/file/d/mock-file-1/view",
+      fehlerText: null, abgeschlossenAm: iso(12),
+      erstelltAm: iso(20), geaendertAm: iso(12),
+    },
+    {
+      id: "mock-up-2", belegArt: "angebot", belegId: "mock-a-2",
+      dateiName: "AN-2026-0019 Bsp Schule 05-2026.pdf",
+      pdfSha256: "def", idempotenzKey: "k2",
+      status: "manuell", versuche: 7, naechsterVersuchAt: null,
+      driveFileId: null, driveWebLink: null,
+      fehlerText: "403: Drive quota exceeded — bitte Speicherplatz prüfen",
+      abgeschlossenAm: null,
+      erstelltAm: iso(180), geaendertAm: iso(60),
+    },
+  ];
+  return _mockDriveUploads;
+}
+
 /** Mock-Drive-Ordner: "{Kategorie}/{YYYY}/{MM}". */
 function driveOrdner(kategorie: string): string {
   const j = new Date();
