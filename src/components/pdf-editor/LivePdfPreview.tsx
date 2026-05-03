@@ -144,9 +144,9 @@ export function LivePdfPreview(props: Props) {
 
   return (
     <div ref={containerRef} className="relative h-full overflow-y-auto bg-muted/30 px-2 py-3 sm:px-4">
-      {rendering && (
-        <div className="pointer-events-none sticky top-2 z-20 ml-auto flex w-fit items-center gap-1.5 rounded-full bg-background/90 px-2.5 py-1 text-xs text-muted-foreground shadow-sm ring-1 ring-border backdrop-blur">
-          <Loader2 className="h-3 w-3 animate-spin" />
+      {showLoader && rendering && (
+        <div className="pointer-events-none sticky top-2 z-20 ml-auto flex w-fit items-center gap-1.5 rounded-full bg-background/80 px-2 py-0.5 text-[10px] text-muted-foreground shadow-sm ring-1 ring-border backdrop-blur">
+          <Loader2 className="h-2.5 w-2.5 animate-spin" />
           aktualisiert …
         </div>
       )}
