@@ -109,20 +109,54 @@ export async function einstellungenRoutes(app: FastifyInstance): Promise<void> {
     return flachZuUi(r.value as z.infer<typeof MahnungSchema>);
   });
 
-  // SMTP — Passwort separat verschlüsselt
-  app.get("/einstellungen/smtp", async () => {
-    const base = loadArea("smtp");
-    const meta = getSettingMeta(SENSITIVE_KEYS.smtpPassword);
+  // SMTP — akzeptiert UI-Aliasse (server/ssl/benutzer/absenderName/absenderEmail/passwort)
+  // UND die internen Felder (host/secure/user/fromName/fromEmail/password).
+  // Liefert beide Schreibweisen zurück, damit jede Konsumentin glücklich ist.
+  function smtpToWire(base: Record<string, unknown>, meta: { exists: boolean; updatedAt?: string | null }) {
+    const b = base as Record<string, unknown>;
     return {
-      ...(base as object),
+      host: b.host, port: b.port, secure: b.secure, user: b.user,
+      fromName: b.fromName, fromEmail: b.fromEmail,
+      // UI-Aliasse:
+      server: b.host, ssl: b.secure, benutzer: b.user,
+      absenderName: b.fromName, absenderEmail: b.fromEmail,
       passwordIsSet: meta.exists,
-      passwordUpdatedAt: meta.updatedAt,
+      passwortGesetzt: meta.exists,
+      passwordUpdatedAt: meta.updatedAt ?? null,
     };
+  }
+  function smtpFromWire(input: Record<string, unknown>): { core: Record<string, unknown>; password?: string } {
+    const i = input;
+    const pw = typeof i.password === "string" && i.password.length > 0
+      ? (i.password as string)
+      : typeof i.passwort === "string" && (i.passwort as string).length > 0
+        ? (i.passwort as string)
+        : undefined;
+    const core: Record<string, unknown> = {};
+    if ("host" in i) core.host = i.host;
+    else if ("server" in i) core.host = i.server;
+    if ("port" in i) core.port = i.port;
+    if ("secure" in i) core.secure = i.secure;
+    else if ("ssl" in i) core.secure = i.ssl;
+    if ("user" in i) core.user = i.user;
+    else if ("benutzer" in i) core.user = i.benutzer;
+    if ("fromName" in i) core.fromName = i.fromName;
+    else if ("absenderName" in i) core.fromName = i.absenderName;
+    if ("fromEmail" in i) core.fromEmail = i.fromEmail;
+    else if ("absenderEmail" in i) core.fromEmail = i.absenderEmail;
+    return { core, password: pw };
+  }
+
+  app.get("/einstellungen/smtp", async () => {
+    const base = loadArea("smtp") as Record<string, unknown>;
+    const meta = getSettingMeta(SENSITIVE_KEYS.smtpPassword);
+    return smtpToWire(base, meta);
   });
   app.patch("/einstellungen/smtp", async (req, reply) => {
-    const body = { ...((req.body ?? {}) as Record<string, unknown>) };
-    if (typeof body.password === "string" && body.password.length > 0) {
-      const pw = SmtpPasswordSchema.safeParse({ password: body.password });
+    const raw = (req.body ?? {}) as Record<string, unknown>;
+    const { core, password } = smtpFromWire(raw);
+    if (password) {
+      const pw = SmtpPasswordSchema.safeParse({ password });
       if (!pw.success) {
         reply.status(422);
         return { error: "validation", issues: pw.error.issues };
@@ -130,10 +164,7 @@ export async function einstellungenRoutes(app: FastifyInstance): Promise<void> {
       setSetting(SENSITIVE_KEYS.smtpPassword, pw.data.password, { encrypt: true });
       resetTransport();
     }
-    delete body.password;
-    delete body.passwordIsSet;
-    delete body.passwordUpdatedAt;
-    const r = patchArea("smtp", body);
+    const r = patchArea("smtp", core);
     if (!r.ok) {
       reply.status(r.status);
       return { error: r.error, issues: r.issues };
@@ -142,30 +173,27 @@ export async function einstellungenRoutes(app: FastifyInstance): Promise<void> {
     audit({ userId: req.user?.id, action: "settings.smtp.patch", ip: req.ip });
     emit("einstellung:geaendert", { key: "smtp", userId: req.user?.id ?? null });
     const meta = getSettingMeta(SENSITIVE_KEYS.smtpPassword);
-    return { ...(r.value as object), passwordIsSet: meta.exists, passwordUpdatedAt: meta.updatedAt };
+    return smtpToWire(r.value as Record<string, unknown>, meta);
   });
   app.delete("/einstellungen/smtp/passwort", async (req) => {
     deleteSetting(SENSITIVE_KEYS.smtpPassword);
     audit({ userId: req.user?.id, action: "settings.smtp.password-clear", ip: req.ip });
     return { ok: true };
   });
+  // Reiner TCP-Reachability-Check (alt). Echte Auth/TLS-Prüfung -> POST /email/verify.
   app.post("/einstellungen/smtp/test", async () => {
     const cfg = loadArea("smtp") as { host: string; port: number };
-    if (!cfg.host) return { ok: false, error: "host fehlt" };
-    return await new Promise<{ ok: boolean; latencyMs?: number; error?: string }>((resolve) => {
+    if (!cfg.host) return { ok: false, erfolg: false, nachricht: "Host fehlt" };
+    return await new Promise<{ ok: boolean; erfolg: boolean; nachricht: string; latencyMs?: number }>((resolve) => {
       const t0 = Date.now();
       const sock = createConnection({ host: cfg.host, port: cfg.port, timeout: 4000 });
-      const done = (res: { ok: boolean; latencyMs?: number; error?: string }): void => {
-        try {
-          sock.destroy();
-        } catch {
-          /* ignore */
-        }
-        resolve(res);
+      const done = (res: { ok: boolean; nachricht: string; latencyMs?: number }): void => {
+        try { sock.destroy(); } catch { /* ignore */ }
+        resolve({ ...res, erfolg: res.ok });
       };
-      sock.once("connect", () => done({ ok: true, latencyMs: Date.now() - t0 }));
-      sock.once("timeout", () => done({ ok: false, error: "Timeout" }));
-      sock.once("error", (e) => done({ ok: false, error: e.message }));
+      sock.once("connect", () => done({ ok: true, latencyMs: Date.now() - t0, nachricht: `Server erreichbar (${Date.now() - t0} ms) — für Auth/TLS bitte „Verbindung prüfen"` }));
+      sock.once("timeout", () => done({ ok: false, nachricht: "Timeout — Server nicht erreichbar" }));
+      sock.once("error", (e) => done({ ok: false, nachricht: e.message }));
     });
   });
 

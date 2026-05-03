@@ -1,25 +1,11 @@
 // =============================================================================
 // E-Mail-Versand-Dialog
 // -----------------------------------------------------------------------------
-// FRONTEND-STUB-HINWEIS (wichtig für später):
-//
-// Aktuell wird KEINE echte E-Mail verschickt. Der Aufruf läuft über
-// `useSendEmail()` → `POST /email/versand` ins Mock-Backend
-// (src/lib/mock/backend.ts). Das Backend simuliert lediglich den Versand
-// und legt einen `EmailVersand`-Eintrag an. Es geht nichts an einen echten
-// SMTP-Server (Strato/nodemailer) raus.
-//
-// Wenn das echte Pi-Backend (Node + Fastify + nodemailer + Strato-SMTP)
-// angebunden ist, MUSS dieser Dialog NICHT geändert werden — der Hook
-// `useSendEmail` ruft bereits den richtigen Endpunkt auf. Das Pi-Backend
-// muss bei `POST /email/versand` dann:
-//   1. SMTP-Transport (nodemailer) anwerfen
-//   2. PDF-Anhang aus Storage / Drive einbinden
-//   3. Bei Erfolg `status: "sent"` zurückgeben (sonst `status: "failed"`)
-//   4. Bei Mahnungen das Beleg-Status-Feld aktualisieren
-// Erst dann fließt aus diesem Dialog tatsächlich eine E-Mail raus.
-// Die UI ist hier so gebaut, dass sie ohne weitere Änderung sofort auf das
-// echte Backend umschwenkt, sobald der Endpunkt liefert.
+// MANUAL-ONLY: Diese Komponente ist der EINZIGE Pfad, über den eine Mail das
+// System verlässt. Versand erfolgt synchron via POST /email/versand. Backend
+// lehnt jede andere Quelle als `quelle="manuell"` mit 403 ab. Pro Klick wird
+// ein eigener idempotenzKey erzeugt — Doppelklick wird vom Backend
+// abgefangen, auch wenn das Netz hakt.
 // =============================================================================
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -36,7 +22,6 @@ import {
   Pencil,
   Check,
   Plus,
-  Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -254,12 +239,12 @@ export function EmailVersandDialog({
 
     setPhase("sending");
 
-    // -----------------------------------------------------------------------
-    // FRONTEND-STUB: Aufruf geht aktuell an useSendEmail → /email/versand
-    // ins Mock-Backend (src/lib/mock/backend.ts). Es wird KEINE echte Mail
-    // verschickt. Sobald das Pi-Backend mit nodemailer + Strato läuft, wird
-    // hier automatisch eine echte Mail ausgelöst — keine UI-Änderung nötig.
-    // -----------------------------------------------------------------------
+    // Idempotenz-Key pro Klick — Backend erkennt Doppelklicks und sendet nicht zweimal.
+    const idempotenzKey =
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `mail-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
     send.mutate(
       {
         belegTyp,
@@ -277,7 +262,8 @@ export function EmailVersandDialog({
             ? [{ name: pdfDateiname, sizeBytes: 0, kind: "pdf-beleg" }]
             : [],
         mahnStufe,
-      },
+        idempotenzKey,
+      } as Parameters<typeof send.mutate>[0],
       {
         onSuccess: (res) => {
           if (res.status === "sent") {
@@ -315,7 +301,7 @@ export function EmailVersandDialog({
     <Dialog open={open} onOpenChange={(o) => phase === "idle" && onOpenChange(o)}>
       <DialogContent className="max-w-3xl max-h-[92vh] overflow-y-auto bg-background p-0">
         {/* Hero Header */}
-        <div className="relative overflow-hidden border-b border-border bg-gradient-to-br from-primary/8 via-background to-background px-6 pb-5 pt-6">
+        <div className="relative overflow-hidden border-b border-border bg-background px-6 pb-5 pt-6">
           <div className="flex items-start gap-4">
             <div className="grid h-14 w-14 shrink-0 place-content-center rounded-2xl bg-primary/10 ring-1 ring-primary/20">
               <Mail className="h-7 w-7 text-primary" strokeWidth={1.75} />
@@ -651,11 +637,6 @@ function SendOverlay({
           60% { transform: scale(1.15); opacity: 1; }
           100% { transform: scale(1); opacity: 1; }
         }
-        @keyframes spark-out {
-          0% { transform: translate(-50%, -50%) scale(0); opacity: 0; }
-          30% { opacity: 1; }
-          100% { transform: translate(calc(-50% + var(--tx)), calc(-50% + var(--ty))) scale(0.6); opacity: 0; }
-        }
       `}</style>
 
       {phase === "sending" ? (
@@ -684,25 +665,6 @@ function SendOverlay({
       ) : (
         <>
           <div className="relative">
-            {/* Sparkle-Burst — funktionale Erfolgs-Mikroanimation */}
-            {[...Array(8)].map((_, i) => {
-              const angle = (i / 8) * 2 * Math.PI;
-              const tx = Math.cos(angle) * 55;
-              const ty = Math.sin(angle) * 55;
-              return (
-                <Sparkles
-                  key={i}
-                  className="pointer-events-none absolute left-1/2 top-1/2 h-3 w-3 text-primary"
-                  style={
-                    {
-                      animation: "spark-out 0.9s ease-out forwards",
-                      "--tx": `${tx}px`,
-                      "--ty": `${ty}px`,
-                    } as React.CSSProperties
-                  }
-                />
-              );
-            })}
             <div
               className="grid h-20 w-20 place-content-center rounded-full bg-success/15 ring-2 ring-success/40"
               style={{

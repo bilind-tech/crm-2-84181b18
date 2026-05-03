@@ -17,6 +17,7 @@ export interface EmailVersand {
   belegId?: string | null;
   vorlageId?: string | null;
   signaturId?: string | null;
+  mahnStufe?: number | null;
   idempotenzKey: string;
   status: EmailVersandStatus;
   versuche: number;
@@ -34,6 +35,7 @@ interface Row {
   betreff: string; body_html: string;
   beleg_art: BelegArt | null; beleg_id: string | null;
   vorlage_id: string | null; signatur_id: string | null;
+  mahn_stufe: number | null;
   idempotenz_key: string;
   status: EmailVersandStatus; versuche: number;
   naechster_versuch_at: string | null; versendet_am: string | null;
@@ -46,6 +48,7 @@ const map = (r: Row): EmailVersand => ({
   betreff: r.betreff, bodyHtml: r.body_html,
   belegArt: r.beleg_art, belegId: r.beleg_id,
   vorlageId: r.vorlage_id, signaturId: r.signatur_id,
+  mahnStufe: r.mahn_stufe,
   idempotenzKey: r.idempotenz_key, status: r.status, versuche: r.versuche,
   naechsterVersuchAt: r.naechster_versuch_at, versendetAm: r.versendet_am,
   fehlerText: r.fehler_text, messageId: r.message_id,
@@ -71,6 +74,7 @@ export interface EnqueueInput {
   belegId?: string;
   vorlageId?: string;
   signaturId?: string;
+  mahnStufe?: number;
   idempotenzKey: string;
   /** ABSOLUTE Schutzschicht: nur 'manuell' ist erlaubt — d. h. ein direkter
    *  User-Klick aus dem EmailVersandDialog. Jede andere Quelle wirft. */
@@ -90,14 +94,15 @@ export function enqueueVersand(input: EnqueueInput): { row: EmailVersand; create
   db.prepare(
     `INSERT INTO email_versand (
       id, empfaenger_to, empfaenger_cc, empfaenger_bcc, betreff, body_html,
-      beleg_art, beleg_id, vorlage_id, signatur_id, idempotenz_key,
+      beleg_art, beleg_id, vorlage_id, signatur_id, mahn_stufe, idempotenz_key,
       status, versuche, naechster_versuch_at
-    ) VALUES (?,?,?,?,?,?,?,?,?,?,?, 'pending', 0, datetime('now'))`,
+    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?, 'pending', 0, datetime('now'))`,
   ).run(
     id, input.empfaengerTo, input.empfaengerCc ?? null, input.empfaengerBcc ?? null,
     input.betreff, input.bodyHtml,
     input.belegArt ?? null, input.belegId ?? null,
     input.vorlageId ?? null, input.signaturId ?? null,
+    input.mahnStufe ?? null,
     input.idempotenzKey,
   );
   return { row: getById(id)!, created: true };
