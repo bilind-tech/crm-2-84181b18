@@ -109,7 +109,7 @@ export interface Objekt {
 
 export type Einheit = "stk" | "h" | "m2" | "pauschal" | "tag" | "monat";
 
-export type PositionModus = "einzel" | "pauschal";
+export type PositionModus = "einzel" | "pauschal" | "stunden";
 
 export interface Position {
   id: ID;
