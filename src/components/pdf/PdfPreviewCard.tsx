@@ -45,11 +45,12 @@ export function PdfPreviewCard({
         <div className="min-w-0 flex-1 space-y-1">
           <div className="font-semibold">{title}</div>
           <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-            {status === "loading" && <span>PDF wird erstellt …</span>}
+            {status === "loading" && !pdfUrl && <span>PDF wird erstellt …</span>}
             {status === "error" && (
               <span className="text-destructive">{errorMessage || "PDF konnte nicht erstellt werden"}</span>
             )}
             {status === "ready" && <span>Vorschau bereit</span>}
+            {status === "loading" && pdfUrl && <span>Vorschau bereit</span>}
             <DriveStatusBadge drive={drive} />
           </div>
         </div>
