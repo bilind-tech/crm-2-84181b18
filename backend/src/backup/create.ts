@@ -193,6 +193,11 @@ export async function createBackup(opts: {
     setBackupPhase(id, "rotate", 100, "Fertig");
     finishBackupProgress(id, true);
 
+    // Drive-Mirror (fire-and-forget — Drive-Fehler darf das Backup nicht killen)
+    void import("./drive-mirror.js").then((m) => m.mirrorBackupToDrive(id, opts.category)).catch(() => {
+      /* Status steht in backup_history.drive_status */
+    });
+
     return {
       id,
       filename,
