@@ -57,7 +57,7 @@ export function positionRowToApi(r: DbPosition): ApiPosition {
     einzelpreisNetto: ctToEuro(r.einzelpreis_netto_ct),
     steuersatz: r.steuersatz,
     rabatt: r.rabatt,
-    modus: (r.modus === "pauschal" ? "pauschal" : "einzel"),
+    modus: (r.modus === "pauschal" ? "pauschal" : r.modus === "stunden" ? "stunden" : "einzel"),
     pauschalpreisNetto: r.pauschalpreis_netto_ct == null ? undefined : ctToEuro(r.pauschalpreis_netto_ct),
     ausfuehrung: r.ausfuehrung ?? undefined,
   };
