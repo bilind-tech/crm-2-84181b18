@@ -71,8 +71,15 @@ function Page() {
   const [exportOpen, setExportOpen] = useState(false);
 
   const aktuellesJahr = new Date().getFullYear();
+  // Erfassung startet 2026. Jedes neue Jahr wird automatisch ergänzt; alte Jahre bleiben einsehbar.
+  const STEUER_STARTJAHR = 2026;
   const [jahr, setJahr] = useState(aktuellesJahr);
-  const jahreOptionen = [aktuellesJahr - 2, aktuellesJahr - 1, aktuellesJahr];
+  const jahreOptionen = useMemo(() => {
+    const bis = Math.max(aktuellesJahr, STEUER_STARTJAHR);
+    const arr: number[] = [];
+    for (let j = STEUER_STARTJAHR; j <= bis; j++) arr.push(j);
+    return arr;
+  }, [aktuellesJahr]);
 
   // Automatisch generierte Posten + manuelle Posten + Bezahlt-Overlay
   const allePosten = useMemo<SteuerPosten[]>(() => {
