@@ -1,70 +1,68 @@
-# Plan 3 — Technische Schulden & CI absichern
+# Plan 4 — Restpolitur vor Pi-Auslieferung
 
-Vorbereitung für die Pi-Auslieferung: was heute leise schiefgehen könnte, soll laut werden, und der Release-Build muss vor jedem Merge automatisch grün sein.
+Die großen Brocken (PDF-Vorschau, Mock-Ehrlichkeit, Scheduler-Logging, CI, Drive-Badge) sind durch. Übrig bleiben die kleineren Punkte aus dem ursprünglichen Review (Punkte 5, 7 und die Nice-to-haves). Alles defensiv, kein Eingriff in Versand/Backup/Daten.
 
-## A. Scheduler-Fehler nicht mehr verschlucken
+## A. `/health` final absichern (Punkt 5 aus Review)
 
-Heute fängt `backend/src/belege/scheduler.ts` jeden Fehler in `markOverdueRechnungen()` mit einem leeren `catch {}`. Wenn die DB-Tabellen fehlen, ein Schema-Mismatch da ist oder die Funktion abstürzt, **merkt es niemand** — keine Mahnung, keine Überfällig-Markierung, keine Spur im Log.
+Heute liefert `GET /health` ohne Auth: `version`, `schemaVersion`, `db.path`, `masterKey.present`, `maintenance`, `uptimeSec`. Davon ist `db.path` (absoluter Dateipfad zur SQLite) und `masterKey.present` Information, die ein nicht-eingeloggter Aufrufer im LAN nicht sehen muss.
 
-Änderungen:
-- `console.error` mit Tag `[belege-scheduler]`, Nachricht und Fehlerstack.
-- Beim ersten Tick (Bootstrap): wenn die Tabellen wirklich noch fehlen (`SQLITE_ERROR: no such table`), bleibt es ein freundlicher Info-Log statt Error — alle anderen Fehler werden lautstark geloggt.
-- Counter `consecutiveFailures` — nach 3 Fehlern in Folge kommt eine zusätzliche Warn-Zeile „Scheduler scheint dauerhaft zu scheitern, bitte prüfen". Reset bei erstem Erfolg.
+Änderungen in `backend/src/routes/health.ts`:
+- Public-`/health` reduziert auf: `status`, `version`, `uptimeSec`, `maintenance`. Reicht für jeden Healthcheck (auch den internen Smoketest in `system/runner.ts`, der nur HTTP-200 prüft).
+- Alles andere (`schemaVersion`, `db.*`, `masterKey.*`) wandert nach `/health/detail` (bleibt `requireAuth`).
+- Smoketest in `backend/src/system/runner.ts` braucht keine Anpassung — er prüft nur Status-Code.
 
-Datei: `backend/src/belege/scheduler.ts` (alleinstehend, ~30 Zeilen Diff).
+## B. Stundenzettel-URL serverseitig validieren (Punkt 7)
 
-## B. Release-Bundle validieren
+`StundenzettelSchema.externeUrl` akzeptiert heute jeden String bis 500 Zeichen. Frontend rendert die URL als `<iframe src=>` und in einem „In neuem Tab"-Link. Auch wenn nur der Single-User selbst speichern kann, ist eine echte URL-Validierung sauberer.
 
-`scripts/build-release.ts` baut das ZIP, das später per System-Update auf den Pi geschoben wird. Es gibt zwar `backend/test/release-bundle.spec.ts`, der die Signatur-Formel prüft — aber **nicht den ganzen Build**. Vor der Pi-Auslieferung will ich einmal sauber durchspielen.
+Änderungen in `backend/src/settings/schemas.ts`:
+- `externeUrl`: leer erlaubt, sonst `z.string().url()` mit Schema-Whitelist (`http:` / `https:`). Ablehnen: `javascript:`, `data:`, `file:`.
+- Beibehalten: `.trim().max(500)`.
 
-Änderungen:
-- Neuer Smoke-Test `backend/test/release-bundle-smoke.spec.ts`: ruft den Builder im `--skip-frontend`-Modus auf (Frontend-Build dauert zu lange für CI), prüft danach:
-  1. ZIP existiert in `dist-release/`.
-  2. ZIP enthält `manifest.json` mit `appVersion`, `schemaVersion`, `signature`.
-  3. `validateManifest()` aus `backend/src/system/manifest.ts` akzeptiert die Signatur.
-  4. ZIP enthält `backend/dist/server.js` (also wirklich gebaut, nicht leer).
-- Ein neues npm-Script `release:dry` in `package.json`: `tsx scripts/build-release.ts --skip-frontend --allow-same-version --out=dist-release-dry`.
+Frontend (`StundenzettelTab.tsx`): bei Backend-Fehler 400 die Nachricht inline anzeigen (heute generischer Toast).
 
-## C. GitHub-Actions-CI
+## C. „Demo-Daten löschen"-Knopf in Einstellungen (Nice-to-have)
 
-Die Tests existieren, aber nichts startet sie automatisch. Ich legen einen Workflow an:
+Wenn die App vom Mock-Modus auf das echte Pi-Backend wechselt, bleiben alte Mock-Daten unter `mcc_mock_db_v7` (und Hilfs-Keys wie `mcc.stundenzettel.url`, `mcc_stundenzettel_migrated_v1`) im LocalStorage liegen. Harmlos, aber unsauber.
 
-`/.github/workflows/ci.yml`:
-- Trigger: `push` und `pull_request` auf `main`.
-- Node 20, Bun für Frontend-Lint, Vitest für Backend.
-- Jobs (parallel):
-  1. **frontend-lint**: `bun install` → `bun run lint`.
-  2. **backend-test**: `cd backend && npm ci && npm run typecheck && npm run test`.
-  3. **release-smoke**: nach `backend-test`, ruft `npm run release:dry` auf, lädt das ZIP als Artifact hoch (Retention 7 Tage) — so kannst du dir aus jedem grünen Run direkt ein Test-ZIP ziehen.
+Neue Mini-Komponente in `src/components/einstellungen/MockDataResetCard.tsx`:
+- Wird **nur** gerendert, wenn `!isBackendUrlExplicit()` (Demo-Modus aktiv) oder wenn LocalStorage einen Key mit Prefix `mcc_mock_` / `mcc.` enthält.
+- Button „Demo-Daten in diesem Browser löschen" → Bestätigungs-Mini-Dialog (gleicher Stil wie Zahlungs-Dialog) → leert alle `mcc_mock_*`- und `mcc.*`-Keys + `localStorage.removeItem("mcc_mock_db_v7")` → Hard-Reload.
+- Eingebunden im Tab „Allgemein" oder „Datenschutz" der Einstellungen — wo es organisch passt, prüfe ich beim Implementieren.
 
-Frontend-Build wird bewusst ausgespart (Lovable baut den ohnehin selbst). Falls du es trotzdem willst, sag Bescheid — ich nehme es dann als 4. Job dazu.
+Kein Backend-Aufruf. Wirkt nur auf den aktuellen Browser.
 
-## D. Globaler Drive-Sync-Indikator (klein)
+## D. Release-Doku auffrischen
 
-Auf der Dokumente-Übersichtsseite fehlt heute ein kompakter Status „Drive: synchronisiert / X ausstehend / Fehler". Pro Beleg gibt es schon eine Anzeige, aber kein Gesamt-Glance.
+Vor Tag X kurz durchsehen und konsistent mit aktuellem Stand machen:
+- `RELEASE_NOTES.md`: aktuelle Version + die seit Plan 1–3 gemachten Änderungen (PDF-Refactor, Mock-Hinweise, Scheduler-Logging, CI, Drive-Badge) als „Unreleased"-Block.
+- `BACKEND_INTEGRATION.md`: prüfen, ob neue/geänderte Endpoints (z. B. `/einstellungen/stundenzettel`, geänderter `/health`-Body) korrekt dokumentiert sind.
 
-Änderung: kleines Badge oben rechts in `src/routes/dokumente.tsx` (oder dem entsprechenden Komponenten-Header), das aus dem bestehenden Drive-Status-Hook eine Aggregation rendert. Klick öffnet die Drive-Einstellungen. Keine neuen Backend-Endpoints — reines Aggregieren clientseitig.
+Reine Doku-Edits, kein Code.
 
 ## Geänderte / neue Dateien
 
 | Datei | Änderung |
 |---|---|
-| `backend/src/belege/scheduler.ts` | echtes Logging + Failure-Counter |
-| `backend/test/release-bundle-smoke.spec.ts` | **neu**, Smoke-Test |
-| `package.json` | `release:dry`-Script |
-| `.github/workflows/ci.yml` | **neu**, 3 Jobs |
-| `src/routes/dokumente.tsx` (oder Komponente) | kleines globales Drive-Badge |
+| `backend/src/routes/health.ts` | Public-Body schlanker, Details bleiben in `/health/detail` |
+| `backend/src/settings/schemas.ts` | `externeUrl`: echte URL-Validierung, http/https only |
+| `src/components/einstellungen/StundenzettelTab.tsx` | 400-Fehler inline anzeigen |
+| `src/components/einstellungen/MockDataResetCard.tsx` | **neu**, Demo-Daten-Reset |
+| `src/routes/einstellungen.tsx` | Reset-Karte einhängen (passender Tab) |
+| `RELEASE_NOTES.md` | Unreleased-Block aktualisieren |
+| `BACKEND_INTEGRATION.md` | `/health`- und `/einstellungen/stundenzettel`-Abschnitte prüfen/anpassen |
 
 ## Akzeptanzkriterien
 
-1. Ein simulierter Scheduler-Fehler (z. B. korrupte DB) erzeugt **eine** klare Error-Zeile pro Tick im Konsolen-Log, nach 3 Tries zusätzlich eine Warnung.
-2. `bun run release -- --skip-frontend` produziert ein gültiges ZIP, das `validateManifest` akzeptiert.
-3. Auf einem Push gegen `main` läuft die CI grün durch und stellt das Test-ZIP als Artifact bereit.
-4. Auf der Dokumente-Übersicht ist auf einen Blick erkennbar, ob alle Belege auf Drive synchron sind.
-5. Keine Änderung am echten Versand-, Mahn- oder Daten-Pfad.
+1. `curl http://pi:PORT/health` ohne Login zeigt **keinen** DB-Pfad und **keinen** Master-Key-Status mehr.
+2. Stundenzettel-Tab lehnt `javascript:alert(1)` mit klarer Meldung ab; gültige `https://`-URL wird gespeichert.
+3. Im Demo-Modus erscheint der Reset-Knopf, leert nach Bestätigung alle Mock-Keys, lädt die App neu — danach ist alles leer.
+4. `RELEASE_NOTES.md` listet die Änderungen aus Plan 1–4 unter „Unreleased".
+5. Smoketest in `system/runner.ts` läuft unverändert grün (nur HTTP-200-Check).
+6. Keine Datenbank-Migration, kein Eingriff in Versand/Backup/Daten-Pfade.
 
 ## Risiko
 
-Niedrig. Keine Datenbank-Migrationen, keine Änderung am Versand- oder Backup-Flow. CI ist additiv.
+Sehr niedrig. Drei kleine, unabhängige Änderungen + Doku. Kein Schema-Migrations-Bedarf (das `externeUrl`-Default `""` bleibt erlaubt, alle Bestandswerte sind bereits via Frontend-Form gesetzt und werden bei nächstem Save validiert).
 
-Sag „Go", dann setze ich Plan 3 um.
+Sag „Go", dann setze ich Plan 4 um.
