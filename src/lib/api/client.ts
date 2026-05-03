@@ -69,6 +69,14 @@ function isPiPath(p: string): boolean {
 }
 
 async function viaPi<T>(method: string, path: string, body?: unknown): Promise<T> {
+  // Demo/Mock-Modus: Backend-URL ist nicht explizit hinterlegt → niemals
+  // gegen den (unerreichbaren) Default `localhost:8787` fetchen, sondern
+  // direkt den Mock benutzen. Sonst wartet jeder Request erst auf das
+  // ERR_CONNECTION_REFUSED (mehrere Sekunden Verzögerung pro Hook), was die
+  // PDF-Vorschau und andere Detailseiten künstlich blockiert.
+  if (!isBackendUrlExplicit() && USE_MOCK) {
+    return mockBackend<T>(method, path, body);
+  }
   try {
     switch (method) {
       case "GET":
@@ -87,7 +95,6 @@ async function viaPi<T>(method: string, path: string, body?: unknown): Promise<T
   } catch (err) {
     if (err instanceof PiApiError) {
       if (err.status === 0) {
-        // Nur stiller Fallback wenn KEINE Backend-URL konfiguriert ist
         if (!isBackendUrlExplicit() && USE_MOCK) {
           return mockBackend<T>(method, path, body);
         }
