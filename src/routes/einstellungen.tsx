@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import {
   Building2,
-  Palette,
   Hash,
   Bell,
   FileText,
@@ -40,7 +39,7 @@ import {
 } from "@/components/email/EmailEinstellungen";
 import { MahnwesenTab } from "@/components/mahnung/MahnwesenTab";
 import { DauerauftragTab } from "@/components/einstellungen/DauerauftragTab";
-import { ErscheinungsbildTab } from "@/components/einstellungen/ErscheinungsbildTab";
+
 import { NummernkreiseTab } from "@/components/einstellungen/NummernkreiseTab";
 import { VorlagenTab } from "@/components/einstellungen/VorlagenTab";
 import { GoogleDriveTab } from "@/components/einstellungen/GoogleDriveTab";
@@ -62,7 +61,6 @@ type TabId =
   | "email-vorlagen"
   | "email-signaturen"
   | "smtp"
-  | "erscheinungsbild"
   | "nummernkreise"
   | "mahnwesen"
   | "dauerauftrag"
@@ -96,7 +94,6 @@ const tabs: { id: TabId; label: string; icon: typeof Building2; gruppe: string }
   { id: "backup", label: "Backup & Wiederherstellen", icon: Save, gruppe: "System" },
   { id: "system-update", label: "System & Updates", icon: Package, gruppe: "System" },
   { id: "sicherheit", label: "Sicherheit", icon: Shield, gruppe: "System" },
-  { id: "erscheinungsbild", label: "Erscheinungsbild", icon: Palette, gruppe: "System" },
   { id: "verlauf", label: "Verlauf", icon: History, gruppe: "System" },
 ];
 
@@ -233,7 +230,6 @@ function Page() {
           {tab === "email-vorlagen" && <EmailVorlagenTab />}
           {tab === "email-signaturen" && <EmailSignaturenTab />}
           {tab === "smtp" && <SmtpTab />}
-          {tab === "erscheinungsbild" && <ErscheinungsbildTab />}
           {tab === "nummernkreise" && <NummernkreiseTab />}
           {tab === "mahnwesen" && <MahnwesenTab />}
           {tab === "dauerauftrag" && <DauerauftragTab />}
