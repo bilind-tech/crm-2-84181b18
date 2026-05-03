@@ -89,24 +89,37 @@ async function processDokument(row: DriveUpload): Promise<void> {
   if (!raw?.storage_path) throw new Error("Dokument-Storage-Pfad fehlt");
   const buf = await readFile(absolutePath(raw.storage_path));
 
-  const dateStr = dok.erstelltAm ?? new Date().toISOString();
+  // Sonderbehandlung: Protokolle landen in eigene Unterordner mit eigenem Dateinamen.
+  const protokoll = dok.typ === "protokoll" ? getProtokollByDokumentId(row.belegId) : null;
+
+  const dateStr = (protokoll?.datum ? `${protokoll.datum}T12:00:00Z` : null) ?? dok.erstelltAm ?? new Date().toISOString();
   const d = new Date(dateStr);
+  const objektName = protokoll?.objektId ? (getObjekt(protokoll.objektId)?.name ?? "") : "";
   const ctx: NamingContext = {
     jahr: d.getUTCFullYear(),
     monat: d.getUTCMonth() + 1,
     tag: d.getUTCDate(),
-    nummer: "",
+    nummer: protokoll?.nummer ?? "",
     kunde: kundeName(dok.kundeId ?? null),
-    leistung: dok.titel ?? dok.dateiname ?? "",
+    leistung: protokoll ? objektName : (dok.titel ?? dok.dateiname ?? ""),
   };
-  const folderPath = applyPathTemplate(
-    settings.unterordnerSchema?.dokumente ?? "Dokumente/{YYYY}/{MM}",
-    ctx,
-  );
+
+  let folderTemplate = settings.unterordnerSchema?.dokumente ?? "Dokumente/{YYYY}/{MM}";
+  let fileName = row.dateiName || dok.dateiname || "Dokument";
+  if (protokoll) {
+    folderTemplate = protokoll.kind === "schluessel"
+      ? (settings.unterordnerSchema?.protokollSchluessel ?? "Protokolle/Schlüsselübergabe/{YYYY}/{MM}")
+      : (settings.unterordnerSchema?.protokollUebergabe ?? "Protokolle/Übergabe-Abnahme/{YYYY}/{MM}");
+    const fileTemplate = settings.dateinameSchema?.protokoll ?? "{nummer} {kunde} {leistung} {DD}-{MM}-{YYYY}";
+    const baseName = applyFileNameTemplate(fileTemplate, ctx) || fileName.replace(/\.pdf$/i, "");
+    fileName = `${baseName}.pdf`;
+  }
+
+  const folderPath = applyPathTemplate(folderTemplate, ctx);
   const folderId = await (hooks.ensureFolder ?? ensureFolderPath)(folderPath);
   const out = await (hooks.uploadFn ?? uploadFile)({
     parentFolderId: folderId,
-    name: row.dateiName || dok.dateiname || "Dokument",
+    name: fileName,
     data: buf,
     mimeType: dok.mimeType ?? raw.mime_type ?? "application/octet-stream",
   });
