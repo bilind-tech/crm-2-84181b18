@@ -141,9 +141,7 @@ export function RechnungAusDauerauftragDialog({ open, onOpenChange }: Props) {
                   {alleAusgewaehlt ? "Auswahl aufheben" : "Alle auswählen"}
                 </span>
               </label>
-              <span className="text-xs text-muted-foreground">
-                {auswahl.size} ausgewählt
-              </span>
+              <span className="text-xs text-muted-foreground">{auswahl.size} ausgewählt</span>
             </div>
 
             <ul className="max-h-[55vh] divide-y divide-border overflow-y-auto">

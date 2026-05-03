@@ -92,7 +92,7 @@ export function AnsprechpartnerTab({ kundeId, liste }: Props) {
       await Promise.all(
         liste
           .filter((a) => a.id !== id && a.primaer)
-          .map((a) => update.mutateAsync({ id: a.id, primaer: false }))
+          .map((a) => update.mutateAsync({ id: a.id, primaer: false })),
       );
       await update.mutateAsync({ id, primaer: true });
       toast.success("Primärer Ansprechpartner gesetzt");
@@ -122,7 +122,7 @@ export function AnsprechpartnerTab({ kundeId, liste }: Props) {
           await Promise.all(
             liste
               .filter((a) => a.id !== editId && a.primaer)
-              .map((a) => update.mutateAsync({ id: a.id, primaer: false }))
+              .map((a) => update.mutateAsync({ id: a.id, primaer: false })),
           );
         }
         toast.success("Ansprechpartner aktualisiert");
@@ -140,7 +140,7 @@ export function AnsprechpartnerTab({ kundeId, liste }: Props) {
           await Promise.all(
             liste
               .filter((a) => a.primaer)
-              .map((a) => update.mutateAsync({ id: a.id, primaer: false }))
+              .map((a) => update.mutateAsync({ id: a.id, primaer: false })),
           );
           if (!created.primaer) {
             await update.mutateAsync({ id: created.id, primaer: true });
@@ -176,12 +176,7 @@ export function AnsprechpartnerTab({ kundeId, liste }: Props) {
   return (
     <div className="space-y-4">
       <div className="flex justify-end">
-        <Button
-          onClick={openCreate}
-          variant="outline"
-          className="rounded-full"
-          disabled={showForm}
-        >
+        <Button onClick={openCreate} variant="outline" className="rounded-full" disabled={showForm}>
           <Plus className="mr-1 h-4 w-4" /> Neuer Ansprechpartner
         </Button>
       </div>
@@ -194,7 +189,9 @@ export function AnsprechpartnerTab({ kundeId, liste }: Props) {
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Anrede">
               <Select value={anrede} onValueChange={(v) => setAnrede(v as Anrede)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="keine">—</SelectItem>
                   <SelectItem value="herr">Herr</SelectItem>
@@ -204,7 +201,11 @@ export function AnsprechpartnerTab({ kundeId, liste }: Props) {
               </Select>
             </Field>
             <Field label="Position">
-              <Input value={position} onChange={(e) => setPosition(e.target.value)} placeholder="z. B. Geschäftsführer" />
+              <Input
+                value={position}
+                onChange={(e) => setPosition(e.target.value)}
+                placeholder="z. B. Geschäftsführer"
+              />
             </Field>
             <Field label="Vorname">
               <Input value={vorname} onChange={(e) => setVorname(e.target.value)} />
@@ -235,7 +236,13 @@ export function AnsprechpartnerTab({ kundeId, liste }: Props) {
           </label>
 
           <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-            <Button variant="outline" onClick={() => { setShowForm(false); reset(); }}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowForm(false);
+                reset();
+              }}
+            >
               Abbrechen
             </Button>
             <Button onClick={handleSave} disabled={isPending} className="rounded-md px-6">
@@ -248,7 +255,9 @@ export function AnsprechpartnerTab({ kundeId, liste }: Props) {
       {liste.length === 0 && !showForm ? (
         <div className="rounded-2xl border border-dashed border-border bg-muted/20 p-10 text-center">
           <User className="mx-auto h-8 w-8 text-muted-foreground" />
-          <p className="mt-2 text-sm text-muted-foreground">Noch keine Ansprechpartner hinterlegt.</p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Noch keine Ansprechpartner hinterlegt.
+          </p>
         </div>
       ) : (
         liste.length > 0 && (

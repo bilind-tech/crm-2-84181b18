@@ -77,9 +77,9 @@ export function GitHubVerbindenDialog({ current, open, onClose }: Props) {
             {isEditingExisting ? "GitHub-Verbindung anpassen" : "Mit GitHub verbinden"}
           </DialogTitle>
           <DialogDescription className="pt-1">
-            Verbinde dein eigenes Repository, damit du Updates per Klick aus dem Pi
-            heraus laden kannst. Daten werden bei einem Update niemals verändert —
-            es wird ausschließlich der Programmcode getauscht.
+            Verbinde dein eigenes Repository, damit du Updates per Klick aus dem Pi heraus laden
+            kannst. Daten werden bei einem Update niemals verändert — es wird ausschließlich der
+            Programmcode getauscht.
           </DialogDescription>
         </DialogHeader>
 
@@ -108,8 +108,8 @@ export function GitHubVerbindenDialog({ current, open, onClose }: Props) {
               disabled={verbinden.isPending}
             />
             <p className="text-xs text-muted-foreground">
-              Standard ist <span className="font-mono">main</span>. Empfehlung: lass es so —
-              Updates landen direkt durch deinen letzten Push live.
+              Standard ist <span className="font-mono">main</span>. Empfehlung: lass es so — Updates
+              landen direkt durch deinen letzten Push live.
             </p>
           </div>
 
@@ -142,12 +142,18 @@ export function GitHubVerbindenDialog({ current, open, onClose }: Props) {
               </button>
             </div>
             <div className="rounded-lg border border-border bg-muted/30 p-3 text-xs text-muted-foreground">
-              <p className="font-medium text-foreground">So holst du dir den Token (einmalig, ~2 min):</p>
+              <p className="font-medium text-foreground">
+                So holst du dir den Token (einmalig, ~2 min):
+              </p>
               <ol className="mt-1.5 list-decimal space-y-0.5 pl-4">
                 <li>github.com → Settings → Developer settings → Personal access tokens</li>
                 <li>„Fine-grained tokens" → „Generate new token"</li>
-                <li>Repository access: <strong>Only select repositories</strong> → dein Repo wählen</li>
-                <li>Permissions → Repository → <strong>Contents: Read-only</strong></li>
+                <li>
+                  Repository access: <strong>Only select repositories</strong> → dein Repo wählen
+                </li>
+                <li>
+                  Permissions → Repository → <strong>Contents: Read-only</strong>
+                </li>
                 <li>Generieren, hier einfügen</li>
               </ol>
               <a
@@ -163,7 +169,9 @@ export function GitHubVerbindenDialog({ current, open, onClose }: Props) {
 
           <div className="flex items-center justify-between rounded-lg border border-border bg-muted/20 px-3 py-2.5">
             <div>
-              <Label htmlFor="gh-auto" className="cursor-pointer">Automatisch auf Updates prüfen</Label>
+              <Label htmlFor="gh-auto" className="cursor-pointer">
+                Automatisch auf Updates prüfen
+              </Label>
               <p className="text-xs text-muted-foreground">Alle 30 Minuten im Hintergrund</p>
             </div>
             <Switch
@@ -180,9 +188,7 @@ export function GitHubVerbindenDialog({ current, open, onClose }: Props) {
             Abbrechen
           </Button>
           <Button onClick={submit} disabled={verbinden.isPending || !repo.trim()}>
-            {verbinden.isPending ? (
-              <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
-            ) : null}
+            {verbinden.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : null}
             {isEditingExisting ? "Speichern & testen" : "Verbinden & testen"}
           </Button>
         </DialogFooter>

@@ -17,7 +17,13 @@ import { useCreateDauerauftrag } from "@/hooks/useDauerauftraege";
 import { api } from "@/lib/api/client";
 import { toast } from "sonner";
 import { useNavigate } from "@tanstack/react-router";
-import type { Kunde, Ansprechpartner, DauerauftragFrequenz, DauerauftragModus, Position } from "@/lib/api/types";
+import type {
+  Kunde,
+  Ansprechpartner,
+  DauerauftragFrequenz,
+  DauerauftragModus,
+  Position,
+} from "@/lib/api/types";
 import { cn } from "@/lib/utils";
 
 const PHONE_PREFIX = "+49 ";
@@ -41,7 +47,10 @@ function vorschlagKuerzel(name: string): string {
 }
 
 function sanitizeKuerzel(v: string): string {
-  return v.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 4);
+  return v
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "")
+    .slice(0, 4);
 }
 
 interface Props {
@@ -182,7 +191,9 @@ export function KundeForm({ onClose, onCreated }: Props) {
       return;
     }
     if (kuerzelKonflikt) {
-      toast.error(`Kürzel «${f.kuerzel}» ist bereits vergeben (${kuerzelKonflikt.nummer} • ${kuerzelKonflikt.name}).`);
+      toast.error(
+        `Kürzel «${f.kuerzel}» ist bereits vergeben (${kuerzelKonflikt.nummer} • ${kuerzelKonflikt.name}).`,
+      );
       return;
     }
     if (f.daAktiv && !f.daBezeichnung.trim()) {
@@ -226,7 +237,13 @@ export function KundeForm({ onClose, onCreated }: Props) {
     }
 
     // Personendaten automatisch als primären Ansprechpartner speichern
-    const hatPerson = !!(f.vorname.trim() || f.nachname.trim() || f.email.trim() || f.telefon.trim() || f.mobil.trim());
+    const hatPerson = !!(
+      f.vorname.trim() ||
+      f.nachname.trim() ||
+      f.email.trim() ||
+      f.telefon.trim() ||
+      f.mobil.trim()
+    );
     if (hatPerson) {
       try {
         await api.post<Ansprechpartner>("/ansprechpartner", {
@@ -297,18 +314,30 @@ export function KundeForm({ onClose, onCreated }: Props) {
     <div className="min-w-0 space-y-6">
       <Tabs defaultValue="basis">
         <TabsList className="no-scrollbar flex h-11 w-full justify-start gap-1 overflow-x-auto rounded-full bg-muted p-1">
-          <TabsTrigger value="basis" className="shrink-0 rounded-full px-3 text-sm sm:px-5">Basis</TabsTrigger>
-          <TabsTrigger value="adresse" className="shrink-0 rounded-full px-3 text-sm sm:px-5">Adresse</TabsTrigger>
-          <TabsTrigger value="steuer" className="shrink-0 rounded-full px-3 text-sm sm:px-5">Steuer & Zahlung</TabsTrigger>
-          <TabsTrigger value="notizen" className="shrink-0 rounded-full px-3 text-sm sm:px-5">Notizen</TabsTrigger>
-          <TabsTrigger value="dauerauftrag" className="shrink-0 rounded-full px-3 text-sm sm:px-5">Dauerauftrag</TabsTrigger>
+          <TabsTrigger value="basis" className="shrink-0 rounded-full px-3 text-sm sm:px-5">
+            Basis
+          </TabsTrigger>
+          <TabsTrigger value="adresse" className="shrink-0 rounded-full px-3 text-sm sm:px-5">
+            Adresse
+          </TabsTrigger>
+          <TabsTrigger value="steuer" className="shrink-0 rounded-full px-3 text-sm sm:px-5">
+            Steuer & Zahlung
+          </TabsTrigger>
+          <TabsTrigger value="notizen" className="shrink-0 rounded-full px-3 text-sm sm:px-5">
+            Notizen
+          </TabsTrigger>
+          <TabsTrigger value="dauerauftrag" className="shrink-0 rounded-full px-3 text-sm sm:px-5">
+            Dauerauftrag
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="basis" className="mt-6 space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Typ">
               <Select value={f.typ} onValueChange={(v) => set("typ", v as FormState["typ"])}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="firma">Firma</SelectItem>
                   <SelectItem value="privat">Privat</SelectItem>
@@ -316,8 +345,13 @@ export function KundeForm({ onClose, onCreated }: Props) {
               </Select>
             </Field>
             <Field label="Status">
-              <Select value={f.status} onValueChange={(v) => set("status", v as FormState["status"])}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+              <Select
+                value={f.status}
+                onValueChange={(v) => set("status", v as FormState["status"])}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="aktiv">Aktiv</SelectItem>
                   <SelectItem value="interessent">Interessent</SelectItem>
@@ -356,7 +390,8 @@ export function KundeForm({ onClose, onCreated }: Props) {
                   <span className="text-muted-foreground">Prüfe Verfügbarkeit…</span>
                 ) : f.kuerzel.length >= 3 && kuerzelFreiQ.data?.frei ? (
                   <span className="text-emerald-600 dark:text-emerald-400">
-                    ✓ Kürzel frei{vorschauNummer && (
+                    ✓ Kürzel frei
+                    {vorschauNummer && (
                       <>
                         {" • "}Vorschau:{" "}
                         <span className="font-mono font-semibold text-foreground">
@@ -393,9 +428,9 @@ export function KundeForm({ onClose, onCreated }: Props) {
                 className="font-mono w-32"
               />
               <p className="mt-1.5 text-xs text-muted-foreground">
-                Standard: 1. Wenn du diesen Kunden vorher schon verwendet hast und z. B. 7
-                Belege außerhalb existieren, setze hier <span className="font-mono">8</span>.
-                Bestehende Belege bleiben unverändert.
+                Standard: 1. Wenn du diesen Kunden vorher schon verwendet hast und z. B. 7 Belege
+                außerhalb existieren, setze hier <span className="font-mono">8</span>. Bestehende
+                Belege bleiben unverändert.
               </p>
             </Field>
           )}
@@ -404,9 +439,13 @@ export function KundeForm({ onClose, onCreated }: Props) {
             <Field label="Anrede">
               <Select
                 value={f.anrede || "__none__"}
-                onValueChange={(v) => set("anrede", (v === "__none__" ? "" : v) as FormState["anrede"])}
+                onValueChange={(v) =>
+                  set("anrede", (v === "__none__" ? "" : v) as FormState["anrede"])
+                }
               >
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__none__">—</SelectItem>
                   <SelectItem value="herr">Herr</SelectItem>
@@ -416,19 +455,40 @@ export function KundeForm({ onClose, onCreated }: Props) {
                 </SelectContent>
               </Select>
             </Field>
-            <Field label="Vorname"><Input value={f.vorname} onChange={(e) => set("vorname", e.target.value)} /></Field>
-            <Field label="Nachname"><Input value={f.nachname} onChange={(e) => set("nachname", e.target.value)} /></Field>
+            <Field label="Vorname">
+              <Input value={f.vorname} onChange={(e) => set("vorname", e.target.value)} />
+            </Field>
+            <Field label="Nachname">
+              <Input value={f.nachname} onChange={(e) => set("nachname", e.target.value)} />
+            </Field>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Telefon">
-              <SmartInput prefix={PHONE_PREFIX} value={f.telefon} onChange={(v) => set("telefon", v)} inputMode="tel" />
+              <SmartInput
+                prefix={PHONE_PREFIX}
+                value={f.telefon}
+                onChange={(v) => set("telefon", v)}
+                inputMode="tel"
+              />
             </Field>
             <Field label="Mobil">
-              <SmartInput prefix={PHONE_PREFIX} value={f.mobil} onChange={(v) => set("mobil", v)} inputMode="tel" />
+              <SmartInput
+                prefix={PHONE_PREFIX}
+                value={f.mobil}
+                onChange={(v) => set("mobil", v)}
+                inputMode="tel"
+              />
             </Field>
-            <Field label="E-Mail"><Input type="email" value={f.email} onChange={(e) => set("email", e.target.value)} /></Field>
+            <Field label="E-Mail">
+              <Input type="email" value={f.email} onChange={(e) => set("email", e.target.value)} />
+            </Field>
             <Field label="Webseite">
-              <SmartInput prefix={WEB_PREFIX} value={f.webseite} onChange={(v) => set("webseite", v)} inputMode="url" />
+              <SmartInput
+                prefix={WEB_PREFIX}
+                value={f.webseite}
+                onChange={(v) => set("webseite", v)}
+                inputMode="url"
+              />
             </Field>
           </div>
 
@@ -436,36 +496,73 @@ export function KundeForm({ onClose, onCreated }: Props) {
         </TabsContent>
 
         <TabsContent value="adresse" className="mt-6 space-y-4">
-          <Field label="Straße & Hausnummer"><Input value={f.strasse} onChange={(e) => set("strasse", e.target.value)} /></Field>
+          <Field label="Straße & Hausnummer">
+            <Input value={f.strasse} onChange={(e) => set("strasse", e.target.value)} />
+          </Field>
           <div className="grid gap-4 sm:grid-cols-3">
-            <Field label="PLZ"><Input value={f.plz} onChange={(e) => set("plz", e.target.value)} /></Field>
-            <Field label="Ort" className="sm:col-span-2"><Input value={f.ort} onChange={(e) => set("ort", e.target.value)} /></Field>
+            <Field label="PLZ">
+              <Input value={f.plz} onChange={(e) => set("plz", e.target.value)} />
+            </Field>
+            <Field label="Ort" className="sm:col-span-2">
+              <Input value={f.ort} onChange={(e) => set("ort", e.target.value)} />
+            </Field>
           </div>
-          <Field label="Land"><Input value={f.land} onChange={(e) => set("land", e.target.value)} /></Field>
+          <Field label="Land">
+            <Input value={f.land} onChange={(e) => set("land", e.target.value)} />
+          </Field>
         </TabsContent>
 
         <TabsContent value="steuer" className="mt-6 space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="USt-IdNr."><Input value={f.ustId} onChange={(e) => set("ustId", e.target.value)} placeholder="DE123456789" /></Field>
-            <Field label="Steuernummer"><Input value={f.steuernummer} onChange={(e) => set("steuernummer", e.target.value)} /></Field>
+            <Field label="USt-IdNr.">
+              <Input
+                value={f.ustId}
+                onChange={(e) => set("ustId", e.target.value)}
+                placeholder="DE123456789"
+              />
+            </Field>
+            <Field label="Steuernummer">
+              <Input value={f.steuernummer} onChange={(e) => set("steuernummer", e.target.value)} />
+            </Field>
             <Field label="Zahlungsziel (Tage)">
-              <Input type="number" value={f.zahlungszielTage} onChange={(e) => set("zahlungszielTage", Number(e.target.value) || 0)} />
+              <Input
+                type="number"
+                value={f.zahlungszielTage}
+                onChange={(e) => set("zahlungszielTage", Number(e.target.value) || 0)}
+              />
             </Field>
             <Field label="Standard-Steuersatz (%)">
-              <Input type="number" value={f.standardSteuersatz} onChange={(e) => set("standardSteuersatz", Number(e.target.value) || 0)} />
+              <Input
+                type="number"
+                value={f.standardSteuersatz}
+                onChange={(e) => set("standardSteuersatz", Number(e.target.value) || 0)}
+              />
             </Field>
             <Field label="Standard-Rabatt (%)">
-              <Input type="number" value={f.standardRabatt} onChange={(e) => set("standardRabatt", Number(e.target.value) || 0)} />
+              <Input
+                type="number"
+                value={f.standardRabatt}
+                onChange={(e) => set("standardRabatt", Number(e.target.value) || 0)}
+              />
             </Field>
           </div>
         </TabsContent>
 
         <TabsContent value="notizen" className="mt-6 space-y-4">
           <Field label="Tags (komma-getrennt)">
-            <Input value={f.tags} onChange={(e) => set("tags", e.target.value)} placeholder="A-Kunde, Region Nord" />
+            <Input
+              value={f.tags}
+              onChange={(e) => set("tags", e.target.value)}
+              placeholder="A-Kunde, Region Nord"
+            />
           </Field>
           <Field label="Notizen">
-            <Textarea rows={6} value={f.notizen} onChange={(e) => set("notizen", e.target.value)} placeholder="Interne Notizen zum Kunden…" />
+            <Textarea
+              rows={6}
+              value={f.notizen}
+              onChange={(e) => set("notizen", e.target.value)}
+              placeholder="Interne Notizen zum Kunden…"
+            />
           </Field>
         </TabsContent>
 
@@ -482,9 +579,7 @@ export function KundeForm({ onClose, onCreated }: Props) {
           >
             <div className="flex items-center justify-between gap-3">
               <div>
-                <div className="text-sm font-semibold">
-                  Dauerauftrag für diesen Kunden anlegen
-                </div>
+                <div className="text-sm font-semibold">Dauerauftrag für diesen Kunden anlegen</div>
                 <div className="mt-0.5 text-xs text-muted-foreground">
                   Erzeugt automatisch wiederkehrende Rechnungen nach gewähltem Rhythmus.
                 </div>
@@ -520,7 +615,9 @@ export function KundeForm({ onClose, onCreated }: Props) {
                     value={f.daFrequenz}
                     onValueChange={(v) => set("daFrequenz", v as DauerauftragFrequenz)}
                   >
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="monatlich">Monatlich</SelectItem>
                       <SelectItem value="quartalsweise">Quartalsweise</SelectItem>
@@ -534,7 +631,9 @@ export function KundeForm({ onClose, onCreated }: Props) {
                     value={f.daModus}
                     onValueChange={(v) => set("daModus", v as DauerauftragModus)}
                   >
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="entwurf">Entwurf (manuell freigeben)</SelectItem>
                       <SelectItem value="vollautomatisch">Vollautomatisch (versenden)</SelectItem>
@@ -548,7 +647,9 @@ export function KundeForm({ onClose, onCreated }: Props) {
                     value={f.daStichtagTyp}
                     onValueChange={(v) => set("daStichtagTyp", v as "monatstag" | "monatsletzter")}
                   >
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="monatstag">Bestimmter Monatstag</SelectItem>
                       <SelectItem value="monatsletzter">Letzter des Monats</SelectItem>
@@ -563,7 +664,12 @@ export function KundeForm({ onClose, onCreated }: Props) {
                       min={1}
                       max={28}
                       value={f.daStichtagWert}
-                      onChange={(e) => set("daStichtagWert", Math.min(28, Math.max(1, Number(e.target.value) || 1)))}
+                      onChange={(e) =>
+                        set(
+                          "daStichtagWert",
+                          Math.min(28, Math.max(1, Number(e.target.value) || 1)),
+                        )
+                      }
                       className="w-24 font-mono"
                     />
                   </Field>
@@ -618,7 +724,9 @@ export function KundeForm({ onClose, onCreated }: Props) {
       </Tabs>
 
       <div className="sticky bottom-0 -mx-4 -mb-5 mt-2 flex flex-col-reverse items-stretch gap-2 border-t border-border bg-background px-4 py-3 sm:-mx-8 sm:-mb-6 sm:px-8 sm:flex-row sm:items-center sm:justify-end ">
-        <Button variant="outline" onClick={onClose}>Abbrechen</Button>
+        <Button variant="outline" onClick={onClose}>
+          Abbrechen
+        </Button>
         <Button
           disabled={create.isPending || createDA.isPending || !!kuerzelKonflikt}
           onClick={submit}
@@ -650,27 +758,43 @@ function Field({
 
 function AnsprechpartnerHinweis({ f }: { f: FormState }) {
   const anredeLabel =
-    f.anrede === "herr" ? "Herr" :
-    f.anrede === "frau" ? "Frau" :
-    f.anrede === "divers" ? "" :
-    f.anrede === "keine" ? "" : "";
+    f.anrede === "herr"
+      ? "Herr"
+      : f.anrede === "frau"
+        ? "Frau"
+        : f.anrede === "divers"
+          ? ""
+          : f.anrede === "keine"
+            ? ""
+            : "";
   const fullName = [anredeLabel, f.vorname.trim(), f.nachname.trim()].filter(Boolean).join(" ");
-  const kontakt = f.email.trim() || smartValue(f.telefon, PHONE_PREFIX) || smartValue(f.mobil, PHONE_PREFIX) || "";
-  const hatPerson = !!(f.vorname.trim() || f.nachname.trim() || f.email.trim() || f.telefon.trim() || f.mobil.trim());
+  const kontakt =
+    f.email.trim() ||
+    smartValue(f.telefon, PHONE_PREFIX) ||
+    smartValue(f.mobil, PHONE_PREFIX) ||
+    "";
+  const hatPerson = !!(
+    f.vorname.trim() ||
+    f.nachname.trim() ||
+    f.email.trim() ||
+    f.telefon.trim() ||
+    f.mobil.trim()
+  );
 
   if (!hatPerson) {
     return (
       <div className="rounded-lg border border-dashed border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
         Tipp: Trage Anrede + Name (oder Kontakt) ein – die Person wird automatisch als{" "}
-        <span className="font-medium text-foreground">primärer Ansprechpartner</span> für diesen Kunden gespeichert.
+        <span className="font-medium text-foreground">primärer Ansprechpartner</span> für diesen
+        Kunden gespeichert.
       </div>
     );
   }
 
   return (
     <div className="rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-xs text-foreground">
-      Wird automatisch als <span className="font-medium">primärer Ansprechpartner</span> gespeichert:{" "}
-      <span className="font-medium">{fullName || "(ohne Name)"}</span>
+      Wird automatisch als <span className="font-medium">primärer Ansprechpartner</span>{" "}
+      gespeichert: <span className="font-medium">{fullName || "(ohne Name)"}</span>
       {kontakt && <span className="text-muted-foreground"> · {kontakt}</span>}
     </div>
   );

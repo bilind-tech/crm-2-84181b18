@@ -31,7 +31,7 @@ function Page() {
       interessent: alle.filter((k) => k.status === "interessent").length,
       inaktiv: alle.filter((k) => k.status === "inaktiv").length,
     }),
-    [alle]
+    [alle],
   );
 
   const filtered = useMemo(() => {
@@ -44,7 +44,7 @@ function Page() {
           (k.firmenname ?? "").toLowerCase().includes(t) ||
           (k.nachname ?? "").toLowerCase().includes(t) ||
           k.nummer.toLowerCase().includes(t) ||
-          (k.ort ?? "").toLowerCase().includes(t)
+          (k.ort ?? "").toLowerCase().includes(t),
       );
     }
     return list;
@@ -55,9 +55,7 @@ function Page() {
       <PageHeader
         title="Kunden"
         subtitle="Stammdaten deiner Kunden zentral verwalten."
-        actions={
-          <PrimaryAction onClick={() => setOpen(true)} label="Neuer Kunde" />
-        }
+        actions={<PrimaryAction onClick={() => setOpen(true)} label="Neuer Kunde" />}
       />
 
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
@@ -112,57 +110,57 @@ function Page() {
       {/* Desktop: Tabelle */}
       <div className="hidden overflow-hidden rounded-2xl border border-border bg-card shadow-sm md:block">
         <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-border bg-muted/30 text-left text-xs uppercase tracking-wider text-muted-foreground">
-              <th className="px-4 py-3 font-medium">Nummer</th>
-              <th className="px-4 py-3 font-medium">Name</th>
-              <th className="px-4 py-3 font-medium">Ort</th>
-              <th className="px-4 py-3 font-medium">E-Mail</th>
-              <th className="px-4 py-3 font-medium">Status</th>
-              <th className="px-4 py-3" />
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((k) => (
-              <tr
-                key={k.id}
-                role="link"
-                tabIndex={0}
-                onClick={() => navigate({ to: "/kunden/$id", params: { id: k.id } })}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    navigate({ to: "/kunden/$id", params: { id: k.id } });
-                  }
-                }}
-                className="cursor-pointer border-b border-border last:border-0 transition-colors hover:bg-muted/40 focus:bg-muted/40 focus:outline-none"
-              >
-                <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{k.nummer}</td>
-                <td className="px-4 py-3 font-medium">
-                  {k.firmenname || `${k.vorname ?? ""} ${k.nachname ?? ""}`.trim()}
-                </td>
-                <td className="px-4 py-3 text-muted-foreground">{k.ort ?? "—"}</td>
-                <td className="px-4 py-3 text-muted-foreground">{k.email ?? "—"}</td>
-                <td className="px-4 py-3">
-                  <span className="inline-flex items-center rounded-full border border-border bg-muted px-2.5 py-0.5 text-xs font-medium capitalize">
-                    {k.status}
-                  </span>
-                </td>
-                <td className="px-4 py-3 text-right">
-                  <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground" />
-                </td>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border bg-muted/30 text-left text-xs uppercase tracking-wider text-muted-foreground">
+                <th className="px-4 py-3 font-medium">Nummer</th>
+                <th className="px-4 py-3 font-medium">Name</th>
+                <th className="px-4 py-3 font-medium">Ort</th>
+                <th className="px-4 py-3 font-medium">E-Mail</th>
+                <th className="px-4 py-3 font-medium">Status</th>
+                <th className="px-4 py-3" />
               </tr>
-            ))}
-            {filtered.length === 0 && (
-              <tr>
-                <td colSpan={6} className="px-4 py-12 text-center text-sm text-muted-foreground">
-                  Keine Kunden gefunden.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {filtered.map((k) => (
+                <tr
+                  key={k.id}
+                  role="link"
+                  tabIndex={0}
+                  onClick={() => navigate({ to: "/kunden/$id", params: { id: k.id } })}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      navigate({ to: "/kunden/$id", params: { id: k.id } });
+                    }
+                  }}
+                  className="cursor-pointer border-b border-border last:border-0 transition-colors hover:bg-muted/40 focus:bg-muted/40 focus:outline-none"
+                >
+                  <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{k.nummer}</td>
+                  <td className="px-4 py-3 font-medium">
+                    {k.firmenname || `${k.vorname ?? ""} ${k.nachname ?? ""}`.trim()}
+                  </td>
+                  <td className="px-4 py-3 text-muted-foreground">{k.ort ?? "—"}</td>
+                  <td className="px-4 py-3 text-muted-foreground">{k.email ?? "—"}</td>
+                  <td className="px-4 py-3">
+                    <span className="inline-flex items-center rounded-full border border-border bg-muted px-2.5 py-0.5 text-xs font-medium capitalize">
+                      {k.status}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground" />
+                  </td>
+                </tr>
+              ))}
+              {filtered.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="px-4 py-12 text-center text-sm text-muted-foreground">
+                    Keine Kunden gefunden.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
 

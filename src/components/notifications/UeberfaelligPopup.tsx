@@ -41,9 +41,7 @@ export function UeberfaelligPopup() {
           </div>
           <div className="min-w-0 flex-1">
             <p className="text-sm font-semibold text-foreground">
-              {count === 1
-                ? "1 überfällige Rechnung"
-                : `${count} überfällige Rechnungen`}
+              {count === 1 ? "1 überfällige Rechnung" : `${count} überfällige Rechnungen`}
             </p>
             <p className="text-xs text-muted-foreground">
               Offen: <span className="font-medium text-destructive">{formatEUR(gesamtOffen)}</span>
@@ -76,9 +74,7 @@ export function UeberfaelligPopup() {
                   </p>
                 </div>
                 <div className="shrink-0 text-right">
-                  <p className="text-sm font-semibold text-destructive">
-                    {formatEUR(r.offen)}
-                  </p>
+                  <p className="text-sm font-semibold text-destructive">{formatEUR(r.offen)}</p>
                   <p className="text-[11px] text-destructive/80">
                     +{r.tageUeber} {r.tageUeber === 1 ? "Tag" : "Tage"}
                   </p>
@@ -90,9 +86,7 @@ export function UeberfaelligPopup() {
 
         <div className="flex items-center justify-between gap-2 border-t border-border bg-muted/30 px-4 py-2.5">
           {weitere > 0 ? (
-            <span className="text-xs text-muted-foreground">
-              + {weitere} weitere
-            </span>
+            <span className="text-xs text-muted-foreground">+ {weitere} weitere</span>
           ) : (
             <span />
           )}

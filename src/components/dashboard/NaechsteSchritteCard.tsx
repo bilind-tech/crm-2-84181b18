@@ -4,14 +4,7 @@
 
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
-import {
-  CheckCircle2,
-  Mail,
-  FileCheck2,
-  Bell,
-  ArrowRight,
-  ChevronRight,
-} from "lucide-react";
+import { CheckCircle2, Mail, FileCheck2, Bell, ArrowRight, ChevronRight } from "lucide-react";
 import {
   useAngebote,
   useRechnungen,
@@ -23,10 +16,7 @@ import {
 } from "@/hooks/useApi";
 import { useRechnungPdf } from "@/hooks/useBelegPdf";
 import { EmailVersandDialog } from "@/components/email/EmailVersandDialog";
-import {
-  berechneNaechsteSchritte,
-  type NaechsterSchritt,
-} from "@/lib/dashboard/naechsteSchritte";
+import { berechneNaechsteSchritte, type NaechsterSchritt } from "@/lib/dashboard/naechsteSchritte";
 import { toast } from "sonner";
 import type { Angebot, Kunde, Rechnung } from "@/lib/api/types";
 
@@ -123,10 +113,7 @@ export function NaechsteSchritteCard() {
       )}
 
       {emailRechnung && (
-        <RechnungEmailLauncher
-          rechnung={emailRechnung}
-          onClose={() => setEmailRechnung(null)}
-        />
+        <RechnungEmailLauncher rechnung={emailRechnung} onClose={() => setEmailRechnung(null)} />
       )}
     </div>
   );
@@ -224,13 +211,7 @@ function toneFuer(typ: NaechsterSchritt["typ"]) {
   }
 }
 
-function RechnungEmailLauncher({
-  rechnung,
-  onClose,
-}: {
-  rechnung: Rechnung;
-  onClose: () => void;
-}) {
+function RechnungEmailLauncher({ rechnung, onClose }: { rechnung: Rechnung; onClose: () => void }) {
   const { data: kunde } = useKunde(rechnung.kundeId);
   const pdf = useRechnungPdf(rechnung);
   return (

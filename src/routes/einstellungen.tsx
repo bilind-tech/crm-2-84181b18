@@ -53,7 +53,6 @@ import { BackendVerbindungTab } from "@/components/einstellungen/BackendVerbindu
 import type { Firmendaten } from "@/lib/api/types";
 import { cn } from "@/lib/utils";
 
-
 export const Route = createFileRoute("/einstellungen")({ component: Page });
 
 type TabId =
@@ -140,10 +139,7 @@ function Page() {
 
   return (
     <div className="space-y-6 pb-24">
-      <PageHeader
-        title="Einstellungen"
-        subtitle="Stammdaten, E-Mail, Belege, System."
-      />
+      <PageHeader title="Einstellungen" subtitle="Stammdaten, E-Mail, Belege, System." />
 
       {/* Mobile: Select */}
       <div className="md:hidden">
@@ -348,7 +344,10 @@ function FirmendatenTab({
             <Input value={form.firmenname} onChange={(e) => set("firmenname", e.target.value)} />
           </Field>
           <Field label="Rechtsform">
-            <Input value={form.rechtsform ?? ""} onChange={(e) => set("rechtsform", e.target.value)} />
+            <Input
+              value={form.rechtsform ?? ""}
+              onChange={(e) => set("rechtsform", e.target.value)}
+            />
           </Field>
           <div className="sm:col-span-2">
             <Field label="Slogan / Untertitel">

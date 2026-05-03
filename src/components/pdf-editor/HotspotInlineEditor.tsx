@@ -177,8 +177,12 @@ export function HotspotInlineEditor({ fieldId, draft, kind, set, onOpenAdvanced,
               draft.optionen?.eigenesOutro ??
               draft.outroText ??
               (kind === "angebot"
-                ? defaultOutroAngebot(draft as Angebot, { materialBereitgestellt: draft.optionen?.materialBereitgestellt })
-                : defaultOutroRechnung(draft as Rechnung, { materialBereitgestellt: draft.optionen?.materialBereitgestellt }))
+                ? defaultOutroAngebot(draft as Angebot, {
+                    materialBereitgestellt: draft.optionen?.materialBereitgestellt,
+                  })
+                : defaultOutroRechnung(draft as Rechnung, {
+                    materialBereitgestellt: draft.optionen?.materialBereitgestellt,
+                  }))
             }
             onChange={(e) => {
               const v = e.target.value;

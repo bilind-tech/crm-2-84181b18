@@ -1,10 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import {
-  useDashboardKennzahlen,
-  useUmsatz,
-  useRechnungen,
-} from "@/hooks/useApi";
+import { useDashboardKennzahlen, useUmsatz, useRechnungen } from "@/hooks/useApi";
 import { useMahnZaehler } from "@/hooks/useMahnZaehler";
 import { useDauerauftragLaeufe } from "@/hooks/useDauerauftraege";
 import { formatEUR, formatDate } from "@/lib/format";
@@ -27,10 +23,7 @@ import {
   zeitraumIstAktiv,
   type ZeitraumState,
 } from "@/components/filters/ZeitraumFilter";
-import {
-  ZeitraumSelect,
-  formatZeitraumLabel,
-} from "@/components/filters/ZeitraumSelect";
+import { ZeitraumSelect, formatZeitraumLabel } from "@/components/filters/ZeitraumSelect";
 
 export const Route = createFileRoute("/")({
   component: Dashboard,
@@ -48,10 +41,7 @@ function Dashboard() {
   const aktiv = zeitraumIstAktiv(zeitraum);
   const zeitLabel = formatZeitraumLabel(zeitraum);
 
-  const verfuegbareDaten = useMemo(
-    () => rechnungen.map((r) => r.rechnungsdatum),
-    [rechnungen],
-  );
+  const verfuegbareDaten = useMemo(() => rechnungen.map((r) => r.rechnungsdatum), [rechnungen]);
 
   const offeneDAEntwuerfe = laeufeErzeugt.filter((l) => {
     if (!l.rechnungId) return false;
@@ -61,10 +51,7 @@ function Dashboard() {
 
   // Offene Rechnungen, optional gefiltert auf Zeitraum
   const offeneAlle = rechnungen.filter(
-    (r) =>
-      r.status === "versendet" ||
-      r.status === "ueberfaellig" ||
-      r.status === "teilbezahlt",
+    (r) => r.status === "versendet" || r.status === "ueberfaellig" || r.status === "teilbezahlt",
   );
   const offene = aktiv
     ? offeneAlle.filter((r) => passtInZeitraum(r.rechnungsdatum, zeitraum))
@@ -73,30 +60,20 @@ function Dashboard() {
   // Aktueller KPI-Wert "Umsatz" — bei Einzelmonat/Zeitraum die Summe der Punkte,
   // sonst der zuletzt gelieferte Monat (aktueller Monat)
   const summeZeitraum = umsatz.reduce((acc, u) => acc + u.brutto, 0);
-  const umsatzKpi = aktiv
-    ? summeZeitraum
-    : umsatz[umsatz.length - 1]?.brutto ?? 0;
-  const umsatzKpiSub = aktiv
-    ? `brutto · ${zeitLabel}`
-    : "brutto · aktueller Monat";
+  const umsatzKpi = aktiv ? summeZeitraum : (umsatz[umsatz.length - 1]?.brutto ?? 0);
+  const umsatzKpiSub = aktiv ? `brutto · ${zeitLabel}` : "brutto · aktueller Monat";
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Übersicht"
-        subtitle={
-          aktiv
-            ? `Zeitraum: ${zeitLabel}`
-            : "Aktueller Stand auf einen Blick"
-        }
+        subtitle={aktiv ? `Zeitraum: ${zeitLabel}` : "Aktueller Stand auf einen Blick"}
       />
 
       {/* Schlichter Zeitraum-Filter — Inline, mobil 50/50 */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-xs text-muted-foreground sm:hidden">Zeitraum</p>
-        <div className="hidden sm:block text-xs font-medium text-muted-foreground">
-          Zeitraum
-        </div>
+        <div className="hidden sm:block text-xs font-medium text-muted-foreground">Zeitraum</div>
         <div className="sm:hidden">
           <ZeitraumSelect
             zeitraum={zeitraum}
@@ -145,9 +122,7 @@ function Dashboard() {
         />
       </div>
 
-      <UmsatzChartCard
-        onMonatKlick={(jahr, monat) => setZeitraum({ jahr, monat })}
-      />
+      <UmsatzChartCard onMonatKlick={(jahr, monat) => setZeitraum({ jahr, monat })} />
 
       <NaechsteSchritteCard />
 
@@ -171,7 +146,7 @@ function Dashboard() {
                 const summe =
                   r.positionen.reduce(
                     (a, p) => a + p.menge * p.einzelpreisNetto * (1 - p.rabatt / 100),
-                    0
+                    0,
                   ) *
                   (1 + r.steuersatz / 100);
                 return (
@@ -182,7 +157,9 @@ function Dashboard() {
                       className="flex items-center justify-between gap-3 py-3 hover:text-primary"
                     >
                       <div className="min-w-0">
-                        <p className="text-sm font-medium">{r.nummer} · {r.titel}</p>
+                        <p className="text-sm font-medium">
+                          {r.nummer} · {r.titel}
+                        </p>
                         <p className="text-xs text-muted-foreground">{r.titel}</p>
                       </div>
                       <div className="flex shrink-0 items-center gap-2 text-right">
@@ -224,11 +201,7 @@ function Dashboard() {
             </div>
           ) : (
             <div className="grid grid-cols-3 gap-3">
-              <MahnStat
-                value={mahn.aktionEmpfohlen}
-                label="Aktion empfohlen"
-                tone="primary"
-              />
+              <MahnStat value={mahn.aktionEmpfohlen} label="Aktion empfohlen" tone="primary" />
               <MahnStat
                 value={mahn.ueberfaellig}
                 label="Überfällig"
@@ -256,7 +229,8 @@ function Dashboard() {
             </span>
             <div className="min-w-0">
               <p className="font-medium">
-                {offeneDAEntwuerfe} Rechnungs-Entwurf{offeneDAEntwuerfe === 1 ? "" : "e"} aus Daueraufträgen
+                {offeneDAEntwuerfe} Rechnungs-Entwurf{offeneDAEntwuerfe === 1 ? "" : "e"} aus
+                Daueraufträgen
               </p>
               <p className="text-xs text-muted-foreground">
                 Warten auf Freigabe — in der Rechnungsliste mit Filter „Entwurf" sichtbar.
@@ -266,7 +240,6 @@ function Dashboard() {
           <ArrowRight className="h-4 w-4 shrink-0 text-primary" />
         </Link>
       )}
-
     </div>
   );
 }

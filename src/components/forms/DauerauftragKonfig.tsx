@@ -49,7 +49,9 @@ export function formatWiederkehrend(d: WiederkehrendDetails): string {
       tage[3] === 4 &&
       tage[4] === 5;
     if (istMoFr) return "Mo–Fr · 5× wöchentlich";
-    const labels = tage.map((t) => WOCHENTAGE.find((w) => w.value === t)?.kurz ?? "").filter(Boolean);
+    const labels = tage
+      .map((t) => WOCHENTAGE.find((w) => w.value === t)?.kurz ?? "")
+      .filter(Boolean);
     return `${labels.join(", ")} · ${tage.length}× wöchentlich`;
   }
   if (d.rhythmus === "monatlich") {

@@ -17,7 +17,12 @@ import {
   Clock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useGithubStatus, useGithubPruefen, useGithubInstall, useGithubTrennen } from "@/hooks/useApi";
+import {
+  useGithubStatus,
+  useGithubPruefen,
+  useGithubInstall,
+  useGithubTrennen,
+} from "@/hooks/useApi";
 import { GitHubVerbindenDialog } from "./GitHubVerbindenDialog";
 import type { GithubUpdateStatus } from "@/lib/api/types";
 import { cn } from "@/lib/utils";
@@ -115,9 +120,9 @@ export function GitHubUpdateCard({ onLaufGestartet, updateLaeuft }: Props) {
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold">Updates direkt aus GitHub</p>
               <p className="mt-0.5 text-xs text-muted-foreground">
-                Verbinde dein Code-Repository einmalig, dann reicht ein Klick — der Pi
-                lädt den neuesten Code, macht ein Sicherheits-Backup und tauscht den
-                Code aus. Deine Daten bleiben unangetastet.
+                Verbinde dein Code-Repository einmalig, dann reicht ein Klick — der Pi lädt den
+                neuesten Code, macht ein Sicherheits-Backup und tauscht den Code aus. Deine Daten
+                bleiben unangetastet.
               </p>
             </div>
             <Button onClick={() => setVerbindenOffen(true)} size="sm" className="gap-1.5">
@@ -127,11 +132,7 @@ export function GitHubUpdateCard({ onLaufGestartet, updateLaeuft }: Props) {
           </div>
         </div>
         {verbindenOffen && (
-          <GitHubVerbindenDialog
-            current={s}
-            open
-            onClose={() => setVerbindenOffen(false)}
-          />
+          <GitHubVerbindenDialog current={s} open onClose={() => setVerbindenOffen(false)} />
         )}
       </>
     );
@@ -147,7 +148,9 @@ export function GitHubUpdateCard({ onLaufGestartet, updateLaeuft }: Props) {
           <div
             className={cn(
               "grid h-10 w-10 place-content-center rounded-lg",
-              updateVerfuegbar ? "bg-primary/10 text-primary" : "bg-emerald-500/10 text-emerald-600",
+              updateVerfuegbar
+                ? "bg-primary/10 text-primary"
+                : "bg-emerald-500/10 text-emerald-600",
             )}
           >
             <Github className="h-5 w-5" />
@@ -272,11 +275,7 @@ export function GitHubUpdateCard({ onLaufGestartet, updateLaeuft }: Props) {
       </div>
 
       {verbindenOffen && (
-        <GitHubVerbindenDialog
-          current={s}
-          open
-          onClose={() => setVerbindenOffen(false)}
-        />
+        <GitHubVerbindenDialog current={s} open onClose={() => setVerbindenOffen(false)} />
       )}
 
       {trennConfirm && (
@@ -310,8 +309,8 @@ function TrennenConfirm({
       >
         <p className="text-sm font-semibold">GitHub-Verbindung trennen?</p>
         <p className="mt-1 text-xs text-muted-foreground">
-          Der gespeicherte Token für <span className="font-mono">{repo}</span> wird gelöscht.
-          Du kannst jederzeit neu verbinden. Daten bleiben unberührt.
+          Der gespeicherte Token für <span className="font-mono">{repo}</span> wird gelöscht. Du
+          kannst jederzeit neu verbinden. Daten bleiben unberührt.
         </p>
         <div className="mt-4 flex justify-end gap-2">
           <Button variant="outline" size="sm" onClick={onCancel} disabled={loading}>

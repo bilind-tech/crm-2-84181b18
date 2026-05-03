@@ -122,22 +122,35 @@ export function PositionenEditor({
           <Button size="sm" onClick={() => add("pauschal")} className="rounded-full">
             <Plus className="mr-1 h-3.5 w-3.5" /> Pauschal
           </Button>
-          <Button variant="outline" size="sm" onClick={() => add("stunden")} className="rounded-full">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => add("stunden")}
+            className="rounded-full"
+          >
             <Clock className="mr-1 h-3.5 w-3.5" /> Stunden
           </Button>
-          <Button variant="outline" size="sm" onClick={() => add("einzel")} className="rounded-full">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => add("einzel")}
+            className="rounded-full"
+          >
             <FileText className="mr-1 h-3.5 w-3.5" /> Einzel
           </Button>
         </div>
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs sm:text-sm">
           <span className="text-muted-foreground">
-            Netto <span className="ml-1 font-semibold text-foreground">{formatEUR(totals.netto)}</span>
+            Netto{" "}
+            <span className="ml-1 font-semibold text-foreground">{formatEUR(totals.netto)}</span>
           </span>
           <span className="text-muted-foreground">
-            MwSt <span className="ml-1 font-semibold text-foreground">{formatEUR(totals.steuer)}</span>
+            MwSt{" "}
+            <span className="ml-1 font-semibold text-foreground">{formatEUR(totals.steuer)}</span>
           </span>
           <span className="text-muted-foreground">
-            Brutto <span className="ml-1 font-semibold text-primary">{formatEUR(totals.brutto)}</span>
+            Brutto{" "}
+            <span className="ml-1 font-semibold text-primary">{formatEUR(totals.brutto)}</span>
           </span>
         </div>
       </div>
@@ -211,8 +224,8 @@ function PositionCard({ index, position: p, onChange, onRemove }: CardProps) {
               withToolbar
             />
             <p className="mt-1 text-[11px] text-muted-foreground">
-              Tipp: <kbd className="rounded border border-border bg-muted px-1">Enter</kbd> nach „•" setzt
-              automatisch einen neuen Aufzählungspunkt.
+              Tipp: <kbd className="rounded border border-border bg-muted px-1">Enter</kbd> nach „•"
+              setzt automatisch einen neuen Aufzählungspunkt.
             </p>
           </div>
 
@@ -231,7 +244,9 @@ function PositionCard({ index, position: p, onChange, onRemove }: CardProps) {
               />
             </div>
             <div>
-              <label className="mb-1 block text-[11px] font-medium text-muted-foreground">MwSt</label>
+              <label className="mb-1 block text-[11px] font-medium text-muted-foreground">
+                MwSt
+              </label>
               <MwStStepper value={p.steuersatz} onChange={(v) => onChange({ steuersatz: v })} />
             </div>
           </div>
@@ -280,7 +295,9 @@ function PositionCard({ index, position: p, onChange, onRemove }: CardProps) {
               />
             </div>
             <div>
-              <label className="mb-1 block text-[11px] font-medium text-muted-foreground">MwSt</label>
+              <label className="mb-1 block text-[11px] font-medium text-muted-foreground">
+                MwSt
+              </label>
               <MwStStepper value={p.steuersatz} onChange={(v) => onChange({ steuersatz: v })} />
             </div>
           </div>
@@ -316,7 +333,9 @@ function PositionCard({ index, position: p, onChange, onRemove }: CardProps) {
               />
             </div>
             <div>
-              <label className="mb-1 block text-[11px] font-medium text-muted-foreground">MwSt</label>
+              <label className="mb-1 block text-[11px] font-medium text-muted-foreground">
+                MwSt
+              </label>
               <MwStStepper value={p.steuersatz} onChange={(v) => onChange({ steuersatz: v })} />
             </div>
           </div>

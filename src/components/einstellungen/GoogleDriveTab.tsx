@@ -44,7 +44,15 @@ import { getBackendUrl } from "@/lib/api/backendUrl";
 import { cn } from "@/lib/utils";
 
 const PFAD_PLATZHALTER = ["{YYYY}", "{MM}"];
-const DATEI_PLATZHALTER = ["{nummer}", "{kunde}", "{leistung}", "{DD}", "{MM}", "{YYYY}", "{datum}"];
+const DATEI_PLATZHALTER = [
+  "{nummer}",
+  "{kunde}",
+  "{leistung}",
+  "{DD}",
+  "{MM}",
+  "{YYYY}",
+  "{datum}",
+];
 
 function pfadVorschau(template: string): string {
   const now = new Date();
@@ -163,7 +171,9 @@ export function GoogleDriveTab() {
               <div className="flex items-start gap-3 rounded-xl border border-destructive/30 bg-destructive/5 p-4">
                 <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
                 <div className="flex-1">
-                  <p className="text-sm font-medium text-destructive">Letzter Upload fehlgeschlagen</p>
+                  <p className="text-sm font-medium text-destructive">
+                    Letzter Upload fehlgeschlagen
+                  </p>
                   <p className="text-xs text-muted-foreground">{form.letzterFehler}</p>
                 </div>
               </div>
@@ -268,11 +278,17 @@ export function GoogleDriveTab() {
           </Field>
           <Field label="Unterordner für Übergabe-/Abnahmeprotokolle" required>
             <Input
-              value={form.unterordnerSchema.protokollUebergabe ?? "Protokolle/Übergabe-Abnahme/{YYYY}/{MM}"}
+              value={
+                form.unterordnerSchema.protokollUebergabe ??
+                "Protokolle/Übergabe-Abnahme/{YYYY}/{MM}"
+              }
               onChange={(e) =>
                 setForm({
                   ...form,
-                  unterordnerSchema: { ...form.unterordnerSchema, protokollUebergabe: e.target.value },
+                  unterordnerSchema: {
+                    ...form.unterordnerSchema,
+                    protokollUebergabe: e.target.value,
+                  },
                 })
               }
               className="font-mono"
@@ -281,17 +297,28 @@ export function GoogleDriveTab() {
             <p className="mt-1 text-xs text-muted-foreground">
               Beispiel:{" "}
               <span className="font-mono text-foreground">
-                {form.rootOrdnerName}/{pfadVorschau(form.unterordnerSchema.protokollUebergabe ?? "Protokolle/Übergabe-Abnahme/{YYYY}/{MM}")}/
+                {form.rootOrdnerName}/
+                {pfadVorschau(
+                  form.unterordnerSchema.protokollUebergabe ??
+                    "Protokolle/Übergabe-Abnahme/{YYYY}/{MM}",
+                )}
+                /
               </span>
             </p>
           </Field>
           <Field label="Unterordner für Schlüsselübergaben" required>
             <Input
-              value={form.unterordnerSchema.protokollSchluessel ?? "Protokolle/Schlüsselübergabe/{YYYY}/{MM}"}
+              value={
+                form.unterordnerSchema.protokollSchluessel ??
+                "Protokolle/Schlüsselübergabe/{YYYY}/{MM}"
+              }
               onChange={(e) =>
                 setForm({
                   ...form,
-                  unterordnerSchema: { ...form.unterordnerSchema, protokollSchluessel: e.target.value },
+                  unterordnerSchema: {
+                    ...form.unterordnerSchema,
+                    protokollSchluessel: e.target.value,
+                  },
                 })
               }
               className="font-mono"
@@ -300,7 +327,12 @@ export function GoogleDriveTab() {
             <p className="mt-1 text-xs text-muted-foreground">
               Beispiel:{" "}
               <span className="font-mono text-foreground">
-                {form.rootOrdnerName}/{pfadVorschau(form.unterordnerSchema.protokollSchluessel ?? "Protokolle/Schlüsselübergabe/{YYYY}/{MM}")}/
+                {form.rootOrdnerName}/
+                {pfadVorschau(
+                  form.unterordnerSchema.protokollSchluessel ??
+                    "Protokolle/Schlüsselübergabe/{YYYY}/{MM}",
+                )}
+                /
               </span>
             </p>
           </Field>
@@ -354,7 +386,9 @@ export function GoogleDriveTab() {
           </Field>
           <Field label="Protokoll (Übergabe / Schlüssel)" required>
             <Input
-              value={form.dateinameSchema.protokoll ?? "{nummer} {kunde} {leistung} {DD}-{MM}-{YYYY}"}
+              value={
+                form.dateinameSchema.protokoll ?? "{nummer} {kunde} {leistung} {DD}-{MM}-{YYYY}"
+              }
               onChange={(e) =>
                 setForm({
                   ...form,
@@ -367,11 +401,15 @@ export function GoogleDriveTab() {
             <p className="mt-1 text-xs text-muted-foreground">
               Vorschau:{" "}
               <span className="font-mono text-foreground">
-                {dateiVorschau(form.dateinameSchema.protokoll ?? "{nummer} {kunde} {leistung} {DD}-{MM}-{YYYY}", "protokoll")}
+                {dateiVorschau(
+                  form.dateinameSchema.protokoll ?? "{nummer} {kunde} {leistung} {DD}-{MM}-{YYYY}",
+                  "protokoll",
+                )}
               </span>
               <br />
               <span className="text-[11px]">
-                <code className="font-mono">{"{leistung}"}</code> wird beim Protokoll mit dem Objekt-Namen befüllt.
+                <code className="font-mono">{"{leistung}"}</code> wird beim Protokoll mit dem
+                Objekt-Namen befüllt.
               </span>
             </p>
           </Field>
@@ -611,7 +649,12 @@ function SynchronisationSection() {
         <>
           {/* Counter-Zeile */}
           <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-muted/30 px-4 py-2.5 text-xs">
-            <CounterPill icon={<Loader2 className="h-3 w-3" />} label="läuft" value={counts.running} tone="primary" />
+            <CounterPill
+              icon={<Loader2 className="h-3 w-3" />}
+              label="läuft"
+              value={counts.running}
+              tone="primary"
+            />
             <CounterPill label="in Warteschlange" value={counts.pending} />
             <CounterPill label="erfolgreich" value={counts.erfolg} tone="success" />
             <CounterPill label="manuell" value={counts.manuell} tone="warn" />
@@ -632,12 +675,16 @@ function SynchronisationSection() {
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-mono text-xs">{u.dateiName}</p>
                     <p className="mt-0.5 text-[11px] text-muted-foreground">
-                      <span className="rounded bg-muted px-1.5 py-0.5 font-medium">{u.belegArt}</span>{" "}
+                      <span className="rounded bg-muted px-1.5 py-0.5 font-medium">
+                        {u.belegArt}
+                      </span>{" "}
                       · Versuche: {u.versuche}
                       {u.status === "manuell" && " · gibt jetzt nur noch manuell weiter"}
                     </p>
                     {u.fehlerText && (
-                      <p className="mt-1 line-clamp-2 text-[11px] text-destructive">{u.fehlerText}</p>
+                      <p className="mt-1 line-clamp-2 text-[11px] text-destructive">
+                        {u.fehlerText}
+                      </p>
                     )}
                   </div>
                   <div className="flex shrink-0 gap-1">
@@ -647,7 +694,9 @@ function SynchronisationSection() {
                         size="sm"
                         className="h-8 w-8 p-0"
                         title="In Drive öffnen"
-                        onClick={() => window.open(u.driveWebLink!, "_blank", "noopener,noreferrer")}
+                        onClick={() =>
+                          window.open(u.driveWebLink!, "_blank", "noopener,noreferrer")
+                        }
                       >
                         <ExternalLink className="h-4 w-4" />
                       </Button>

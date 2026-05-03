@@ -23,12 +23,7 @@ import {
   useMahnStatus,
   useUpdateMahnEinstellungen,
 } from "@/hooks/useApi";
-import type {
-  MahnEinstellungen,
-  MahnModus,
-  MahnStufe,
-  MahnStufeConfig,
-} from "@/lib/api/types";
+import type { MahnEinstellungen, MahnModus, MahnStufe, MahnStufeConfig } from "@/lib/api/types";
 import { MahnLaeufeListe } from "./MahnLaeufeListe";
 
 export function MahnwesenTab() {
@@ -78,9 +73,9 @@ export function MahnwesenTab() {
           <h2 className="text-lg font-semibold">Mahnwesen</h2>
         </div>
         <p className="mb-5 text-sm text-muted-foreground">
-          Drei Eskalationsstufen mit eigenen Fristen, Gebühren und E-Mail-Vorlagen.
-          „Tage nach Vorgänger" zählt bei Stufe 1 ab Fälligkeit, bei Stufe 2 und 3 ab
-          dem Ablauf der vorherigen Mahn-Frist.
+          Drei Eskalationsstufen mit eigenen Fristen, Gebühren und E-Mail-Vorlagen. „Tage nach
+          Vorgänger" zählt bei Stufe 1 ab Fälligkeit, bei Stufe 2 und 3 ab dem Ablauf der vorherigen
+          Mahn-Frist.
         </p>
 
         <div className="flex items-center justify-between rounded-xl border border-border bg-muted/30 p-4">
@@ -100,7 +95,6 @@ export function MahnwesenTab() {
       <AutomatikKarte form={form} setForm={setForm} />
 
       <MahnLaeufeListe />
-
 
       {form.stufen
         .slice()
@@ -223,7 +217,6 @@ function StufenKarte({
   );
 }
 
-
 function AutomatikKarte({
   form,
   setForm,
@@ -243,9 +236,9 @@ function AutomatikKarte({
         <h2 className="text-lg font-semibold">Mahnwesen</h2>
       </div>
       <p className="mb-4 text-sm text-muted-foreground">
-        Mahnungen werden <strong>nicht automatisch verschickt</strong>. Im Modus
-        „Vorschlag" erzeugt das System nur einen Hinweis im Cockpit; den
-        eigentlichen Versand löst du manuell im jeweiligen Rechnungs-Detail aus.
+        Mahnungen werden <strong>nicht automatisch verschickt</strong>. Im Modus „Vorschlag" erzeugt
+        das System nur einen Hinweis im Cockpit; den eigentlichen Versand löst du manuell im
+        jeweiligen Rechnungs-Detail aus.
       </p>
 
       <div className="grid gap-4 sm:grid-cols-2">
@@ -255,15 +248,17 @@ function AutomatikKarte({
             value={form.modus === "auto" ? "vorschlag" : form.modus}
             onValueChange={(v) => setM({ modus: v as MahnModus })}
           >
-            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="aus">Aus</SelectItem>
               <SelectItem value="vorschlag">Vorschlag (nur Hinweis)</SelectItem>
             </SelectContent>
           </Select>
           <p className="text-xs text-muted-foreground">
-            Auto-Versand ist deaktiviert — diese App verschickt grundsätzlich
-            keine E-Mails ohne deine ausdrückliche Bestätigung.
+            Auto-Versand ist deaktiviert — diese App verschickt grundsätzlich keine E-Mails ohne
+            deine ausdrückliche Bestätigung.
           </p>
         </div>
       </div>
@@ -295,4 +290,3 @@ function AutomatikKarte({
     </div>
   );
 }
-

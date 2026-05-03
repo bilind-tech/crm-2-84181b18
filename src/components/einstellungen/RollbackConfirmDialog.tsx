@@ -142,8 +142,8 @@ export function RollbackConfirmDialog({
               <strong className="font-mono">{zielVersion}</strong> gesetzt.
             </span>
             <span className="block text-muted-foreground">
-              Die App wird kurz neu gestartet. Vor dem Rollback wird automatisch
-              ein Sicherheitsbackup deiner Daten erstellt.
+              Die App wird kurz neu gestartet. Vor dem Rollback wird automatisch ein
+              Sicherheitsbackup deiner Daten erstellt.
             </span>
           </DialogDescription>
         </DialogHeader>
@@ -154,9 +154,9 @@ export function RollbackConfirmDialog({
             Deine Daten bleiben unberührt.
           </p>
           <p className="mt-1 pl-5 text-emerald-700/80 dark:text-emerald-400/80">
-            Kunden, Angebote, Rechnungen, Zahlungen, Anhänge und Einstellungen
-            werden bei einem Rollback <strong>nicht</strong> verändert, gelöscht
-            oder überschrieben. Es wird ausschließlich der Programmcode getauscht.
+            Kunden, Angebote, Rechnungen, Zahlungen, Anhänge und Einstellungen werden bei einem
+            Rollback <strong>nicht</strong> verändert, gelöscht oder überschrieben. Es wird
+            ausschließlich der Programmcode getauscht.
           </p>
         </div>
 
@@ -164,9 +164,7 @@ export function RollbackConfirmDialog({
           <div className="space-y-1.5">
             <label className="text-xs font-medium">
               1. Tippe{" "}
-              <code className="rounded bg-muted px-1 py-0.5 text-xs font-bold">
-                {BESTAETIGUNG}
-              </code>{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs font-bold">{BESTAETIGUNG}</code>{" "}
               zur Bestätigung
             </label>
             <Input

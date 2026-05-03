@@ -28,7 +28,8 @@ function applyAkzent(hex: string) {
 
 function applyTheme(t: Theme) {
   const root = document.documentElement;
-  const useDark = t === "dunkel" || (t === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+  const useDark =
+    t === "dunkel" || (t === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
   root.classList.toggle("dark", useDark);
 }
 
@@ -70,7 +71,10 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const setTheme = useCallback((t: Theme) => setThemeState(t), []);
   const setAkzent = useCallback((hex: string) => setAkzentState(hex), []);
 
-  const value = useMemo(() => ({ theme, akzent, setTheme, setAkzent }), [theme, akzent, setTheme, setAkzent]);
+  const value = useMemo(
+    () => ({ theme, akzent, setTheme, setAkzent }),
+    [theme, akzent, setTheme, setAkzent],
+  );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 

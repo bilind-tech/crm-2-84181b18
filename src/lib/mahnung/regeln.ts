@@ -3,12 +3,7 @@
 // Kanonische Werte für Empfehlungen, Versand-Vorschläge und Lauf-Statistik
 // liefert das Backend (`/mahnung/status`, `/mahnung/laeufe`).
 
-import type {
-  MahnEinstellungen,
-  MahnStufe,
-  MahnStufeConfig,
-  Rechnung,
-} from "@/lib/api/types";
+import type { MahnEinstellungen, MahnStufe, MahnStufeConfig, Rechnung } from "@/lib/api/types";
 import { summenRechnung } from "@/lib/belege/summen";
 
 export interface MahnZustand {
@@ -75,8 +70,7 @@ export function bestimmeMahnZustand(
       const tageSeitReferenz = tageDifferenz(heute, referenzDatum);
       // Bei Stufe 1 wird tageNachVorgaenger an Fälligkeit gemessen — nicht an Frist.
       // Bei Stufe 2/3 wird gemessen, wie lang die letzte Frist überzogen ist.
-      const schwelle =
-        naechsteStufe === 1 ? config.tageNachVorgaenger : config.tageNachVorgaenger;
+      const schwelle = naechsteStufe === 1 ? config.tageNachVorgaenger : config.tageNachVorgaenger;
       // Hinweis: bei Stufe 2/3 ist tageSeitReferenz "Tage seit letzter Frist"
       // — da setzen wir die tageNachVorgaenger als Karenz nach Fristablauf.
       // Für Stufe 1: tageSeitReferenz ist bereits "Tage seit Fälligkeit".

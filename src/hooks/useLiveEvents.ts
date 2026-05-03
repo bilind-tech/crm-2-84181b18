@@ -23,10 +23,14 @@ export function useLiveEvents(enabled: boolean): void {
           qc.invalidateQueries({ queryKey: ["aktivitaeten"] });
           const d = data as { prioritaet?: string; titel?: string };
           if (d?.titel) {
-            const fn = d.prioritaet === "fehler" ? toast.error
-              : d.prioritaet === "warnung" ? toast.warning
-              : d.prioritaet === "erfolg" ? toast.success
-              : toast.info;
+            const fn =
+              d.prioritaet === "fehler"
+                ? toast.error
+                : d.prioritaet === "warnung"
+                  ? toast.warning
+                  : d.prioritaet === "erfolg"
+                    ? toast.success
+                    : toast.info;
             fn(d.titel);
           }
           break;

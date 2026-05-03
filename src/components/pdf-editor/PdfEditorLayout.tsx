@@ -16,7 +16,14 @@ import { EditorPanel, type EditorTab } from "./EditorPanel";
 import { HotspotInlineEditor } from "./HotspotInlineEditor";
 import { useBelegEditor } from "@/hooks/useBelegEditor";
 import { metaForId } from "@/lib/pdf/fieldMap";
-import type { Angebot, Rechnung, Kunde, Firmendaten, Ansprechpartner, BelegOptionen } from "@/lib/api/types";
+import type {
+  Angebot,
+  Rechnung,
+  Kunde,
+  Firmendaten,
+  Ansprechpartner,
+  BelegOptionen,
+} from "@/lib/api/types";
 
 type Props =
   | {
@@ -115,9 +122,13 @@ export function PdfEditorLayout(props: Props) {
               Speichere…
             </span>
           ) : editor.isDirty ? (
-            <span className="hidden text-xs text-muted-foreground sm:inline">Ungespeicherte Änderungen</span>
+            <span className="hidden text-xs text-muted-foreground sm:inline">
+              Ungespeicherte Änderungen
+            </span>
           ) : (
-            <span className="hidden text-xs text-muted-foreground sm:inline">Alles gespeichert</span>
+            <span className="hidden text-xs text-muted-foreground sm:inline">
+              Alles gespeichert
+            </span>
           )}
           <Button
             variant="outline"

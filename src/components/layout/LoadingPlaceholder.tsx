@@ -17,11 +17,7 @@ export function LoadingPlaceholder({ label = "Lade …", rows = 3 }: Props) {
       <p className="text-sm text-muted-foreground">{label}</p>
       <div className="space-y-2">
         {Array.from({ length: rows }).map((_, i) => (
-          <Skeleton
-            key={i}
-            className="h-4 w-full"
-            style={{ maxWidth: `${100 - i * 12}%` }}
-          />
+          <Skeleton key={i} className="h-4 w-full" style={{ maxWidth: `${100 - i * 12}%` }} />
         ))}
       </div>
     </div>

@@ -76,10 +76,14 @@ export function SteuerExportDialog({ open, onOpenChange, defaultJahr }: Props) {
           <div className="space-y-1.5">
             <Label>Jahr</Label>
             <Select value={jahr} onValueChange={setJahr}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 {jahre.map((j) => (
-                  <SelectItem key={j} value={String(j)}>{j}</SelectItem>
+                  <SelectItem key={j} value={String(j)}>
+                    {j}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -87,7 +91,9 @@ export function SteuerExportDialog({ open, onOpenChange, defaultJahr }: Props) {
           <div className="space-y-1.5">
             <Label>USt-Periode</Label>
             <Select value={rhythmus} onValueChange={(v) => setRhythmus(v as UstRhythmus)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="monatlich">Monatlich</SelectItem>
                 <SelectItem value="quartalsweise">Quartalsweise</SelectItem>

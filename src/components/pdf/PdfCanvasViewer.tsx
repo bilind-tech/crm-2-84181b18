@@ -90,7 +90,9 @@ export function PdfCanvasViewer({
       {pdfUrl && loadError && (
         <div className="flex h-full min-h-[40vh] flex-col items-center justify-center gap-3 px-6 text-center">
           <AlertCircle className="h-6 w-6 text-destructive" />
-          <div className="text-sm font-medium text-destructive">PDF kann nicht angezeigt werden</div>
+          <div className="text-sm font-medium text-destructive">
+            PDF kann nicht angezeigt werden
+          </div>
           <p className="max-w-md text-xs text-muted-foreground">{loadError}</p>
           <div className="flex gap-2">
             <a

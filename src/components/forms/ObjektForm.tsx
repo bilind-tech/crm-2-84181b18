@@ -66,7 +66,7 @@ export function ObjektForm({ onClose, defaultKundeId, kompakt }: Props) {
             frequenz: "auf_abruf",
             reinigungstage: [],
             status: "aktiv",
-          }
+          },
     );
     toast.success("Objekt angelegt", { description: `${o.nummer} • erfolgreich gespeichert.` });
     onClose();
@@ -88,11 +88,17 @@ export function ObjektForm({ onClose, defaultKundeId, kompakt }: Props) {
           <Input value={strasse} onChange={(e) => setStrasse(e.target.value)} />
         </Field>
         <div className="grid gap-4 sm:grid-cols-3">
-          <Field label="PLZ"><Input value={plz} onChange={(e) => setPlz(e.target.value)} /></Field>
-          <Field label="Ort" className="sm:col-span-2"><Input value={ort} onChange={(e) => setOrt(e.target.value)} /></Field>
+          <Field label="PLZ">
+            <Input value={plz} onChange={(e) => setPlz(e.target.value)} />
+          </Field>
+          <Field label="Ort" className="sm:col-span-2">
+            <Input value={ort} onChange={(e) => setOrt(e.target.value)} />
+          </Field>
         </div>
         <div className="sticky bottom-0 -mx-4 -mb-6 mt-2 flex flex-col-reverse items-stretch gap-2 border-t border-border bg-background px-4 py-3 sm:-mx-8 sm:px-8 sm:flex-row sm:items-center sm:justify-end">
-          <Button variant="outline" onClick={onClose}>Abbrechen</Button>
+          <Button variant="outline" onClick={onClose}>
+            Abbrechen
+          </Button>
           <Button disabled={create.isPending} onClick={submit} className="rounded-md px-6">
             {create.isPending ? "Speichere…" : "Objekt anlegen"}
           </Button>
@@ -105,7 +111,9 @@ export function ObjektForm({ onClose, defaultKundeId, kompakt }: Props) {
     <div className="space-y-4">
       <Field label="Kunde *">
         <Select value={kundeId || undefined} onValueChange={setKundeId}>
-          <SelectTrigger><SelectValue placeholder="Kunde wählen…" /></SelectTrigger>
+          <SelectTrigger>
+            <SelectValue placeholder="Kunde wählen…" />
+          </SelectTrigger>
           <SelectContent>
             {kunden.map((k) => (
               <SelectItem key={k.id} value={k.id}>
@@ -117,7 +125,11 @@ export function ObjektForm({ onClose, defaultKundeId, kompakt }: Props) {
       </Field>
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Bezeichnung *">
-          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="z. B. Bürogebäude Hauptsitz" />
+          <Input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="z. B. Bürogebäude Hauptsitz"
+          />
         </Field>
         <Field label="Objektnummer">
           <Input
@@ -128,14 +140,22 @@ export function ObjektForm({ onClose, defaultKundeId, kompakt }: Props) {
           />
         </Field>
       </div>
-      <Field label="Straße & Hausnummer"><Input value={strasse} onChange={(e) => setStrasse(e.target.value)} /></Field>
+      <Field label="Straße & Hausnummer">
+        <Input value={strasse} onChange={(e) => setStrasse(e.target.value)} />
+      </Field>
       <div className="grid gap-4 sm:grid-cols-3">
-        <Field label="PLZ"><Input value={plz} onChange={(e) => setPlz(e.target.value)} /></Field>
-        <Field label="Ort" className="sm:col-span-2"><Input value={ort} onChange={(e) => setOrt(e.target.value)} /></Field>
+        <Field label="PLZ">
+          <Input value={plz} onChange={(e) => setPlz(e.target.value)} />
+        </Field>
+        <Field label="Ort" className="sm:col-span-2">
+          <Input value={ort} onChange={(e) => setOrt(e.target.value)} />
+        </Field>
       </div>
 
       <div className="sticky bottom-0 -mx-4 -mb-6 mt-2 flex flex-col-reverse items-stretch gap-2 border-t border-border bg-background px-4 py-3 sm:-mx-8 sm:px-8 sm:flex-row sm:items-center sm:justify-end ">
-        <Button variant="outline" onClick={onClose}>Abbrechen</Button>
+        <Button variant="outline" onClick={onClose}>
+          Abbrechen
+        </Button>
         <Button disabled={create.isPending} onClick={submit} className="rounded-md px-6">
           {create.isPending ? "Speichere…" : "Objekt anlegen"}
         </Button>

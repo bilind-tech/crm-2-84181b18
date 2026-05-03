@@ -48,7 +48,9 @@ export function SlideOver({
               <span className="sr-only">Schließen</span>
             </DialogPrimitive.Close>
           </div>
-          <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-5 sm:px-8 sm:py-6">{children}</div>
+          <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-5 sm:px-8 sm:py-6">
+            {children}
+          </div>
           {footer && (
             <div className="border-t border-border bg-card/50 px-4 py-4 sm:px-8">{footer}</div>
           )}

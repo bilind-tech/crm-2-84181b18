@@ -37,22 +37,20 @@ export function ZeitraumSelect({
   const jahre = useMemo(() => jahreAusDaten(verfuegbareDaten), [verfuegbareDaten]);
   const aktiv = zeitraumIstAktiv(zeitraum);
 
-  const triggerBase =
-    "h-9 rounded-full border-border bg-background text-sm";
-  const jahrTrigger =
-    size === "stretch" ? `${triggerBase} w-full` : `${triggerBase} w-[120px]`;
+  const triggerBase = "h-9 rounded-full border-border bg-background text-sm";
+  const jahrTrigger = size === "stretch" ? `${triggerBase} w-full` : `${triggerBase} w-[120px]`;
   const monatTrigger =
     size === "stretch"
       ? `${triggerBase} w-full disabled:opacity-50`
       : `${triggerBase} w-[140px] disabled:opacity-50`;
 
   return (
-    <div
-      className={`flex items-center gap-1.5 ${
-        size === "stretch" ? "w-full" : ""
-      } ${className}`}
-    >
-      <div className={size === "stretch" ? "grid flex-1 grid-cols-2 gap-2" : "flex items-center gap-1.5"}>
+    <div className={`flex items-center gap-1.5 ${size === "stretch" ? "w-full" : ""} ${className}`}>
+      <div
+        className={
+          size === "stretch" ? "grid flex-1 grid-cols-2 gap-2" : "flex items-center gap-1.5"
+        }
+      >
         <Select
           value={zeitraum.jahr}
           onValueChange={(v) =>

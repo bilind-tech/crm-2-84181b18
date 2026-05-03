@@ -60,7 +60,11 @@ function LgFlow({ steps, className }: { steps: FlowStep[]; className?: string })
                 <p
                   className={cn(
                     "mt-2 text-xs font-medium",
-                    step.current ? "text-foreground" : step.reached ? "text-foreground" : "text-muted-foreground",
+                    step.current
+                      ? "text-foreground"
+                      : step.reached
+                        ? "text-foreground"
+                        : "text-muted-foreground",
                   )}
                 >
                   {step.label}
@@ -100,7 +104,11 @@ function SmFlow({ steps, className }: { steps: FlowStep[]; className?: string })
         const isLast = i === steps.length - 1;
         const nextReached = !isLast && steps[i + 1].reached;
         return (
-          <div key={step.key} className="flex items-center" title={step.label + (step.hint ? ` — ${step.hint}` : "")}>
+          <div
+            key={step.key}
+            className="flex items-center"
+            title={step.label + (step.hint ? ` — ${step.hint}` : "")}
+          >
             <div
               className={cn(
                 "h-2.5 w-2.5 rounded-full border transition-all",

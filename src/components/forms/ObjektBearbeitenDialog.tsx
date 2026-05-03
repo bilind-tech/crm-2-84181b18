@@ -3,7 +3,13 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -74,21 +80,29 @@ export function ObjektBearbeitenDialog({ objekt, open, onOpenChange }: Props) {
               <Input value={name} onChange={(e) => setName(e.target.value)} />
             </Field>
             <Field label="Objektnummer">
-              <Input value={nummer} onChange={(e) => setNummer(e.target.value)} className="font-mono" />
+              <Input
+                value={nummer}
+                onChange={(e) => setNummer(e.target.value)}
+                className="font-mono"
+              />
             </Field>
           </div>
           <Field label="Straße & Hausnummer">
             <Input value={strasse} onChange={(e) => setStrasse(e.target.value)} />
           </Field>
           <div className="grid gap-4 sm:grid-cols-3">
-            <Field label="PLZ"><Input value={plz} onChange={(e) => setPlz(e.target.value)} /></Field>
+            <Field label="PLZ">
+              <Input value={plz} onChange={(e) => setPlz(e.target.value)} />
+            </Field>
             <Field label="Ort" className="sm:col-span-2">
               <Input value={ort} onChange={(e) => setOrt(e.target.value)} />
             </Field>
           </div>
           <Field label="Status">
             <Select value={status} onValueChange={(v) => setStatus(v as Objekt["status"])}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="aktiv">Aktiv</SelectItem>
                 <SelectItem value="pausiert">Pausiert</SelectItem>
@@ -99,7 +113,9 @@ export function ObjektBearbeitenDialog({ objekt, open, onOpenChange }: Props) {
         </div>
 
         <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Abbrechen</Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Abbrechen
+          </Button>
           <Button onClick={speichern} disabled={update.isPending}>
             {update.isPending ? "Speichere…" : "Speichern"}
           </Button>

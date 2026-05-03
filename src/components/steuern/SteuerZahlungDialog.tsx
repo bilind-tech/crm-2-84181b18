@@ -114,7 +114,13 @@ export function SteuerZahlungDialog({ open, onOpenChange, posten, onSpeichern }:
 
   function handleSpeichern() {
     const betrag = parseEUInput(betragStr);
-    const result = eingabeSchema.safeParse({ art, postenId, betrag, datum, notiz: notiz.trim() || undefined });
+    const result = eingabeSchema.safeParse({
+      art,
+      postenId,
+      betrag,
+      datum,
+      notiz: notiz.trim() || undefined,
+    });
     if (!result.success) {
       toast.error(result.error.issues[0]?.message ?? "Eingabe ungültig");
       return;
@@ -134,7 +140,8 @@ export function SteuerZahlungDialog({ open, onOpenChange, posten, onSpeichern }:
         <DialogHeader>
           <DialogTitle>Steuerzahlung erfassen</DialogTitle>
           <DialogDescription>
-            Was wurde wann ans Finanzamt überwiesen? Wird vom „Empfohlene Rücklage"-Betrag abgezogen.
+            Was wurde wann ans Finanzamt überwiesen? Wird vom „Empfohlene Rücklage"-Betrag
+            abgezogen.
           </DialogDescription>
         </DialogHeader>
 
@@ -161,8 +168,9 @@ export function SteuerZahlungDialog({ open, onOpenChange, posten, onSpeichern }:
             <Label>Zeitraum</Label>
             {passendePosten.length === 0 ? (
               <p className="rounded-lg border border-dashed border-border bg-muted/30 p-3 text-sm text-muted-foreground">
-                Keine berechneten Posten dieser Art für {new Date().getFullYear()}. Es liegen noch keine
-                Rechnungen oder Belege im System vor, aus denen sich diese Steuer ableiten ließe.
+                Keine berechneten Posten dieser Art für {new Date().getFullYear()}. Es liegen noch
+                keine Rechnungen oder Belege im System vor, aus denen sich diese Steuer ableiten
+                ließe.
               </p>
             ) : (
               <Select value={postenId} onValueChange={handlePostenChange}>
@@ -183,14 +191,16 @@ export function SteuerZahlungDialog({ open, onOpenChange, posten, onSpeichern }:
                 </SelectContent>
               </Select>
             )}
-            {postenId && (() => {
-              const p = passendePosten.find((x) => x.id === postenId);
-              return p ? (
-                <p className="text-xs text-muted-foreground">
-                  Geschätzter Betrag: {formatEUR(p.geschaetzterBetrag)} · Fällig {formatDate(p.faelligAm)}
-                </p>
-              ) : null;
-            })()}
+            {postenId &&
+              (() => {
+                const p = passendePosten.find((x) => x.id === postenId);
+                return p ? (
+                  <p className="text-xs text-muted-foreground">
+                    Geschätzter Betrag: {formatEUR(p.geschaetzterBetrag)} · Fällig{" "}
+                    {formatDate(p.faelligAm)}
+                  </p>
+                ) : null;
+              })()}
           </div>
 
           {/* Betrag + Datum nebeneinander */}

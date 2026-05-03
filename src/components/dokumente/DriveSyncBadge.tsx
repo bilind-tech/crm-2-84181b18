@@ -25,16 +25,21 @@ export function DriveSyncBadge({ dokument, size = "xs", className }: Props) {
 
   const meta = dokument.drive ?? {};
 
-  const config: Record<Exclude<DriveState, "none">, {
-    Icon: typeof Cloud;
-    label: string;
-    tooltip: string;
-    classes: string;
-  }> = {
+  const config: Record<
+    Exclude<DriveState, "none">,
+    {
+      Icon: typeof Cloud;
+      label: string;
+      tooltip: string;
+      classes: string;
+    }
+  > = {
     synced: {
       Icon: Cloud,
       label: "Drive",
-      tooltip: meta.syncedAt ? `In Google Drive gesichert · ${formatDate(meta.syncedAt.slice(0, 10))}` : "In Google Drive gesichert",
+      tooltip: meta.syncedAt
+        ? `In Google Drive gesichert · ${formatDate(meta.syncedAt.slice(0, 10))}`
+        : "In Google Drive gesichert",
       classes: "text-success",
     },
     pending: {
@@ -46,7 +51,9 @@ export function DriveSyncBadge({ dokument, size = "xs", className }: Props) {
     error: {
       Icon: AlertTriangle,
       label: "Drive-Fehler",
-      tooltip: meta.error ? `Drive-Sync fehlgeschlagen: ${meta.error}` : "Drive-Sync fehlgeschlagen",
+      tooltip: meta.error
+        ? `Drive-Sync fehlgeschlagen: ${meta.error}`
+        : "Drive-Sync fehlgeschlagen",
       classes: "text-warning",
     },
   };
@@ -78,9 +85,19 @@ export function DriveSyncRow({ dokument }: { dokument: Pick<Dokument, "drive"> }
   const meta = dokument.drive;
 
   const map: Record<DriveState, { Icon: typeof Cloud; text: string; tone: string }> = {
-    synced: { Icon: Cloud, text: meta?.syncedAt ? `In Drive gesichert · ${formatDate(meta.syncedAt.slice(0, 10))}` : "In Drive gesichert", tone: "text-success" },
+    synced: {
+      Icon: Cloud,
+      text: meta?.syncedAt
+        ? `In Drive gesichert · ${formatDate(meta.syncedAt.slice(0, 10))}`
+        : "In Drive gesichert",
+      tone: "text-success",
+    },
     pending: { Icon: Loader2, text: "Wird synchronisiert…", tone: "text-muted-foreground" },
-    error: { Icon: AlertTriangle, text: meta?.error ? `Sync-Fehler: ${meta.error}` : "Sync-Fehler", tone: "text-warning" },
+    error: {
+      Icon: AlertTriangle,
+      text: meta?.error ? `Sync-Fehler: ${meta.error}` : "Sync-Fehler",
+      tone: "text-warning",
+    },
     none: { Icon: CloudOff, text: "Noch nicht in Drive", tone: "text-muted-foreground" },
   };
 

@@ -30,7 +30,12 @@ function Page() {
           backLabel="Zurück zu Protokollen"
         />
         <div className="flex justify-center">
-          <Button variant="ghost" asChild><Link to="/protokolle"><ArrowLeft className="mr-1.5 h-4 w-4" />Zurück</Link></Button>
+          <Button variant="ghost" asChild>
+            <Link to="/protokolle">
+              <ArrowLeft className="mr-1.5 h-4 w-4" />
+              Zurück
+            </Link>
+          </Button>
         </div>
       </div>
     );

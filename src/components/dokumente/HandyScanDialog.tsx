@@ -37,10 +37,13 @@ export function HandyScanDialog({ open, onOpenChange }: Props) {
   // Beim Öffnen: Session anlegen
   useEffect(() => {
     if (open && !session && !create.isPending) {
-      create.mutateAsync().then(setSession).catch(() => {
-        toast.error("Sitzung konnte nicht gestartet werden");
-        onOpenChange(false);
-      });
+      create
+        .mutateAsync()
+        .then(setSession)
+        .catch(() => {
+          toast.error("Sitzung konnte nicht gestartet werden");
+          onOpenChange(false);
+        });
     }
     if (!open) {
       // Beim Schließen: Session beenden + zurücksetzen
@@ -54,8 +57,7 @@ export function HandyScanDialog({ open, onOpenChange }: Props) {
   }, [open]);
 
   const dateien = live.data?.dateien ?? [];
-  const status: "warten" | "aktiv" =
-    dateien.length > 0 ? "aktiv" : "warten";
+  const status: "warten" | "aktiv" = dateien.length > 0 ? "aktiv" : "warten";
 
   async function copyUrl() {
     try {
@@ -107,10 +109,14 @@ export function HandyScanDialog({ open, onOpenChange }: Props) {
               <div className="rounded-xl border border-border bg-card p-3">
                 <div className="flex items-center justify-between text-sm">
                   <span className="font-medium">
-                    {status === "warten" ? "Warte auf Dateien…" : `${dateien.length} Datei(en) empfangen`}
+                    {status === "warten"
+                      ? "Warte auf Dateien…"
+                      : `${dateien.length} Datei(en) empfangen`}
                   </span>
                   <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <span className={`h-2 w-2 rounded-full ${status === "aktiv" ? "bg-success animate-pulse" : "bg-muted-foreground/40"}`} />
+                    <span
+                      className={`h-2 w-2 rounded-full ${status === "aktiv" ? "bg-success animate-pulse" : "bg-muted-foreground/40"}`}
+                    />
                     {status === "aktiv" ? "verbunden" : "wartet"}
                   </span>
                 </div>

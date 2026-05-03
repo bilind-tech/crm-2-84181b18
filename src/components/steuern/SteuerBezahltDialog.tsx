@@ -69,18 +69,10 @@ export function SteuerBezahltDialog({ posten, onOpenChange, onConfirm }: Props) 
               >
                 Ja, mit geschätztem Betrag ({formatEUR(geschaetzt)})
               </Button>
-              <Button
-                variant="outline"
-                className="h-11"
-                onClick={() => setStufe("betrag")}
-              >
+              <Button variant="outline" className="h-11" onClick={() => setStufe("betrag")}>
                 Nein, anderer Betrag
               </Button>
-              <Button
-                variant="ghost"
-                className="h-10"
-                onClick={() => onOpenChange(false)}
-              >
+              <Button variant="ghost" className="h-10" onClick={() => onOpenChange(false)}>
                 Abbrechen
               </Button>
             </div>
@@ -90,7 +82,8 @@ export function SteuerBezahltDialog({ posten, onOpenChange, onConfirm }: Props) 
             <DialogHeader>
               <DialogTitle>Wie viel wurde bezahlt?</DialogTitle>
               <DialogDescription>
-                Geschätzt: <span className="font-semibold text-foreground">{formatEUR(geschaetzt)}</span>
+                Geschätzt:{" "}
+                <span className="font-semibold text-foreground">{formatEUR(geschaetzt)}</span>
               </DialogDescription>
             </DialogHeader>
 
@@ -112,11 +105,7 @@ export function SteuerBezahltDialog({ posten, onOpenChange, onConfirm }: Props) 
             </div>
 
             <div className="mt-3 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-              <Button
-                variant="outline"
-                className="h-11"
-                onClick={() => setStufe("frage")}
-              >
+              <Button variant="outline" className="h-11" onClick={() => setStufe("frage")}>
                 Zurück
               </Button>
               <Button

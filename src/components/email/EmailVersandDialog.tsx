@@ -27,7 +27,6 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-
 import {
   Dialog,
   DialogContent,
@@ -60,13 +59,7 @@ import {
   replacePlaceholders,
   type PlaceholderContext,
 } from "@/lib/email/placeholders";
-import type {
-  Angebot,
-  EmailKontext,
-  EmailVorlage,
-  Kunde,
-  Rechnung,
-} from "@/lib/api/types";
+import type { Angebot, EmailKontext, EmailVorlage, Kunde, Rechnung } from "@/lib/api/types";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -113,7 +106,6 @@ export function EmailVersandDialog({
   const { data: mahnEinstellungen } = useMahnEinstellungen();
   const { data: smtp } = useSmtp();
   const send = useSendEmail();
-  
 
   // Harte Voraussetzung: ohne SMTP kein Versand. UI muss das klar zeigen
   // und den Senden-Button sperren — sonst entsteht ein falsches Erfolgs-Signal.
@@ -148,9 +140,7 @@ export function EmailVersandDialog({
       angebot,
       rechnung,
       firma,
-      mahnung: mahnStufe
-        ? { stufe: mahnStufe, einstellungen: mahnEinstellungen ?? null }
-        : null,
+      mahnung: mahnStufe ? { stufe: mahnStufe, einstellungen: mahnEinstellungen ?? null } : null,
     }),
     [kunde, angebot, rechnung, firma, mahnStufe, mahnEinstellungen],
   );
@@ -224,7 +214,10 @@ export function EmailVersandDialog({
   ];
 
   const empfaengerListe = (s: string) =>
-    s.split(/[,;]/).map((x) => x.trim()).filter(Boolean);
+    s
+      .split(/[,;]/)
+      .map((x) => x.trim())
+      .filter(Boolean);
 
   const anChips = empfaengerListe(an);
   const ccChips = empfaengerListe(cc);
@@ -300,14 +293,16 @@ export function EmailVersandDialog({
             }, 1100);
           } else {
             setPhase("idle");
-            toast.error(
-              `Versand fehlgeschlagen: ${res.fehlerGrund ?? "Unbekannter Fehler"}`,
-            );
+            toast.error(`Versand fehlgeschlagen: ${res.fehlerGrund ?? "Unbekannter Fehler"}`);
           }
         },
         onError: (e: unknown) => {
           setPhase("idle");
-          const err = e as { message?: string; status?: number; body?: { error?: string; message?: string; demo?: boolean } };
+          const err = e as {
+            message?: string;
+            status?: number;
+            body?: { error?: string; message?: string; demo?: boolean };
+          };
           // Demo-Modus: ehrlicher Hinweis, kein roter „Fehler"-Toast.
           if (err?.body?.demo) {
             toast.info("Demo-Modus — nicht versendet", {
@@ -335,9 +330,7 @@ export function EmailVersandDialog({
   };
 
   const empfaengerName =
-    kunde?.firmenname ||
-    `${kunde?.vorname ?? ""} ${kunde?.nachname ?? ""}`.trim() ||
-    "Empfänger";
+    kunde?.firmenname || `${kunde?.vorname ?? ""} ${kunde?.nachname ?? ""}`.trim() || "Empfänger";
 
   return (
     <Dialog open={open} onOpenChange={(o) => phase === "idle" && onOpenChange(o)}>
@@ -388,8 +381,8 @@ export function EmailVersandDialog({
                 E-Mail-Versand nicht möglich — SMTP nicht konfiguriert
               </p>
               <p className="text-xs text-muted-foreground">
-                Hinterlege zuerst Server, Benutzer und Passwort, sonst kann keine
-                Mail an Kunden gesendet werden.
+                Hinterlege zuerst Server, Benutzer und Passwort, sonst kann keine Mail an Kunden
+                gesendet werden.
               </p>
               <Link
                 to="/einstellungen"
@@ -454,13 +447,7 @@ export function EmailVersandDialog({
 
           {/* Empfänger-Block (visuell als zusammenhängende Karte) */}
           <div className="rounded-xl border border-border bg-card/50">
-            <RecipientRow
-              label="An"
-              value={an}
-              chips={anChips}
-              onChange={setAn}
-              required
-            />
+            <RecipientRow label="An" value={an} chips={anChips} onChange={setAn} required />
             {!zeigeCcBcc ? (
               <button
                 type="button"
@@ -621,8 +608,8 @@ export function EmailVersandDialog({
                 Mahnstufe {mahnStufe} wirklich versenden?
               </p>
               <p className="text-xs text-muted-foreground">
-                An {anChips.join(", ") || an}. Klicke nochmal auf „E-Mail senden", um den
-                Versand zu bestätigen.
+                An {anChips.join(", ") || an}. Klicke nochmal auf „E-Mail senden", um den Versand zu
+                bestätigen.
               </p>
             </div>
             <button
@@ -684,13 +671,7 @@ export function EmailVersandDialog({
 /* Send-Overlay — schöne Animation während Versand & Erfolg                   */
 /* -------------------------------------------------------------------------- */
 
-function SendOverlay({
-  phase,
-  empfaenger,
-}: {
-  phase: SendPhase;
-  empfaenger: string[];
-}) {
+function SendOverlay({ phase, empfaenger }: { phase: SendPhase; empfaenger: string[] }) {
   return (
     <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4 bg-background/95 backdrop-blur-sm animate-in fade-in duration-300">
       <style>{`
@@ -735,8 +716,7 @@ function SendOverlay({
             <div
               className="grid h-20 w-20 place-content-center rounded-full bg-success/15 ring-2 ring-success/40"
               style={{
-                animation:
-                  "email-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards",
+                animation: "email-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards",
               }}
             >
               <MailOpen className="h-9 w-9 text-success" strokeWidth={2} />
@@ -744,8 +724,7 @@ function SendOverlay({
             <div
               className="absolute -bottom-1 -right-1 grid h-8 w-8 place-content-center rounded-full bg-success text-white shadow-lg"
               style={{
-                animation:
-                  "email-pop 0.6s 0.15s cubic-bezier(0.34, 1.56, 0.64, 1) backwards",
+                animation: "email-pop 0.6s 0.15s cubic-bezier(0.34, 1.56, 0.64, 1) backwards",
               }}
             >
               <Check className="h-4 w-4" strokeWidth={3} />
@@ -754,9 +733,7 @@ function SendOverlay({
           <div className="text-center">
             <p className="text-base font-semibold text-success">E-Mail versendet</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              {empfaenger.length === 1
-                ? empfaenger[0]
-                : `${empfaenger.length} Empfänger`}
+              {empfaenger.length === 1 ? empfaenger[0] : `${empfaenger.length} Empfänger`}
             </p>
           </div>
         </>

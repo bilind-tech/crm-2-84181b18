@@ -18,7 +18,11 @@ function parseDateiname(headers: Headers, fallback: string): string {
   // filename*=UTF-8''... oder filename="..."
   const star = /filename\*=UTF-8''([^;]+)/i.exec(cd);
   if (star) {
-    try { return decodeURIComponent(star[1]); } catch { /* noop */ }
+    try {
+      return decodeURIComponent(star[1]);
+    } catch {
+      /* noop */
+    }
   }
   const plain = /filename="?([^"]+)"?/i.exec(cd);
   return plain ? plain[1] : fallback;

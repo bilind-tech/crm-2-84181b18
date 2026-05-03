@@ -9,10 +9,7 @@ import { pdfjs } from "react-pdf";
 // Vite löst diese URL bundle-zeitlich auf, der Worker wird mit ausgeliefert.
 let workerUrl: string;
 try {
-  workerUrl = new URL(
-    "pdfjs-dist/build/pdf.worker.min.mjs",
-    import.meta.url,
-  ).toString();
+  workerUrl = new URL("pdfjs-dist/build/pdf.worker.min.mjs", import.meta.url).toString();
 } catch {
   // CDN-Fallback exakt zur API-Version (verhindert Mismatch).
   workerUrl = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;

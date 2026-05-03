@@ -35,11 +35,7 @@ export async function compressImage(file: File, maxLong = 1600, quality = 0.8): 
       const ctx = canvas.getContext("2d");
       if (!ctx) return resolve(file);
       ctx.drawImage(img, 0, 0, w, h);
-      canvas.toBlob(
-        (blob) => resolve(blob ?? file),
-        "image/jpeg",
-        quality,
-      );
+      canvas.toBlob((blob) => resolve(blob ?? file), "image/jpeg", quality);
     };
     img.onerror = () => resolve(file);
     img.src = dataUrl;

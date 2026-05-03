@@ -27,7 +27,11 @@ export function DokumentThumb({ dokument, className }: Props) {
         className,
       )}
     >
-      {dokument.typ === "bild" ? <ImageIcon className="h-5 w-5" /> : <FileText className="h-5 w-5" />}
+      {dokument.typ === "bild" ? (
+        <ImageIcon className="h-5 w-5" />
+      ) : (
+        <FileText className="h-5 w-5" />
+      )}
     </div>
   );
 }

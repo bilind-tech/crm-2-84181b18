@@ -3,8 +3,18 @@
 // Hier liegen nur State-Typ, Default, Match-Funktion und Monatsnamen.
 
 export const MONATE_DE = [
-  "Januar", "Februar", "März", "April", "Mai", "Juni",
-  "Juli", "August", "September", "Oktober", "November", "Dezember",
+  "Januar",
+  "Februar",
+  "März",
+  "April",
+  "Mai",
+  "Juni",
+  "Juli",
+  "August",
+  "September",
+  "Oktober",
+  "November",
+  "Dezember",
 ];
 
 export interface ZeitraumState {

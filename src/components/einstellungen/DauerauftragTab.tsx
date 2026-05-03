@@ -16,7 +16,11 @@ import {
   useDauerauftragEinstellungen,
   useUpdateDauerauftragEinstellungen,
 } from "@/hooks/useDauerauftraege";
-import type { DauerauftragEinstellungen, DauerauftragModus, DauerauftragStichtag } from "@/lib/api/types";
+import type {
+  DauerauftragEinstellungen,
+  DauerauftragModus,
+  DauerauftragStichtag,
+} from "@/lib/api/types";
 
 export function DauerauftragTab() {
   const { data } = useDauerauftragEinstellungen();
@@ -59,8 +63,8 @@ export function DauerauftragTab() {
             ))}
           </div>
           <p className="mt-1.5 text-[11px] text-muted-foreground">
-            Vollautomatik versendet Rechnungen ohne Klick — nutze sie nur für stabile,
-            geprüfte Daueraufträge.
+            Vollautomatik versendet Rechnungen ohne Klick — nutze sie nur für stabile, geprüfte
+            Daueraufträge.
           </p>
         </div>
 
@@ -79,7 +83,9 @@ export function DauerauftragTab() {
                 })
               }
             >
-              <SelectTrigger className="mt-1.5 h-10"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="mt-1.5 h-10">
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="monatstag">Tag im Monat</SelectItem>
                 <SelectItem value="monatsletzter">Letzter Monatstag</SelectItem>

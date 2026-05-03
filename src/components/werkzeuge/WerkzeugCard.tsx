@@ -16,12 +16,8 @@ export function WerkzeugCard({ werkzeug }: Props) {
           <Icon className="h-5 w-5 text-foreground/80" />
         </div>
         <div className="min-w-0">
-          <h3 className="text-base font-semibold leading-tight">
-            {werkzeug.titel}
-          </h3>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {werkzeug.beschreibung}
-          </p>
+          <h3 className="text-base font-semibold leading-tight">{werkzeug.titel}</h3>
+          <p className="mt-1 text-sm text-muted-foreground">{werkzeug.beschreibung}</p>
         </div>
       </div>
       <div className="mt-4 flex justify-end">

@@ -38,10 +38,7 @@ async function request<T>(method: string, path: string, init: FetchInit = {}): P
       signal: init.signal,
     });
   } catch (err) {
-    throw new PiApiError(
-      err instanceof Error ? err.message : "Backend nicht erreichbar",
-      0,
-    );
+    throw new PiApiError(err instanceof Error ? err.message : "Backend nicht erreichbar", 0);
   }
 
   if (res.status === 204) return undefined as T;

@@ -94,7 +94,13 @@ export function angebotFlow(a: Angebot, hatRechnung = false): FlowResult {
   const s4: FlowStep = {
     key: "rechnung",
     label: "In Rechnung",
-    tone: hatRechnung ? "success" : abgelehnt || abgelaufen ? "muted" : angenommen ? "active" : "muted",
+    tone: hatRechnung
+      ? "success"
+      : abgelehnt || abgelaufen
+        ? "muted"
+        : angenommen
+          ? "active"
+          : "muted",
     reached: hatRechnung,
     current: angenommen && !hatRechnung,
   };
@@ -139,9 +145,10 @@ export function rechnungFlow(r: Rechnung): FlowResult {
   const s3: FlowStep = {
     key: "bezahlt",
     label: istStorniert ? "Storniert" : "Bezahlt",
-    date: istBezahlt && r.zahlungen.length > 0
-      ? formatDate(r.zahlungen[r.zahlungen.length - 1].datum)
-      : undefined,
+    date:
+      istBezahlt && r.zahlungen.length > 0
+        ? formatDate(r.zahlungen[r.zahlungen.length - 1].datum)
+        : undefined,
     hint: istTeilbezahlt
       ? `${formatEUR(bezahlt)} von ${formatEUR(s.brutto)} · noch ${formatEUR(offen)} offen`
       : undefined,

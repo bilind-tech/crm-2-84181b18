@@ -16,11 +16,17 @@ export function StammdatenPanel({ kind, draft, kunde, set }: Props) {
     <div className="space-y-5">
       <Section label="Empfänger" feldId="kunde">
         <div className="rounded-lg border border-border bg-muted/20 p-3 text-sm">
-          <p className="font-medium">{kunde.firmenname || `${kunde.vorname ?? ""} ${kunde.nachname ?? ""}`.trim() || "—"}</p>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            {[kunde.strasse, [kunde.plz, kunde.ort].filter(Boolean).join(" ")].filter(Boolean).join(", ") || "Keine Adresse hinterlegt"}
+          <p className="font-medium">
+            {kunde.firmenname || `${kunde.vorname ?? ""} ${kunde.nachname ?? ""}`.trim() || "—"}
           </p>
-          <p className="mt-1 text-[11px] text-muted-foreground">Zum Ändern: Kundenstammdaten bearbeiten.</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            {[kunde.strasse, [kunde.plz, kunde.ort].filter(Boolean).join(" ")]
+              .filter(Boolean)
+              .join(", ") || "Keine Adresse hinterlegt"}
+          </p>
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            Zum Ändern: Kundenstammdaten bearbeiten.
+          </p>
         </div>
       </Section>
 
@@ -95,10 +101,20 @@ export function StammdatenPanel({ kind, draft, kunde, set }: Props) {
   );
 }
 
-function Section({ label, feldId, children }: { label: string; feldId: string; children: React.ReactNode }) {
+function Section({
+  label,
+  feldId,
+  children,
+}: {
+  label: string;
+  feldId: string;
+  children: React.ReactNode;
+}) {
   return (
     <div data-feld-id={feldId} className="space-y-2">
-      <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>
+      <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+        {label}
+      </p>
       {children}
     </div>
   );

@@ -29,24 +29,37 @@ function Page() {
     );
   }
 
-  const adresse = [o.strasse, `${o.plz ?? ""} ${o.ort ?? ""}`.trim()].filter(Boolean).join(", ") || "—";
+  const adresse =
+    [o.strasse, `${o.plz ?? ""} ${o.ort ?? ""}`.trim()].filter(Boolean).join(", ") || "—";
 
   return (
     <div className="space-y-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <Link to="/objekte" className="text-xs text-muted-foreground hover:underline">← Objekte</Link>
+          <Link to="/objekte" className="text-xs text-muted-foreground hover:underline">
+            ← Objekte
+          </Link>
           <h1 className="text-2xl font-semibold">{o.name}</h1>
           <p className="font-mono text-sm text-muted-foreground">{o.nummer}</p>
         </div>
-        <Button variant="outline" size="sm" className="rounded-full" onClick={() => setEditOpen(true)}>
+        <Button
+          variant="outline"
+          size="sm"
+          className="rounded-full"
+          onClick={() => setEditOpen(true)}
+        >
           <Pencil className="mr-1 h-3.5 w-3.5" /> Bearbeiten
         </Button>
       </div>
       <Card>
-        <CardHeader><CardTitle>Details</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle>Details</CardTitle>
+        </CardHeader>
         <CardContent className="grid gap-2 text-sm sm:grid-cols-2">
-          <div className="sm:col-span-2"><span className="text-muted-foreground">Adresse: </span>{adresse}</div>
+          <div className="sm:col-span-2">
+            <span className="text-muted-foreground">Adresse: </span>
+            {adresse}
+          </div>
           <div className="sm:col-span-2">
             <span className="text-muted-foreground">Status: </span>
             <span className="capitalize">{o.status}</span>
@@ -61,7 +74,9 @@ function Page() {
         <CardContent className="space-y-4">
           <DokumentUploadPanel kundeId={o.kundeId} objektId={o.id} compact />
           {dokumente.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Noch keine Dokumente. Dateien aufs Fenster ziehen oder oben hochladen.</p>
+            <p className="text-sm text-muted-foreground">
+              Noch keine Dokumente. Dateien aufs Fenster ziehen oder oben hochladen.
+            </p>
           ) : (
             <ul className="divide-y divide-border rounded-2xl border border-border">
               {dokumente.map((d) => (

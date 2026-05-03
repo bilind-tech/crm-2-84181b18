@@ -86,7 +86,10 @@ function PositionsvorlagenSektion() {
       ) : (
         <ul className="divide-y divide-border">
           {list.map((v) => (
-            <li key={v.id} className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
+            <li
+              key={v.id}
+              className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0"
+            >
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium">{v.bezeichnung}</p>
                 <p className="truncate text-xs text-muted-foreground">
@@ -108,7 +111,8 @@ function PositionsvorlagenSektion() {
                         variant: "destructive",
                         confirmLabel: "Löschen",
                       },
-                      () => del.mutate(v.id, { onSuccess: () => toast.success("Vorlage gelöscht") }),
+                      () =>
+                        del.mutate(v.id, { onSuccess: () => toast.success("Vorlage gelöscht") }),
                     )
                   }
                 >

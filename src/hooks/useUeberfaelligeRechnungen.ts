@@ -51,12 +51,8 @@ export function useUeberfaelligeRechnungen(): UeberfaelligErgebnis {
 
       const k = kundeMap.get(r.kundeId);
       const kundeName =
-        k?.firmenname ||
-        [k?.vorname, k?.nachname].filter(Boolean).join(" ") ||
-        "Unbekannt";
-      const tageUeber = Math.floor(
-        (heuteMs - Date.parse(r.faelligkeitsdatum)) / 86_400_000,
-      );
+        k?.firmenname || [k?.vorname, k?.nachname].filter(Boolean).join(" ") || "Unbekannt";
+      const tageUeber = Math.floor((heuteMs - Date.parse(r.faelligkeitsdatum)) / 86_400_000);
 
       liste.push({
         id: r.id,

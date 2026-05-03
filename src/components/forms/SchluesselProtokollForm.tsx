@@ -24,7 +24,12 @@ interface Props {
   defaultObjektId?: string;
 }
 
-const emptyZeile = (): SchluesselZeile => ({ bezeichnung: "", anzahl: 1, schluesselNr: "", bemerkung: "" });
+const emptyZeile = (): SchluesselZeile => ({
+  bezeichnung: "",
+  anzahl: 1,
+  schluesselNr: "",
+  bemerkung: "",
+});
 
 export function SchluesselProtokollForm({ onClose, defaultKundeId, defaultObjektId }: Props) {
   const navigate = useNavigate();
@@ -78,8 +83,16 @@ export function SchluesselProtokollForm({ onClose, defaultKundeId, defaultObjekt
     <div className="space-y-6">
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Kunde *">
-          <Select value={kundeId || undefined} onValueChange={(v) => { setKundeId(v); setObjektId(""); }}>
-            <SelectTrigger><SelectValue placeholder="Kunde wählen…" /></SelectTrigger>
+          <Select
+            value={kundeId || undefined}
+            onValueChange={(v) => {
+              setKundeId(v);
+              setObjektId("");
+            }}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Kunde wählen…" />
+            </SelectTrigger>
             <SelectContent>
               {kunden.map((k) => (
                 <SelectItem key={k.id} value={k.id}>
@@ -95,11 +108,15 @@ export function SchluesselProtokollForm({ onClose, defaultKundeId, defaultObjekt
             onValueChange={(v) => setObjektId(v === "__none__" ? "" : v)}
             disabled={!kundeId}
           >
-            <SelectTrigger><SelectValue placeholder={kundeId ? "— kein Objekt —" : "Erst Kunde wählen"} /></SelectTrigger>
+            <SelectTrigger>
+              <SelectValue placeholder={kundeId ? "— kein Objekt —" : "Erst Kunde wählen"} />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="__none__">— kein Objekt —</SelectItem>
               {objekteVonKunde.map((o) => (
-                <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>
+                <SelectItem key={o.id} value={o.id}>
+                  {o.name}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -112,7 +129,9 @@ export function SchluesselProtokollForm({ onClose, defaultKundeId, defaultObjekt
         </Field>
         <Field label="Richtung">
           <Select value={richtung} onValueChange={(v) => setRichtung(v as SchluesselRichtung)}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="ausgabe">Ausgabe</SelectItem>
               <SelectItem value="ruecknahme">Rücknahme</SelectItem>
@@ -151,7 +170,10 @@ export function SchluesselProtokollForm({ onClose, defaultKundeId, defaultObjekt
         </div>
         <div className="space-y-2">
           {zeilen.map((z, i) => (
-            <div key={i} className="grid grid-cols-12 gap-2 rounded-lg border border-border bg-card p-2">
+            <div
+              key={i}
+              className="grid grid-cols-12 gap-2 rounded-lg border border-border bg-card p-2"
+            >
               <Input
                 className="col-span-12 sm:col-span-4"
                 placeholder="Bezeichnung *"
@@ -193,7 +215,9 @@ export function SchluesselProtokollForm({ onClose, defaultKundeId, defaultObjekt
       </div>
 
       <div className="sticky bottom-0 -mx-4 -mb-6 mt-2 flex flex-col-reverse items-stretch gap-2 border-t border-border bg-background px-4 py-3 sm:-mx-8 sm:px-8 sm:flex-row sm:items-center sm:justify-end">
-        <Button variant="outline" onClick={onClose}>Abbrechen</Button>
+        <Button variant="outline" onClick={onClose}>
+          Abbrechen
+        </Button>
         <PrimaryAction
           icon={Check}
           label={create.isPending ? "Speichere…" : "Protokoll anlegen"}

@@ -5,10 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import {
-  getBackendUrl,
-  setBackendUrl,
-} from "@/lib/api/backendUrl";
+import { getBackendUrl, setBackendUrl } from "@/lib/api/backendUrl";
 import { useBackendStatus } from "@/hooks/useBackendStatus";
 
 import { cn } from "@/lib/utils";
@@ -31,8 +28,7 @@ export function BackendVerbindungTab() {
           <div>
             <h2 className="text-lg font-semibold">Backend-Verbindung</h2>
             <p className="text-sm text-muted-foreground">
-              Adresse des Raspberry-Pi-Backends. Diese Einstellung gilt nur für
-              dieses Gerät.
+              Adresse des Raspberry-Pi-Backends. Diese Einstellung gilt nur für dieses Gerät.
             </p>
           </div>
         </div>
@@ -105,9 +101,7 @@ export function BackendVerbindungTab() {
                     </>
                   )}
                   <dt>Uptime</dt>
-                  <dd className="text-foreground">
-                    {Math.floor(health.uptimeSec / 60)} min
-                  </dd>
+                  <dd className="text-foreground">{Math.floor(health.uptimeSec / 60)} min</dd>
                 </dl>
               )}
 
@@ -153,8 +147,6 @@ export function BackendVerbindungTab() {
           <code> NODE_ENV=production</code>.
         </p>
       </div>
-
-      
     </div>
   );
 }

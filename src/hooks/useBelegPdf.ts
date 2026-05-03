@@ -30,8 +30,14 @@ function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
       ms,
     );
     p.then(
-      (v) => { clearTimeout(t); resolve(v); },
-      (e) => { clearTimeout(t); reject(e); },
+      (v) => {
+        clearTimeout(t);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(t);
+        reject(e);
+      },
     );
   });
 }
@@ -46,14 +52,26 @@ interface PdfData {
 async function buildAngebot(angebot: Angebot, kunde: Kunde, firma: Firmendaten): Promise<PdfData> {
   const backend = await fetchBackendPdf("angebot", angebot.id);
   if (backend) return { blob: backend.blob, fileName: backend.dateiname };
-  const { blob } = await withTimeout(generateAngebotPdf(angebot, kunde, firma), PDF_TIMEOUT_MS, "PDF-Erstellung");
+  const { blob } = await withTimeout(
+    generateAngebotPdf(angebot, kunde, firma),
+    PDF_TIMEOUT_MS,
+    "PDF-Erstellung",
+  );
   return { blob };
 }
 
-async function buildRechnung(rechnung: Rechnung, kunde: Kunde, firma: Firmendaten): Promise<PdfData> {
+async function buildRechnung(
+  rechnung: Rechnung,
+  kunde: Kunde,
+  firma: Firmendaten,
+): Promise<PdfData> {
   const backend = await fetchBackendPdf("rechnung", rechnung.id);
   if (backend) return { blob: backend.blob, fileName: backend.dateiname };
-  const { blob } = await withTimeout(generateRechnungPdf(rechnung, kunde, firma), PDF_TIMEOUT_MS, "PDF-Erstellung");
+  const { blob } = await withTimeout(
+    generateRechnungPdf(rechnung, kunde, firma),
+    PDF_TIMEOUT_MS,
+    "PDF-Erstellung",
+  );
   return { blob };
 }
 
@@ -121,10 +139,13 @@ export function useAngebotPdf(angebot?: Angebot): UsePdfResult {
   });
 
   const url = useBlobUrl(query.data?.blob, angebot?.id ?? "noop");
-  const status: Status = !enabled ? "idle"
-    : query.isError ? "error"
-    : query.data ? "ready"
-    : "loading";
+  const status: Status = !enabled
+    ? "idle"
+    : query.isError
+      ? "error"
+      : query.data
+        ? "ready"
+        : "loading";
 
   return {
     url,
@@ -151,10 +172,13 @@ export function useRechnungPdf(rechnung?: Rechnung): UsePdfResult {
   });
 
   const url = useBlobUrl(query.data?.blob, rechnung?.id ?? "noop");
-  const status: Status = !enabled ? "idle"
-    : query.isError ? "error"
-    : query.data ? "ready"
-    : "loading";
+  const status: Status = !enabled
+    ? "idle"
+    : query.isError
+      ? "error"
+      : query.data
+        ? "ready"
+        : "loading";
 
   return {
     url,

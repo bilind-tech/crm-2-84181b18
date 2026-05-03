@@ -2,7 +2,14 @@
 // Layout 1:1 nach My-Clean-Center-Vorlage: schwarz/weiß, dünne graue Linien,
 // Logo rechts oben, kompakter 4-spaltiger Footer.
 
-import type { Angebot, Rechnung, Position, Kunde, Firmendaten, Ansprechpartner } from "@/lib/api/types";
+import type {
+  Angebot,
+  Rechnung,
+  Position,
+  Kunde,
+  Firmendaten,
+  Ansprechpartner,
+} from "@/lib/api/types";
 import logoUrl from "@/assets/logo.png";
 import { A4, createHotspotTracker, type RuntimeHotspot } from "./hotspotTracker";
 
@@ -13,14 +20,21 @@ import { A4, createHotspotTracker, type RuntimeHotspot } from "./hotspotTracker"
 const PDF_LRU_MAX = 50;
 const pdfLru = new Map<string, { blob: Blob; hotspots: RuntimeHotspot[] }>();
 
-const VOLATILE_PDF_KEYS = new Set(["aktualisiertAm", "updatedAt", "erstelltAm", "createdAt", "geaendertAm"]);
+const VOLATILE_PDF_KEYS = new Set([
+  "aktualisiertAm",
+  "updatedAt",
+  "erstelltAm",
+  "createdAt",
+  "geaendertAm",
+]);
 function semanticPdfKey(parts: unknown[]): string {
   return JSON.stringify(parts, (k, v) => (VOLATILE_PDF_KEYS.has(k) ? undefined : v));
 }
 function lruGet(key: string): { blob: Blob; hotspots: RuntimeHotspot[] } | null {
   const v = pdfLru.get(key);
   if (!v) return null;
-  pdfLru.delete(key); pdfLru.set(key, v); // refresh recency
+  pdfLru.delete(key);
+  pdfLru.set(key, v); // refresh recency
   return v;
 }
 function lruSet(key: string, value: { blob: Blob; hotspots: RuntimeHotspot[] }): void {
@@ -95,7 +109,11 @@ const COLOR_MUTED = "#555555";
 const COLOR_LINE = "#bdbdbd";
 
 function eur(n: number) {
-  return n.toLocaleString("de-DE", { style: "currency", currency: "EUR", minimumFractionDigits: 2 });
+  return n.toLocaleString("de-DE", {
+    style: "currency",
+    currency: "EUR",
+    minimumFractionDigits: 2,
+  });
 }
 function dt(iso?: string) {
   if (!iso) return "";
@@ -157,7 +175,8 @@ function anrede(k: Kunde, ap?: Ansprechpartner) {
     const name = ap.nachname?.trim() || "";
     if (ap.anrede === "herr") return `Sehr geehrter Herr ${name},`;
     if (ap.anrede === "frau") return `Sehr geehrte Frau ${name},`;
-    if (ap.vorname || ap.nachname) return `Hallo ${[ap.vorname, ap.nachname].filter(Boolean).join(" ")},`;
+    if (ap.vorname || ap.nachname)
+      return `Hallo ${[ap.vorname, ap.nachname].filter(Boolean).join(" ")},`;
   }
   if (k.anrede === "herr") return `Sehr geehrter Herr ${k.nachname ?? ""},`;
   if (k.anrede === "frau") return `Sehr geehrte Frau ${k.nachname ?? ""},`;
@@ -173,12 +192,25 @@ function header(firma: Firmendaten, logo: string | null) {
       {
         width: "*",
         stack: [
-          { text: absenderzeile(firma), fontSize: 8, color: COLOR_TEXT, decoration: "underline", margin: [0, 50, 0, 0] },
+          {
+            text: absenderzeile(firma),
+            fontSize: 8,
+            color: COLOR_TEXT,
+            decoration: "underline",
+            margin: [0, 50, 0, 0],
+          },
         ],
       },
       logo
         ? { width: 270, image: logo, fit: [270, 120], alignment: "right" }
-        : { width: 270, text: (firma.firmenname || "MY CLEAN CENTER").toUpperCase(), bold: true, fontSize: 20, color: COLOR_TEXT, alignment: "right" },
+        : {
+            width: 270,
+            text: (firma.firmenname || "MY CLEAN CENTER").toUpperCase(),
+            bold: true,
+            fontSize: 20,
+            color: COLOR_TEXT,
+            alignment: "right",
+          },
     ],
   };
 }
@@ -186,23 +218,35 @@ function header(firma: Firmendaten, logo: string | null) {
 function footer(firma: Firmendaten) {
   return function () {
     const cell = (lines: (string | null | undefined)[]) => ({
-      stack: lines.filter(Boolean).map((l) => ({ text: l as string, fontSize: 7, color: COLOR_TEXT })),
+      stack: lines
+        .filter(Boolean)
+        .map((l) => ({ text: l as string, fontSize: 7, color: COLOR_TEXT })),
     });
     return {
       margin: [55, 0, 55, 12] as [number, number, number, number],
       stack: [
-        { canvas: [{ type: "line", x1: 0, y1: 0, x2: 485, y2: 0, lineWidth: 0.5, lineColor: COLOR_LINE }] },
+        {
+          canvas: [
+            { type: "line", x1: 0, y1: 0, x2: 485, y2: 0, lineWidth: 0.5, lineColor: COLOR_LINE },
+          ],
+        },
         {
           margin: [0, 8, 0, 0] as [number, number, number, number],
           columns: [
             cell([
               firma.firmenname,
               firma.geschaeftsfuehrer ? `Geschäftsführer: ${firma.geschaeftsfuehrer}` : null,
-              [firma.strasse, [firma.plz, firma.ort].filter(Boolean).join(" ")].filter(Boolean).join(" - "),
+              [firma.strasse, [firma.plz, firma.ort].filter(Boolean).join(" ")]
+                .filter(Boolean)
+                .join(" - "),
             ]),
             cell(["Bank", firma.bankName, firma.iban]),
             cell([firma.telefon, firma.email]),
-            cell([firma.handelsregister, firma.ustId ? `USt-ID: ${firma.ustId}` : null, firma.webseite]),
+            cell([
+              firma.handelsregister,
+              firma.ustId ? `USt-ID: ${firma.ustId}` : null,
+              firma.webseite,
+            ]),
           ],
           columnGap: 12,
         },
@@ -219,7 +263,10 @@ function hasStundenPositionen(positionen: Position[]): boolean {
 
 function stundenText(p: Position): string {
   if (p.modus !== "stunden") return "";
-  const menge = p.menge.toLocaleString("de-DE", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  const menge = p.menge.toLocaleString("de-DE", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  });
   return `${menge} h`;
 }
 function abrechnungsartText(p: Position): string {
@@ -229,7 +276,11 @@ function abrechnungsartText(p: Position): string {
   return "Pauschal";
 }
 
-function leistungstabelle(positionen: Position[], totalsT: { netto: number; steuer: number; brutto: number }, steuersatz: number) {
+function leistungstabelle(
+  positionen: Position[],
+  totalsT: { netto: number; steuer: number; brutto: number },
+  steuersatz: number,
+) {
   const showStunden = hasStundenPositionen(positionen);
   const colCount = showStunden ? 4 : 3;
 
@@ -237,11 +288,32 @@ function leistungstabelle(positionen: Position[], totalsT: { netto: number; steu
     { text: "Leistung", bold: true, fontSize: 10, color: COLOR_TEXT, margin: [0, 4, 0, 4] },
   ];
   if (showStunden) {
-    headerRow.push({ text: "Stunden", bold: true, fontSize: 10, color: COLOR_TEXT, alignment: "center", margin: [0, 4, 0, 4] });
+    headerRow.push({
+      text: "Stunden",
+      bold: true,
+      fontSize: 10,
+      color: COLOR_TEXT,
+      alignment: "center",
+      margin: [0, 4, 0, 4],
+    });
   }
   headerRow.push(
-    { text: "Abrechnungsart", bold: true, fontSize: 10, color: COLOR_TEXT, alignment: "center", margin: [0, 4, 0, 4] },
-    { text: "Preis (netto)", bold: true, fontSize: 10, color: COLOR_TEXT, alignment: "right", margin: [0, 4, 0, 4] },
+    {
+      text: "Abrechnungsart",
+      bold: true,
+      fontSize: 10,
+      color: COLOR_TEXT,
+      alignment: "center",
+      margin: [0, 4, 0, 4],
+    },
+    {
+      text: "Preis (netto)",
+      bold: true,
+      fontSize: 10,
+      color: COLOR_TEXT,
+      alignment: "right",
+      margin: [0, 4, 0, 4],
+    },
   );
 
   const body: unknown[][] = [headerRow];
@@ -298,7 +370,11 @@ function leistungstabelle(positionen: Position[], totalsT: { netto: number; steu
 
 // ───────── Meta-Box ────────────────────────────────────────────────────────
 
-function metaBox(meta: { label: string; wert: string }[], variant: "box" | "plain", headerNote?: string) {
+function metaBox(
+  meta: { label: string; wert: string }[],
+  variant: "box" | "plain",
+  headerNote?: string,
+) {
   if (variant === "plain") {
     return {
       id: "meta",
@@ -334,8 +410,21 @@ function metaBox(meta: { label: string; wert: string }[], variant: "box" | "plai
   }
   meta.forEach((m) => {
     body.push([
-      { text: m.label, fontSize: 9.5, border: [false, false, false, false], margin: [0, 1, 8, 1], lineHeight: 1.2 },
-      { text: m.wert, fontSize: 9.5, alignment: "right", border: [false, false, false, false], margin: [0, 1, 0, 1], lineHeight: 1.2 },
+      {
+        text: m.label,
+        fontSize: 9.5,
+        border: [false, false, false, false],
+        margin: [0, 1, 8, 1],
+        lineHeight: 1.2,
+      },
+      {
+        text: m.wert,
+        fontSize: 9.5,
+        alignment: "right",
+        border: [false, false, false, false],
+        margin: [0, 1, 0, 1],
+        lineHeight: 1.2,
+      },
     ]);
   });
   const dividerIndex = noteRowsCount; // Linie zwischen Note und Daten
@@ -352,7 +441,8 @@ function metaBox(meta: { label: string; wert: string }[], variant: "box" | "plai
         if (i === dividerIndex && noteRowsCount > 0) return 0.4;
         return 0;
       },
-      vLineWidth: (i: number, node: { table: { widths: unknown[] } }) => (i === 0 || i === node.table.widths.length ? 0.6 : 0),
+      vLineWidth: (i: number, node: { table: { widths: unknown[] } }) =>
+        i === 0 || i === node.table.widths.length ? 0.6 : 0,
       hLineColor: () => COLOR_TEXT,
       vLineColor: () => COLOR_TEXT,
       paddingTop: () => 2,
@@ -467,7 +557,14 @@ async function buildDoc(
         ],
         columnGap: 20,
       },
-      { id: "titel", text: titel, fontSize: 22, bold: true, color: COLOR_TEXT, margin: [0, 30, 0, 14] },
+      {
+        id: "titel",
+        text: titel,
+        fontSize: 22,
+        bold: true,
+        color: COLOR_TEXT,
+        margin: [0, 30, 0, 14],
+      },
       {
         stack: [
           { id: "anrede", text: anrede(ctx.kunde, ctx.ansprechpartner), margin: [0, 0, 0, 8] },
@@ -524,7 +621,8 @@ export async function generateAngebotPdf(
   firma: Firmendaten,
   ansprechpartner?: Ansprechpartner,
 ): Promise<PdfBuildResult> {
-  const cacheKey = "a:" + angebot.id + ":" + semanticPdfKey([angebot, kunde, firma, ansprechpartner ?? null]);
+  const cacheKey =
+    "a:" + angebot.id + ":" + semanticPdfKey([angebot, kunde, firma, ansprechpartner ?? null]);
   const cached = lruGet(cacheKey);
   if (cached) return cached;
   const meta = [
@@ -545,7 +643,11 @@ export async function generateAngebotPdf(
     meta,
     "plain",
     undefined,
-    { positionen: angebot.positionen, rabattGesamt: angebot.rabattGesamt, steuersatz: angebot.steuersatz },
+    {
+      positionen: angebot.positionen,
+      rabattGesamt: angebot.rabattGesamt,
+      steuersatz: angebot.steuersatz,
+    },
     defaultIntroAngebot(angebot, opts),
     defaultOutroAngebot(angebot, opts),
     signaturFromFirma(effFirma),
@@ -564,12 +666,11 @@ export async function generateRechnungPdf(
   firma: Firmendaten,
   ansprechpartner?: Ansprechpartner,
 ): Promise<PdfBuildResult> {
-  const cacheKey = "r:" + rechnung.id + ":" + semanticPdfKey([rechnung, kunde, firma, ansprechpartner ?? null]);
+  const cacheKey =
+    "r:" + rechnung.id + ":" + semanticPdfKey([rechnung, kunde, firma, ansprechpartner ?? null]);
   const cached = lruGet(cacheKey);
   if (cached) return cached;
-  const meta = [
-    { label: "Rechnungsdatum:", wert: dt(rechnung.rechnungsdatum) },
-  ];
+  const meta = [{ label: "Rechnungsdatum:", wert: dt(rechnung.rechnungsdatum) }];
   const opts: BuildOptions = {
     intro: rechnung.optionen?.eigenesIntro || rechnung.introText,
     outro: rechnung.optionen?.eigenesOutro || rechnung.outroText,
@@ -590,7 +691,14 @@ export async function generateRechnungPdf(
   const baseOutro = opts.outro ? opts.outro : zahlungsSatz;
   const fullOutro = opts.outro
     ? baseOutro
-    : [zahlungsSatz, opts.materialBereitgestellt ? "Zugunsten der Reinigung werden Reinigungswerkzeuge und Reinigungsmittel von uns zur Verfügung gestellt." : null].filter(Boolean).join("\n\n");
+    : [
+        zahlungsSatz,
+        opts.materialBereitgestellt
+          ? "Zugunsten der Reinigung werden Reinigungswerkzeuge und Reinigungsmittel von uns zur Verfügung gestellt."
+          : null,
+      ]
+        .filter(Boolean)
+        .join("\n\n");
   const headerNote = "Bei Zahlung bitte\ndie Rechnungs-Nr. angeben";
   const doc = await buildDoc(
     { firma: effFirma, kunde, ansprechpartner },
@@ -598,7 +706,11 @@ export async function generateRechnungPdf(
     meta,
     "box",
     headerNote,
-    { positionen: rechnung.positionen, rabattGesamt: rechnung.rabattGesamt, steuersatz: rechnung.steuersatz },
+    {
+      positionen: rechnung.positionen,
+      rabattGesamt: rechnung.rabattGesamt,
+      steuersatz: rechnung.steuersatz,
+    },
     defaultIntroRechnung(rechnung, opts),
     fullOutro,
     signaturFromFirma(effFirma),

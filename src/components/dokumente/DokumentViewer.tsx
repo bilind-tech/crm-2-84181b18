@@ -40,9 +40,7 @@ export function DokumentViewer({ dokument, open, onOpenChange, onEdit }: Props) 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        className="flex h-[100dvh] w-screen max-w-none flex-col gap-0 rounded-none border-0 bg-background p-0 sm:h-[92vh] sm:w-[min(96vw,1100px)] sm:rounded-2xl sm:border"
-      >
+      <DialogContent className="flex h-[100dvh] w-screen max-w-none flex-col gap-0 rounded-none border-0 bg-background p-0 sm:h-[92vh] sm:w-[min(96vw,1100px)] sm:rounded-2xl sm:border">
         {/* Header */}
         <div className="flex items-center gap-2 border-b border-border bg-card px-4 py-3 pr-12 sm:px-5 sm:pr-14">
           <div className="min-w-0 flex-1">
@@ -60,10 +58,21 @@ export function DokumentViewer({ dokument, open, onOpenChange, onEdit }: Props) 
             <span className="hidden sm:inline">Download</span>
           </Button>
           {(isImage || isPdf) && (
-            <PrintButton url={dateiUrl || null} variant="outline" size="sm" className="h-9 px-2 sm:px-3" />
+            <PrintButton
+              url={dateiUrl || null}
+              variant="outline"
+              size="sm"
+              className="h-9 px-2 sm:px-3"
+            />
           )}
           {protokoll && protokoll.status !== "abgeschlossen" && (
-            <Button variant="outline" size="sm" asChild className="rounded-lg" aria-label="Im Editor öffnen">
+            <Button
+              variant="outline"
+              size="sm"
+              asChild
+              className="rounded-lg"
+              aria-label="Im Editor öffnen"
+            >
               <Link
                 to="/protokolle/$id/bearbeiten"
                 params={{ id: protokoll.id }}
@@ -75,7 +84,13 @@ export function DokumentViewer({ dokument, open, onOpenChange, onEdit }: Props) 
             </Button>
           )}
           {protokoll && protokoll.status === "abgeschlossen" && (
-            <Button variant="outline" size="sm" asChild className="rounded-lg" aria-label="Zum Protokoll">
+            <Button
+              variant="outline"
+              size="sm"
+              asChild
+              className="rounded-lg"
+              aria-label="Zum Protokoll"
+            >
               <Link
                 to="/protokolle/$id"
                 params={{ id: protokoll.id }}
@@ -117,11 +132,7 @@ export function DokumentViewer({ dokument, open, onOpenChange, onEdit }: Props) 
               />
             </div>
           ) : isPdf && dateiUrl ? (
-            <iframe
-              src={dateiUrl}
-              title={dokument.titel}
-              className="h-full w-full border-0"
-            />
+            <iframe src={dateiUrl} title={dokument.titel} className="h-full w-full border-0" />
           ) : (
             <div className="flex h-full flex-col items-center justify-center gap-4 p-8 text-center">
               <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 text-primary">
@@ -159,7 +170,9 @@ export function DokumentViewer({ dokument, open, onOpenChange, onEdit }: Props) 
                 className="text-primary hover:underline"
                 onClick={() => onOpenChange(false)}
               >
-                {kunde.firmenname || `${kunde.vorname ?? ""} ${kunde.nachname ?? ""}`.trim() || "Kunde"}
+                {kunde.firmenname ||
+                  `${kunde.vorname ?? ""} ${kunde.nachname ?? ""}`.trim() ||
+                  "Kunde"}
               </Link>
             ) : (
               <span className="text-muted-foreground">Kein Kunde verknüpft</span>

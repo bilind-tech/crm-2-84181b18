@@ -24,11 +24,7 @@ export interface RechnungEntwurfInput {
   jetztIso: string;
 }
 
-function fillTokens(
-  template: string,
-  da: Dauerauftrag,
-  stichtag: Date,
-): string {
+function fillTokens(template: string, da: Dauerauftrag, stichtag: Date): string {
   const bereich = periodeBereich(da, stichtag);
   return template
     .replace(/\{\{lauf\.zeitraum\}\}/g, periodeBezeichnung(da, stichtag))

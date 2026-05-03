@@ -71,9 +71,7 @@ export function SteuerTab() {
               value={data.gewstHebesatz}
               onChange={(e) => update({ gewstHebesatz: Number(e.target.value) })}
             />
-            <p className="text-xs text-muted-foreground">
-              Sankt Augustin 525 % (seit 01.01.2025)
-            </p>
+            <p className="text-xs text-muted-foreground">Sankt Augustin 525 % (seit 01.01.2025)</p>
           </div>
         </div>
 
@@ -122,10 +120,13 @@ export function SteuerTab() {
               min="0"
               max="50"
               value={data.ustPufferSatz}
-              onChange={(e) => update({ ustPufferSatz: Math.max(0, Math.min(50, Number(e.target.value))) })}
+              onChange={(e) =>
+                update({ ustPufferSatz: Math.max(0, Math.min(50, Number(e.target.value))) })
+              }
             />
             <p className="text-xs text-muted-foreground">
-              Reduziert die USt-Schuld pauschal. Default 10 % — deckt Belege ab, die noch nicht erfasst sind (Auto, Material, etc.).
+              Reduziert die USt-Schuld pauschal. Default 10 % — deckt Belege ab, die noch nicht
+              erfasst sind (Auto, Material, etc.).
             </p>
           </div>
           <div className="space-y-1.5">

@@ -50,9 +50,7 @@ export function AppSidebar() {
   const uebersicht: NavItem[] = [
     { title: "Dashboard", url: "/", icon: LayoutDashboard, exact: true },
   ];
-  const stammdaten: NavItem[] = [
-    { title: "Kunden", url: "/kunden", icon: Users },
-  ];
+  const stammdaten: NavItem[] = [{ title: "Kunden", url: "/kunden", icon: Users }];
   const vertrieb: NavItem[] = [
     { title: "Angebote", url: "/angebote", icon: FileText },
     { title: "Rechnungen", url: "/rechnungen", icon: Receipt },
@@ -61,9 +59,7 @@ export function AppSidebar() {
     { title: "Stundenzettel", url: "/stundenzettel", icon: Clock },
     { title: "Sonstiges", url: "/werkzeuge", icon: Wrench },
   ];
-  const system: NavItem[] = [
-    { title: "Einstellungen", url: "/einstellungen", icon: Settings },
-  ];
+  const system: NavItem[] = [{ title: "Einstellungen", url: "/einstellungen", icon: Settings }];
 
   const isActive = (url: string, exact = false) =>
     exact ? path === url : path === url || path.startsWith(url + "/");
@@ -85,9 +81,7 @@ export function AppSidebar() {
                 <SidebarMenuButton
                   asChild
                   isActive={active}
-                  tooltip={
-                    showBadge ? `${item.title} · ${item.badge}` : item.title
-                  }
+                  tooltip={showBadge ? `${item.title} · ${item.badge}` : item.title}
                   className={
                     active
                       ? "bg-sidebar-accent font-medium text-sidebar-primary border border-sidebar-border shadow-sm transition-colors duration-150"
@@ -101,9 +95,7 @@ export function AppSidebar() {
                     className="flex items-center gap-2.5"
                   >
                     <span className="relative flex h-4 w-4 items-center justify-center">
-                      <item.icon
-                        className={`h-4 w-4 ${active ? "text-sidebar-primary" : ""}`}
-                      />
+                      <item.icon className={`h-4 w-4 ${active ? "text-sidebar-primary" : ""}`} />
                       {showBadge && collapsed && (
                         <span
                           className={cn(
@@ -152,11 +144,7 @@ export function AppSidebar() {
     <Sidebar collapsible="icon" className="border-r">
       <SidebarHeader className="border-b border-sidebar-border/60 pb-3">
         <Link to="/" onClick={closeOnMobile} className="flex items-center gap-2.5 px-2 py-1">
-          <img
-            src={logo}
-            alt="My Clean Center"
-            className="h-9 w-9 shrink-0 object-contain"
-          />
+          <img src={logo} alt="My Clean Center" className="h-9 w-9 shrink-0 object-contain" />
           {!collapsed && (
             <div className="flex flex-col leading-tight">
               <span className="text-[15px] font-semibold tracking-tight text-foreground">

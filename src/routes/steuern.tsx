@@ -25,10 +25,7 @@ import {
   useManuellePosten,
   type BezahltMarkierung,
 } from "@/lib/steuern/store";
-import {
-  generiereAutomatischePosten,
-  berechneKennzahlen,
-} from "@/lib/steuern/berechnung";
+import { generiereAutomatischePosten, berechneKennzahlen } from "@/lib/steuern/berechnung";
 import type { SteuerPosten, SteuerArt } from "@/lib/steuern/types";
 import { PageHeader, KpiCard } from "@/components/layout/PageHeader";
 import { PrimaryAction } from "@/components/layout/PrimaryAction";
@@ -44,7 +41,10 @@ export const Route = createFileRoute("/steuern")({
   head: () => ({
     meta: [
       { title: "Steuern — My Clean Center" },
-      { name: "description", content: "Automatische Übersicht über Umsatzsteuer-Schuld und empfohlene Rücklage." },
+      {
+        name: "description",
+        content: "Automatische Übersicht über Umsatzsteuer-Schuld und empfohlene Rücklage.",
+      },
     ],
   }),
   component: Page,
@@ -138,7 +138,10 @@ function Page() {
   const bezahlte = useMemo(
     () =>
       allePosten
-        .filter((p) => p.status === "bezahlt" && p.bezahltAm && new Date(p.bezahltAm).getFullYear() === jahr)
+        .filter(
+          (p) =>
+            p.status === "bezahlt" && p.bezahltAm && new Date(p.bezahltAm).getFullYear() === jahr,
+        )
         .sort((a, b) => (b.bezahltAm ?? "").localeCompare(a.bezahltAm ?? "")),
     [allePosten, jahr],
   );
@@ -228,11 +231,7 @@ function Page() {
         <KpiCard
           label={`Gewinn ${jahr}`}
           value={formatEUR(kennzahlen.gewinnYtd)}
-          sublabel={
-            kennzahlen.gewinnYtd < 0
-              ? "Verlust YTD"
-              : "Netto-Einnahmen − Netto-Ausgaben"
-          }
+          sublabel={kennzahlen.gewinnYtd < 0 ? "Verlust YTD" : "Netto-Einnahmen − Netto-Ausgaben"}
           tone={kennzahlen.gewinnYtd >= 0 ? "default" : "default"}
         />
       </div>
@@ -350,10 +349,9 @@ function Page() {
             <p className="font-medium text-foreground">Schätzung — keine Steuerberatung</p>
             <p className="mt-1">
               USt wird aus bezahlten Rechnungen minus erfasster Vorsteuer berechnet, abzüglich eines
-              Puffers für noch nicht erfasste Belege (anpassbar).
-              Ertragsteuern (KSt/Soli/GewSt) sind eine Rücklage auf den bisher tatsächlich
-              realisierten Gewinn — nicht auf den Umsatz.
-              Mit Steuerberater abstimmen vor Vorauszahlung oder Jahreserklärung.{" "}
+              Puffers für noch nicht erfasste Belege (anpassbar). Ertragsteuern (KSt/Soli/GewSt)
+              sind eine Rücklage auf den bisher tatsächlich realisierten Gewinn — nicht auf den
+              Umsatz. Mit Steuerberater abstimmen vor Vorauszahlung oder Jahreserklärung.{" "}
               <Link to="/einstellungen" className="font-medium text-primary hover:underline">
                 Steuersätze in Einstellungen anpassen
               </Link>
@@ -410,9 +408,7 @@ function RuecklageZeile({
           <span
             className={cn(
               "rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
-              ton === "exakt"
-                ? "bg-success/10 text-success"
-                : "bg-warning/10 text-warning",
+              ton === "exakt" ? "bg-success/10 text-success" : "bg-warning/10 text-warning",
             )}
           >
             {ton === "exakt" ? "exakt" : "Schätzung"}
@@ -447,8 +443,8 @@ function PostenZeile({ posten, onClick }: ZeileProps) {
           isUeberfaellig
             ? "bg-destructive/10 text-destructive"
             : posten.art === "ust"
-            ? "bg-primary/10 text-primary"
-            : "bg-warning/10 text-warning",
+              ? "bg-primary/10 text-primary"
+              : "bg-warning/10 text-warning",
         )}
       >
         <Icon className="h-5 w-5" />
@@ -462,8 +458,8 @@ function PostenZeile({ posten, onClick }: ZeileProps) {
             {tageBis < 0
               ? `${Math.abs(tageBis)} Tage überfällig`
               : tageBis === 0
-              ? "heute fällig"
-              : `in ${tageBis} ${tageBis === 1 ? "Tag" : "Tagen"}`}
+                ? "heute fällig"
+                : `in ${tageBis} ${tageBis === 1 ? "Tag" : "Tagen"}`}
           </span>
         </div>
       </div>

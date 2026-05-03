@@ -25,10 +25,7 @@ import {
   useMahnungVersenden,
 } from "@/hooks/useApi";
 import { useRechnungPdf } from "@/hooks/useBelegPdf";
-import {
-  bestimmeMahnZustand,
-  stufenLabel,
-} from "@/lib/mahnung/regeln";
+import { bestimmeMahnZustand, stufenLabel } from "@/lib/mahnung/regeln";
 import { formatDate, formatEUR, todayISO, addDays } from "@/lib/format";
 import type { Rechnung, MahnStufe } from "@/lib/api/types";
 import { cn } from "@/lib/utils";
@@ -156,10 +153,7 @@ export function MahnSektion({ rechnung }: Props) {
         {/* Aktionen */}
         <div className="mt-4 flex flex-wrap gap-2">
           {z.empfohleneStufe && !z.istPausiert && (
-            <Button
-              onClick={() => oeffneVersandConfirm(z.empfohleneStufe!)}
-              className="rounded-lg"
-            >
+            <Button onClick={() => oeffneVersandConfirm(z.empfohleneStufe!)} className="rounded-lg">
               <Send className="mr-1.5 h-4 w-4" />
               {stufenLabel(z.empfohleneStufe, einstellungen)} senden
             </Button>
@@ -236,8 +230,8 @@ export function MahnSektion({ rechnung }: Props) {
               {confirmStufe ? stufenLabel(confirmStufe, einstellungen) : "Mahnung"} senden?
             </DialogTitle>
             <DialogDescription>
-              Die E-Mail wird automatisch mit der hinterlegten Vorlage versendet
-              und die Mahnung in der Rechnung erfasst.
+              Die E-Mail wird automatisch mit der hinterlegten Vorlage versendet und die Mahnung in
+              der Rechnung erfasst.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:justify-between">
@@ -284,8 +278,8 @@ export function MahnSektion({ rechnung }: Props) {
           <DialogHeader>
             <DialogTitle>Mahnverfahren pausieren</DialogTitle>
             <DialogDescription>
-              Z.B. nach mündlicher Zahlungszusage. Bis zum gewählten Datum werden keine
-              Mahnungen vorgeschlagen.
+              Z.B. nach mündlicher Zahlungszusage. Bis zum gewählten Datum werden keine Mahnungen
+              vorgeschlagen.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
@@ -314,8 +308,8 @@ export function MahnSektion({ rechnung }: Props) {
           <DialogHeader>
             <DialogTitle>Rechnung an Inkasso übergeben?</DialogTitle>
             <DialogDescription>
-              Markiert die Rechnung als „an Inkasso übergeben". Die eigentliche Übergabe
-              erfolgt manuell außerhalb des Systems.
+              Markiert die Rechnung als „an Inkasso übergeben". Die eigentliche Übergabe erfolgt
+              manuell außerhalb des Systems.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2">
@@ -416,28 +410,16 @@ function StufenTimeline({
               >
                 {s.label}
               </p>
-              {istEmpfehlung && (
-                <p className="text-[10px] text-primary">empfohlen</p>
-              )}
+              {istEmpfehlung && <p className="text-[10px] text-primary">empfohlen</p>}
             </div>
             {!isLast && (
-              <div
-                className={cn(
-                  "h-0.5 flex-1",
-                  nextVersendet ? "bg-success" : "bg-border",
-                )}
-              />
+              <div className={cn("h-0.5 flex-1", nextVersendet ? "bg-success" : "bg-border")} />
             )}
           </div>
         );
       })}
       <div className="flex flex-1 items-center">
-        <div
-          className={cn(
-            "h-0.5 flex-1",
-            istInkasso ? "bg-destructive" : "bg-border",
-          )}
-        />
+        <div className={cn("h-0.5 flex-1", istInkasso ? "bg-destructive" : "bg-border")} />
         <div className="flex flex-col items-center">
           <div
             className={cn(
