@@ -610,6 +610,10 @@ export function EmailVersandDialog({
               <>
                 <Loader2 className="h-4 w-4 animate-spin" /> PDF wird vorbereitet …
               </>
+            ) : mahnStufe && mahnConfirm ? (
+              <>
+                <AlertCircle className="h-4 w-4" /> Mahnung bestätigen & senden
+              </>
             ) : (
               <>
                 <Send className="h-4 w-4" /> E-Mail senden
