@@ -18,8 +18,14 @@ interface DriveResponse {
   verbundenAm?: string;
   rootOrdnerName: string;
   rootOrdnerId?: string;
-  unterordnerSchema: { rechnungen: string; angebote: string; dokumente: string };
-  dateinameSchema: { rechnung: string; angebot: string };
+  unterordnerSchema: {
+    rechnungen: string;
+    angebote: string;
+    dokumente: string;
+    protokollUebergabe: string;
+    protokollSchluessel: string;
+  };
+  dateinameSchema: { rechnung: string; angebot: string; protokoll: string };
   autoUpload: boolean;
   letzteSynchronisation?: string;
   letzterFehler?: string;
@@ -30,23 +36,29 @@ interface DriveResponse {
   refreshTokenIsSet: boolean;
 }
 
+const DEFAULT_FOLDERS = {
+  rechnungen: "Rechnungen/{YYYY}/{MM}",
+  angebote: "Angebote/{YYYY}/{MM}",
+  dokumente: "Dokumente/{YYYY}/{MM}",
+  protokollUebergabe: "Protokolle/Übergabe-Abnahme/{YYYY}/{MM}",
+  protokollSchluessel: "Protokolle/Schlüsselübergabe/{YYYY}/{MM}",
+};
+const DEFAULT_FILES = {
+  rechnung: "{nummer} {kunde} {leistung} {MM}-{YYYY}",
+  angebot: "{nummer} {kunde} {leistung} {MM}-{YYYY}",
+  protokoll: "{nummer} {kunde} {leistung} {DD}-{MM}-{YYYY}",
+};
+
 function buildResponse(): DriveResponse {
   const s = loadDriveSettings();
   return {
     verbunden: s.refreshTokenIsSet,
     kontoEmail: s.kontoEmail,
-    verbundenAm: undefined, // optional: kann später aus Audit-Log gezogen werden
+    verbundenAm: undefined,
     rootOrdnerName: s.rootFolderName ?? "mycleancenter.cm",
     rootOrdnerId: s.rootOrdnerId,
-    unterordnerSchema: s.unterordnerSchema ?? {
-      rechnungen: "Rechnungen/{YYYY}/{MM}",
-      angebote: "Angebote/{YYYY}/{MM}",
-      dokumente: "Dokumente/{YYYY}/{MM}",
-    },
-    dateinameSchema: s.dateinameSchema ?? {
-      rechnung: "{nummer} {kunde} {leistung} {MM}-{YYYY}",
-      angebot: "{nummer} {kunde} {leistung} {MM}-{YYYY}",
-    },
+    unterordnerSchema: { ...DEFAULT_FOLDERS, ...(s.unterordnerSchema ?? {}) },
+    dateinameSchema: { ...DEFAULT_FILES, ...(s.dateinameSchema ?? {}) },
     autoUpload: s.autoUpload ?? true,
     letzteSynchronisation: s.letzteSynchronisation,
     letzterFehler: s.letzterFehler,
@@ -64,11 +76,14 @@ const PatchBodySchema = z.object({
   unterordnerSchema: z.object({
     rechnungen: z.string().trim().min(1).max(200),
     angebote: z.string().trim().min(1).max(200),
-    dokumente: z.string().trim().min(1).max(200).optional(),
+    dokumente: z.string().trim().min(1).max(200),
+    protokollUebergabe: z.string().trim().min(1).max(200),
+    protokollSchluessel: z.string().trim().min(1).max(200),
   }).partial().optional(),
   dateinameSchema: z.object({
     rechnung: z.string().trim().min(1).max(200),
     angebot: z.string().trim().min(1).max(200),
+    protokoll: z.string().trim().min(1).max(200),
   }).partial().optional(),
   autoUpload: z.coerce.boolean().optional(),
 }).strict();
