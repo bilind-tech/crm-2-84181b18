@@ -112,6 +112,13 @@ export function getProtokoll(id: string): Protokoll | null {
   return r ? rowToApi(r) : null;
 }
 
+export function getProtokollByDokumentId(dokumentId: string): Protokoll | null {
+  const r = getDatabase()
+    .prepare(`SELECT * FROM protokolle WHERE dokument_id = ? LIMIT 1`)
+    .get(dokumentId) as ProtokollRow | undefined;
+  return r ? rowToApi(r) : null;
+}
+
 export function createProtokoll(input: CreateInput): Protokoll {
   const id = `prot-${crypto.randomUUID().slice(0, 12)}`;
   const nummer = nextNummer(input.kind);
