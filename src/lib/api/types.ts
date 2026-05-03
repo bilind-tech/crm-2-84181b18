@@ -816,7 +816,7 @@ export interface Warnung {
 
 export interface SuchTreffer {
   id: ID;
-  typ: "kunde" | "objekt" | "angebot" | "rechnung" | "dokument" | "notiz";
+  typ: "kunde" | "objekt" | "angebot" | "rechnung" | "dokument" | "protokoll" | "notiz";
   titel: string;
   untertitel?: string;
   link: { route: string; params?: Record<string, string> };
