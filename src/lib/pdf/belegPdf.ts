@@ -404,20 +404,27 @@ async function buildDocWithOverrides(
   intro: string,
   outro: string,
   logoOverride: string | null,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  pageBreakBefore?: (currentNode: any) => boolean,
 ) {
   const logo = logoOverride ?? (await logoDataUrl());
   const t = totals(beleg.positionen, beleg.rabattGesamt, beleg.steuersatz);
+  const summe = summenBlock(t, beleg.steuersatz);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (summe as any).id = "summe";
   return {
     pageSize: "A4" as const,
     pageMargins: [40, 90, 40, 110] as [number, number, number, number],
     defaultStyle: { font: "Roboto", fontSize: 10, color: "#0f172a" },
     header: header(absenderzeile(ctx.firma), logo),
     footer: footer(ctx.firma),
+    pageBreakBefore,
     content: [
       {
         margin: [0, 10, 0, 0],
         columns: [
           {
+            id: "kunde",
             stack: [
               { text: absenderzeile(ctx.firma), fontSize: 7, color: "#64748b", decoration: "underline" },
               { text: "\n" },
@@ -425,6 +432,7 @@ async function buildDocWithOverrides(
             ],
           },
           {
+            id: "meta",
             width: 200,
             stack: meta.map((m) => ({
               columns: [
@@ -436,19 +444,31 @@ async function buildDocWithOverrides(
           },
         ],
       },
-      { text: titel, fontSize: 18, bold: true, color: "#1e3a8a", margin: [0, 24, 0, 12] },
-      { text: anrede(ctx.kunde, ctx.ansprechpartner), margin: [0, 0, 0, 8] },
-      { text: intro, margin: [0, 0, 0, 14] },
+      { id: "titel", text: titel, fontSize: 18, bold: true, color: "#1e3a8a", margin: [0, 24, 0, 12] },
+      { id: "anrede", text: anrede(ctx.kunde, ctx.ansprechpartner), margin: [0, 0, 0, 8] },
+      { id: "intro", text: intro, margin: [0, 0, 0, 14] },
       leistungstabelle(beleg.positionen),
-      summenBlock(t, beleg.steuersatz),
-      { text: outro, margin: [0, 20, 0, 0] },
+      summe,
+      { id: "outro", text: outro, margin: [0, 20, 0, 0] },
       { text: ctx.firma.geschaeftsfuehrer ?? "", margin: [0, 24, 0, 0], italics: true },
     ],
   };
 }
 
-export async function generateAngebotPdf(angebot: Angebot, kunde: Kunde, firma: Firmendaten, ansprechpartner?: Ansprechpartner): Promise<Blob> {
+async function renderPdf(doc: unknown, hotspots: RuntimeHotspot[]): Promise<PdfBuildResult> {
   const pdfMake = await getPdfMake();
+  const blob = await new Promise<Blob>((resolve) => {
+    pdfMake.createPdf(doc).getBlob((b: Blob) => resolve(b));
+  });
+  return { blob, hotspots };
+}
+
+export async function generateAngebotPdf(
+  angebot: Angebot,
+  kunde: Kunde,
+  firma: Firmendaten,
+  ansprechpartner?: Ansprechpartner,
+): Promise<PdfBuildResult> {
   const meta = [
     { label: "Angebot-Nr.", wert: angebot.nummer },
     { label: "Datum", wert: dt(angebot.erstelltAm) },
@@ -461,6 +481,7 @@ export async function generateAngebotPdf(angebot: Angebot, kunde: Kunde, firma: 
     materialBereitgestellt: angebot.optionen?.materialBereitgestellt ?? true,
   };
   const effFirma = mergeFirma(firma, angebot.optionen?.firmaOverride);
+  const tracker = createHotspotTracker(A4);
   const doc = await buildDocWithOverrides(
     { firma: effFirma, kunde, ansprechpartner },
     `Angebot ${angebot.nummer}`,
@@ -469,14 +490,18 @@ export async function generateAngebotPdf(angebot: Angebot, kunde: Kunde, firma: 
     defaultIntroAngebot(angebot, opts),
     defaultOutroAngebot(angebot, opts),
     angebot.optionen?.logoOverride ?? null,
+    tracker.pageBreakBefore,
   );
-  return new Promise<Blob>((resolve) => {
-    pdfMake.createPdf(doc).getBlob((blob: Blob) => resolve(blob));
-  });
+  const result = await renderPdf(doc, []);
+  return { blob: result.blob, hotspots: tracker.build() };
 }
 
-export async function generateRechnungPdf(rechnung: Rechnung, kunde: Kunde, firma: Firmendaten, ansprechpartner?: Ansprechpartner): Promise<Blob> {
-  const pdfMake = await getPdfMake();
+export async function generateRechnungPdf(
+  rechnung: Rechnung,
+  kunde: Kunde,
+  firma: Firmendaten,
+  ansprechpartner?: Ansprechpartner,
+): Promise<PdfBuildResult> {
   const meta = [
     { label: "Rechnung-Nr.", wert: rechnung.nummer },
     { label: "Rechnungsdatum", wert: dt(rechnung.rechnungsdatum) },
@@ -489,6 +514,7 @@ export async function generateRechnungPdf(rechnung: Rechnung, kunde: Kunde, firm
     materialBereitgestellt: rechnung.optionen?.materialBereitgestellt ?? true,
   };
   const effFirma = mergeFirma(firma, rechnung.optionen?.firmaOverride);
+  const tracker = createHotspotTracker(A4);
   const doc = await buildDocWithOverrides(
     { firma: effFirma, kunde, ansprechpartner },
     `Rechnung ${rechnung.nummer}`,
@@ -497,8 +523,9 @@ export async function generateRechnungPdf(rechnung: Rechnung, kunde: Kunde, firm
     defaultIntroRechnung(rechnung, opts),
     defaultOutroRechnung(rechnung, opts),
     rechnung.optionen?.logoOverride ?? null,
+    tracker.pageBreakBefore,
   );
-  return new Promise<Blob>((resolve) => {
-    pdfMake.createPdf(doc).getBlob((blob: Blob) => resolve(blob));
-  });
+  const result = await renderPdf(doc, []);
+  return { blob: result.blob, hotspots: tracker.build() };
 }
+
