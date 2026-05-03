@@ -1,12 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useMemo } from "react";
-import { Smartphone, Receipt, AlertTriangle, X } from "lucide-react";
+import { useState, useMemo, useRef } from "react";
+import { Smartphone, Receipt, AlertTriangle, X, Upload } from "lucide-react";
 import { useDokumente, useKunden, useObjekte } from "@/hooks/useApi";
 import { formatEUR, formatDate } from "@/lib/format";
 import { PageHeader, KpiCard } from "@/components/layout/PageHeader";
 import { PrimaryAction } from "@/components/layout/PrimaryAction";
 import { FilterBar } from "@/routes/angebote";
-import { DokumentUploadPanel } from "@/components/dokumente/DokumentUploadPanel";
+import { DokumentUploadPanel, type DokumentUploadPanelHandle } from "@/components/dokumente/DokumentUploadPanel";
 import { HandyScanDialog } from "@/components/dokumente/HandyScanDialog";
 import { DokumentBearbeitenDialog } from "@/components/dokumente/DokumentBearbeitenDialog";
 import { DokumentViewer } from "@/components/dokumente/DokumentViewer";
@@ -40,6 +40,13 @@ function Page() {
     kundeFilter !== "alle" ? kundeFilter : undefined,
   );
   const jahr = new Date().getFullYear();
+  const uploadRef = useRef<DokumentUploadPanelHandle>(null);
+  const uploadPanelRef = useRef<HTMLDivElement>(null);
+
+  const handlePickFiles = () => {
+    uploadPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    uploadRef.current?.openPicker();
+  };
 
   const kundeMap = useMemo(() => {
     const m = new Map<string, string>();
@@ -130,7 +137,10 @@ function Page() {
               label="Vom Handy scannen"
               onClick={() => setScanOpen(true)}
             />
-            <DokumentUploadPanel compact />
+            <Button onClick={handlePickFiles} className="rounded-xl">
+              <Upload className="mr-2 h-4 w-4" />
+              Datei wählen
+            </Button>
           </div>
         }
       />
@@ -142,8 +152,9 @@ function Page() {
         <KpiCard label={`Steuerrelevant ${jahr}`} value={counts.steuerrelevant} tone="success" sublabel={formatEUR(counts.summe)} />
       </div>
 
-      <DokumentUploadPanel />
-
+      <div ref={uploadPanelRef}>
+        <DokumentUploadPanel ref={uploadRef} />
+      </div>
       <FilterBar
         filter={filter}
         setFilter={setFilter}
