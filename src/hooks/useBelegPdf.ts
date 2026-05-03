@@ -6,6 +6,27 @@ import type { Angebot, Rechnung } from "@/lib/api/types";
 
 type Status = "idle" | "loading" | "ready" | "error";
 
+const PDF_TIMEOUT_MS = 20_000;
+
+function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const t = setTimeout(
+      () => reject(new Error(`${label} hat zu lange gedauert (>${Math.round(ms / 1000)}s).`)),
+      ms,
+    );
+    p.then(
+      (v) => {
+        clearTimeout(t);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(t);
+        reject(e);
+      },
+    );
+  });
+}
+
 export function useAngebotPdf(angebot?: Angebot) {
   const { data: kunde } = useKunde(angebot?.kundeId ?? "");
   const { data: firma } = useFirmendaten();
@@ -19,27 +40,30 @@ export function useAngebotPdf(angebot?: Angebot) {
     let cancelled = false;
     const ctrl = new AbortController();
     setStatus("loading");
+    setError(null);
 
     (async () => {
-      // 1. Backend bevorzugen, wenn konfiguriert
-      const backend = await fetchBackendPdf("angebot", angebot.id, ctrl.signal);
-      if (cancelled) return;
-      if (backend) {
-        blobUrl = URL.createObjectURL(backend.blob);
-        setUrl(blobUrl);
-        setStatus("ready");
-        return;
-      }
-      // 2. Fallback: Browser-Generator
       try {
-        const { blob } = await generateAngebotPdf(angebot, kunde, firma);
+        const backend = await fetchBackendPdf("angebot", angebot.id, ctrl.signal);
+        if (cancelled) return;
+        if (backend) {
+          blobUrl = URL.createObjectURL(backend.blob);
+          setUrl(blobUrl);
+          setStatus("ready");
+          return;
+        }
+        const { blob } = await withTimeout(
+          generateAngebotPdf(angebot, kunde, firma),
+          PDF_TIMEOUT_MS,
+          "PDF-Erzeugung",
+        );
         if (cancelled) return;
         blobUrl = URL.createObjectURL(blob);
         setUrl(blobUrl);
         setStatus("ready");
       } catch (e) {
         if (cancelled) return;
-        console.error(e);
+        console.error("[useAngebotPdf]", e);
         setError(String((e as Error)?.message ?? e));
         setStatus("error");
       }
@@ -68,25 +92,30 @@ export function useRechnungPdf(rechnung?: Rechnung) {
     let cancelled = false;
     const ctrl = new AbortController();
     setStatus("loading");
+    setError(null);
 
     (async () => {
-      const backend = await fetchBackendPdf("rechnung", rechnung.id, ctrl.signal);
-      if (cancelled) return;
-      if (backend) {
-        blobUrl = URL.createObjectURL(backend.blob);
-        setUrl(blobUrl);
-        setStatus("ready");
-        return;
-      }
       try {
-        const { blob } = await generateRechnungPdf(rechnung, kunde, firma);
+        const backend = await fetchBackendPdf("rechnung", rechnung.id, ctrl.signal);
+        if (cancelled) return;
+        if (backend) {
+          blobUrl = URL.createObjectURL(backend.blob);
+          setUrl(blobUrl);
+          setStatus("ready");
+          return;
+        }
+        const { blob } = await withTimeout(
+          generateRechnungPdf(rechnung, kunde, firma),
+          PDF_TIMEOUT_MS,
+          "PDF-Erzeugung",
+        );
         if (cancelled) return;
         blobUrl = URL.createObjectURL(blob);
         setUrl(blobUrl);
         setStatus("ready");
       } catch (e) {
         if (cancelled) return;
-        console.error(e);
+        console.error("[useRechnungPdf]", e);
         setError(String((e as Error)?.message ?? e));
         setStatus("error");
       }
