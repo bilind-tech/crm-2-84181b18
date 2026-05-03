@@ -1,27 +1,22 @@
-// Tab "Sicherheit": Auto-Lock + aktive Geräte/Sitzungen.
+// Tab "Sicherheit": Passwort, Recovery-Code, Auto-Lock.
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Laptop, LogOut } from "lucide-react";
+import { KeyRound, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  useSicherheit,
-  useUpdateSicherheit,
-  useSitzungen,
-  useAlleSitzungenBeenden,
-} from "@/hooks/useApi";
+import { useSicherheit, useUpdateSicherheit } from "@/hooks/useApi";
 import type { SicherheitsEinstellungen } from "@/lib/api/types";
 import { Field, Section, StickySaveBar } from "./_shared";
 import { LoadingPlaceholder } from "@/components/layout/LoadingPlaceholder";
-import { useConfirm } from "@/hooks/useConfirm";
+import { PasswortAendernDialog } from "./PasswortAendernDialog";
+import { RecoveryRotateDialog } from "./RecoveryRotateDialog";
 
 export function SicherheitTab() {
   const { data, isLoading } = useSicherheit();
-  const { data: sitzungen = [] } = useSitzungen();
   const update = useUpdateSicherheit();
-  const beenden = useAlleSitzungenBeenden();
-  const { confirm, dialog } = useConfirm();
   const [form, setForm] = useState<SicherheitsEinstellungen | null>(null);
+  const [pwOpen, setPwOpen] = useState(false);
+  const [recOpen, setRecOpen] = useState(false);
 
   useEffect(() => {
     if (data) setForm(data);
@@ -33,6 +28,25 @@ export function SicherheitTab() {
 
   return (
     <div className="space-y-5 pb-24">
+      <Section title="Passwort" description="Anmelde-Passwort dieses Geräts ändern.">
+        <div className="flex justify-end">
+          <Button variant="outline" onClick={() => setPwOpen(true)}>
+            <KeyRound className="mr-1.5 h-4 w-4" /> Passwort ändern
+          </Button>
+        </div>
+      </Section>
+
+      <Section
+        title="Recovery-Code"
+        description="Falls du dein Passwort vergisst, ist der Recovery-Code der einzige Weg zurück. Erzeuge bei Bedarf einen neuen — der alte wird sofort ungültig."
+      >
+        <div className="flex justify-end">
+          <Button variant="outline" onClick={() => setRecOpen(true)}>
+            <ShieldCheck className="mr-1.5 h-4 w-4" /> Neuen Recovery-Code erzeugen
+          </Button>
+        </div>
+      </Section>
+
       <Section title="Auto-Lock" description="App sperrt sich automatisch nach Inaktivität.">
         <Field
           label={`Inaktivität: ${form.autoLockMinuten} Minuten`}
@@ -48,65 +62,17 @@ export function SicherheitTab() {
         </Field>
       </Section>
 
-      <Section title="Aktive Geräte" description="Geräte im LAN, die aktuell angemeldet sind.">
-        {sitzungen.length === 0 ? (
-          <p className="py-6 text-center text-sm text-muted-foreground">Keine aktiven Sitzungen.</p>
-        ) : (
-          <ul className="divide-y divide-border">
-            {sitzungen.map((s) => (
-              <li key={s.id} className="flex items-center gap-3 py-3">
-                <Laptop className="h-5 w-5 text-muted-foreground" />
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium">
-                    {s.hostname}{" "}
-                    {s.istAktuellesGeraet && (
-                      <span className="ml-1 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
-                        dieses Gerät
-                      </span>
-                    )}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {s.ip} · zuletzt aktiv {new Date(s.letzteAktivitaet).toLocaleString("de-DE")}
-                  </p>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-        {sitzungen.filter((s) => !s.istAktuellesGeraet).length > 0 && (
-          <div className="mt-4 flex justify-end">
-            <Button
-              variant="outline"
-              onClick={() =>
-                confirm(
-                  {
-                    title: "Alle anderen Geräte abmelden?",
-                    description: "Andere Sitzungen werden sofort getrennt.",
-                    variant: "destructive",
-                    confirmLabel: "Abmelden",
-                  },
-                  () =>
-                    beenden.mutate(undefined, {
-                      onSuccess: () => toast.success("Andere Geräte abgemeldet"),
-                    }),
-                )
-              }
-            >
-              <LogOut className="mr-1.5 h-4 w-4" /> Andere abmelden
-            </Button>
-          </div>
-        )}
-      </Section>
-
-
-      {dialog}
+      <PasswortAendernDialog open={pwOpen} onOpenChange={setPwOpen} />
+      <RecoveryRotateDialog open={recOpen} onOpenChange={setRecOpen} />
 
       <StickySaveBar
         dirty={dirty}
         saving={update.isPending}
         onReset={() => setForm(data)}
         onSave={() =>
-          update.mutate(form, { onSuccess: () => toast.success("Sicherheits-Einstellungen gespeichert") })
+          update.mutate(form, {
+            onSuccess: () => toast.success("Sicherheits-Einstellungen gespeichert"),
+          })
         }
       />
     </div>
