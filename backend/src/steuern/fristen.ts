@@ -55,6 +55,52 @@ export interface SteuerFristResult {
   uebersprungen: number;
 }
 
+/** Liefert deterministische Auto-Steuer-Termine für die nächsten ~60 Tage.
+ *  Reine Kalender-Logik — Beträge werden hier NICHT berechnet (das passiert
+ *  im Frontend), nur die Termine zur Erinnerung.
+ */
+export function naechsteAutoFristen(now: Date): Array<{ id: string; titel: string; faelligAm: string }> {
+  const heute = now.toISOString().slice(0, 10);
+  const horizont = new Date(now.getTime() + 60 * 86_400_000).toISOString().slice(0, 10);
+  const out: Array<{ id: string; titel: string; faelligAm: string }> = [];
+
+  const jahr = now.getFullYear();
+  // KSt/Soli: 10.03/06/09/12  ·  GewSt: 15.02/05/08/11
+  const kstMonate = [3, 6, 9, 12];
+  const gewstMonate = [2, 5, 8, 11];
+  for (const m of kstMonate) {
+    const d = `${jahr}-${String(m).padStart(2, "0")}-10`;
+    if (d >= heute && d <= horizont) {
+      out.push({ id: `auto-kst-${jahr}-${m}`, titel: `KSt-/Soli-Vorauszahlung Q${Math.ceil(m / 3)}`, faelligAm: d });
+    }
+  }
+  for (const m of gewstMonate) {
+    const d = `${jahr}-${String(m).padStart(2, "0")}-15`;
+    if (d >= heute && d <= horizont) {
+      out.push({ id: `auto-gewst-${jahr}-${m}`, titel: `GewSt-Vorauszahlung Q${Math.ceil(m / 3)}`, faelligAm: d });
+    }
+  }
+  // USt: 10. des Folgemonats — nur die nächsten 2 Termine erinnern
+  for (let i = 0; i < 2; i++) {
+    const ref = new Date(now.getFullYear(), now.getMonth() + i + 1, 10);
+    const d = ref.toISOString().slice(0, 10);
+    if (d >= heute && d <= horizont) {
+      const periode = `${ref.getFullYear()}-M${String(ref.getMonth()).padStart(2, "0")}`;
+      // Periode = Vormonat (Folge-10. = Frist für den Vormonat → ref.getMonth() ist 1-basiert für Vormonat)
+      const periodMonth = ref.getMonth(); // 0-basiert = Vormonat 1-basiert
+      const labelMonth = periodMonth === 0 ? 12 : periodMonth;
+      const labelYear = periodMonth === 0 ? ref.getFullYear() - 1 : ref.getFullYear();
+      out.push({
+        id: `auto-ust-${labelYear}-M${String(labelMonth).padStart(2, "0")}`,
+        titel: `USt-Voranmeldung ${String(labelMonth).padStart(2, "0")}/${labelYear}`,
+        faelligAm: d,
+      });
+      void periode;
+    }
+  }
+  return out;
+}
+
 export function runSteuerFristCheck(now = new Date()): SteuerFristResult {
   const heute = now.toISOString().slice(0, 10);
   const tag = heute;
@@ -95,5 +141,32 @@ export function runSteuerFristCheck(now = new Date()): SteuerFristResult {
     logBenachrichtigung(p.id, tag, status);
     benachrichtigt++;
   }
-  return { geprueft: posten.length, benachrichtigt, uebersprungen };
+
+  // --- Auto-Posten (USt/KSt/GewSt) — deterministische Kalender-Termine ---
+  const auto = naechsteAutoFristen(now);
+  for (const a of auto) {
+    if (bezahlt[a.id]) { uebersprungen++; continue; }
+    const status = fristStatusFor(a.faelligAm, heute);
+    if (status === "ok" || status === "erledigt") { uebersprungen++; continue; }
+    if (alreadyLogged(a.id, tag, status)) { uebersprungen++; continue; }
+    const tpl = STATUS_LABEL[status];
+    record({
+      art: "steuer_frist",
+      bezugArt: "steuer_posten",
+      bezugId: a.id,
+      titel: tpl.titel(a.titel),
+      beschreibung: `Fällig am ${a.faelligAm}`,
+      notify: {
+        prioritaet: tpl.prio,
+        titel: tpl.titel(a.titel),
+        beschreibung: `Fällig am ${a.faelligAm}`,
+        aktionLabel: "Öffnen",
+        aktionRoute: "/steuern",
+      },
+    });
+    logBenachrichtigung(a.id, tag, status);
+    benachrichtigt++;
+  }
+
+  return { geprueft: posten.length + auto.length, benachrichtigt, uebersprungen };
 }

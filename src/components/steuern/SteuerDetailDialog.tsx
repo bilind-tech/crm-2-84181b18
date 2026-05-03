@@ -1,5 +1,6 @@
 // Detail-Dialog für einen Steuerposten: Berechnungsgrundlage transparent zeigen.
 
+import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import {
   Dialog,
@@ -7,12 +8,22 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog";
-import { Receipt, FileText } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Receipt, FileText, CheckCircle2, Pencil, Trash2 } from "lucide-react";
 import { useRechnungen, useDokumente, useKunden } from "@/hooks/useApi";
 import { formatEUR, formatDate } from "@/lib/format";
 import { STEUER_ART_LABEL } from "@/lib/steuern/berechnung";
+import {
+  useBezahltMarkierungen,
+  useManuellePosten,
+  type BezahltMarkierung,
+} from "@/lib/steuern/store";
 import type { SteuerPosten } from "@/lib/steuern/types";
+import { SteuerAlsBezahltDialog } from "./SteuerAlsBezahltDialog";
+import { ManuellerPostenDialog } from "./ManuellerPostenDialog";
+import { toast } from "sonner";
 
 interface Props {
   posten: SteuerPosten | null;
@@ -23,6 +34,11 @@ export function SteuerDetailDialog({ posten, onOpenChange }: Props) {
   const { data: rechnungen = [] } = useRechnungen();
   const { data: dokumente = [] } = useDokumente();
   const { data: kunden = [] } = useKunden();
+  const { setBezahlt } = useBezahltMarkierungen();
+  const { remove: removeManuell } = useManuellePosten();
+
+  const [bezahltOpen, setBezahltOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
 
   if (!posten) return null;
 
@@ -33,6 +49,24 @@ export function SteuerDetailDialog({ posten, onOpenChange }: Props) {
   const refDokumente = grundlage
     ? dokumente.filter((d) => grundlage.dokumentIds.includes(d.id))
     : [];
+
+  const istManuell = !posten.automatisch;
+  const istOffen = posten.status !== "bezahlt";
+
+  function handleBezahlt(eintrag: BezahltMarkierung) {
+    if (!posten) return;
+    setBezahlt(posten.id, eintrag);
+    toast.success("Als bezahlt markiert");
+    onOpenChange(false);
+  }
+
+  function handleLoeschen() {
+    if (!posten) return;
+    if (!confirm(`„${posten.titel}" wirklich löschen?`)) return;
+    removeManuell(posten.id);
+    toast.success("Termin gelöscht");
+    onOpenChange(false);
+  }
 
   const kundenMap = new Map(kunden.map((k) => [k.id, k]));
 
@@ -155,7 +189,44 @@ export function SteuerDetailDialog({ posten, onOpenChange }: Props) {
             </div>
           )}
         </div>
+
+        <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:justify-between">
+          <div className="flex gap-2">
+            {istManuell && (
+              <>
+                <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
+                  <Pencil className="mr-1.5 h-4 w-4" /> Bearbeiten
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleLoeschen}
+                  className="text-muted-foreground hover:text-destructive"
+                >
+                  <Trash2 className="mr-1.5 h-4 w-4" /> Löschen
+                </Button>
+              </>
+            )}
+          </div>
+          {istOffen && (
+            <Button onClick={() => setBezahltOpen(true)}>
+              <CheckCircle2 className="mr-1.5 h-4 w-4" /> Als bezahlt markieren
+            </Button>
+          )}
+        </DialogFooter>
       </DialogContent>
+
+      <SteuerAlsBezahltDialog
+        open={bezahltOpen}
+        onOpenChange={setBezahltOpen}
+        vorschlag={posten.geschaetzterBetrag}
+        onSpeichern={handleBezahlt}
+      />
+      <ManuellerPostenDialog
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        editPosten={istManuell ? posten : undefined}
+      />
     </Dialog>
   );
 }

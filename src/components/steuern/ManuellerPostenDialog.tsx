@@ -1,6 +1,6 @@
 // Dialog zum Anlegen eines manuellen Steuer-Termins (Grundsteuer, Kfz, IHK, etc.)
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -14,20 +14,37 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useManuellePosten } from "@/lib/steuern/store";
+import type { SteuerPosten } from "@/lib/steuern/types";
 import { todayISO } from "@/lib/format";
 import { toast } from "sonner";
 
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Wenn gesetzt → Edit-Modus statt Anlegen. */
+  editPosten?: SteuerPosten;
 }
 
-export function ManuellerPostenDialog({ open, onOpenChange }: Props) {
-  const { add } = useManuellePosten();
+export function ManuellerPostenDialog({ open, onOpenChange, editPosten }: Props) {
+  const { add, update } = useManuellePosten();
   const [titel, setTitel] = useState("");
   const [betragStr, setBetragStr] = useState("");
   const [faelligAm, setFaelligAm] = useState("");
   const [notiz, setNotiz] = useState("");
+
+  useEffect(() => {
+    if (open && editPosten) {
+      setTitel(editPosten.titel);
+      setBetragStr(String(editPosten.geschaetzterBetrag).replace(".", ","));
+      setFaelligAm(editPosten.faelligAm);
+      setNotiz(editPosten.notiz ?? "");
+    } else if (open && !editPosten) {
+      setTitel("");
+      setBetragStr("");
+      setFaelligAm("");
+      setNotiz("");
+    }
+  }, [open, editPosten]);
 
   function reset() {
     setTitel("");
@@ -42,16 +59,27 @@ export function ManuellerPostenDialog({ open, onOpenChange }: Props) {
       return;
     }
     const betrag = parseFloat(betragStr.replace(",", ".")) || 0;
-    add({
-      art: "manuell",
-      titel: titel.trim(),
-      zeitraum: { jahr: new Date(faelligAm).getFullYear() },
-      faelligAm,
-      geschaetzterBetrag: betrag,
-      status: "offen",
-      notiz: notiz.trim() || undefined,
-    });
-    toast.success("Steuer-Termin angelegt");
+    if (editPosten) {
+      update(editPosten.id, {
+        titel: titel.trim(),
+        zeitraum: { jahr: new Date(faelligAm).getFullYear() },
+        faelligAm,
+        geschaetzterBetrag: betrag,
+        notiz: notiz.trim() || undefined,
+      });
+      toast.success("Termin aktualisiert");
+    } else {
+      add({
+        art: "manuell",
+        titel: titel.trim(),
+        zeitraum: { jahr: new Date(faelligAm).getFullYear() },
+        faelligAm,
+        geschaetzterBetrag: betrag,
+        status: "offen",
+        notiz: notiz.trim() || undefined,
+      });
+      toast.success("Steuer-Termin angelegt");
+    }
     reset();
     onOpenChange(false);
   }
@@ -60,7 +88,7 @@ export function ManuellerPostenDialog({ open, onOpenChange }: Props) {
     <Dialog open={open} onOpenChange={(v) => { onOpenChange(v); if (!v) reset(); }}>
       <DialogContent className="sm:max-w-md bg-background">
         <DialogHeader>
-          <DialogTitle>Steuer-Termin anlegen</DialogTitle>
+          <DialogTitle>{editPosten ? "Steuer-Termin bearbeiten" : "Steuer-Termin anlegen"}</DialogTitle>
           <DialogDescription>
             Für alles, was nicht automatisch berechnet wird (Grundsteuer, Kfz, IHK, Berufsgenossenschaft, Rundfunk …).
           </DialogDescription>
@@ -84,7 +112,7 @@ export function ManuellerPostenDialog({ open, onOpenChange }: Props) {
                 id="faellig"
                 type="date"
                 value={faelligAm}
-                min={todayISO()}
+                /* Vergangene Termine erlaubt im Edit-Modus */
                 onChange={(e) => setFaelligAm(e.target.value)}
               />
             </div>
@@ -116,7 +144,7 @@ export function ManuellerPostenDialog({ open, onOpenChange }: Props) {
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Abbrechen
           </Button>
-          <Button onClick={handleSpeichern}>Anlegen</Button>
+          <Button onClick={handleSpeichern}>{editPosten ? "Speichern" : "Anlegen"}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
