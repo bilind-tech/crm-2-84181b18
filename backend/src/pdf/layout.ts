@@ -190,38 +190,48 @@ function metaBox(meta: { label: string; wert: string }[], variant: "box" | "plai
   const body: unknown[][] = [];
   let noteRowsCount = 0;
   if (headerNote) {
-    for (const line of headerNote.split("\n")) {
+    const noteLines = headerNote.split("\n");
+    noteLines.forEach((line, idx) => {
+      const isLast = idx === noteLines.length - 1;
       body.push([
-        { text: line, fontSize: 10, bold: true, colSpan: 2, border: [false, false, false, false], margin: [0, 0, 0, 0] },
+        {
+          text: line,
+          fontSize: 9.5,
+          bold: true,
+          colSpan: 2,
+          border: [false, false, false, false],
+          margin: [0, 0, 0, isLast ? 2 : 0],
+          lineHeight: 1.15,
+        },
         {},
       ]);
       noteRowsCount++;
-    }
+    });
   }
   meta.forEach((m) => {
     body.push([
-      { text: m.label, fontSize: 10, border: [false, false, false, false], margin: [0, 2, 8, 2] },
-      { text: m.wert, fontSize: 10, alignment: "right", border: [false, false, false, false], margin: [0, 2, 0, 2] },
+      { text: m.label, fontSize: 9.5, border: [false, false, false, false], margin: [0, 1, 8, 1], lineHeight: 1.2 },
+      { text: m.wert, fontSize: 9.5, alignment: "right", border: [false, false, false, false], margin: [0, 1, 0, 1], lineHeight: 1.2 },
     ]);
   });
   const dividerIndex = noteRowsCount;
   return {
-    width: 245,
+    width: 235,
     table: {
       widths: ["auto", "*"],
       body,
     },
     layout: {
       hLineWidth: (i: number, node: { table: { body: unknown[][] } }) => {
-        if (i === 0 || i === node.table.body.length) return 0.7;
-        if (i === dividerIndex && noteRowsCount > 0) return 0.5;
+        if (i === 0 || i === node.table.body.length) return 0.6;
+        if (i === dividerIndex && noteRowsCount > 0) return 0.4;
         return 0;
       },
-      vLineWidth: (i: number, node: { table: { widths: unknown[] } }) => (i === 0 || i === node.table.widths.length ? 0.7 : 0),
+      vLineWidth: (i: number, node: { table: { widths: unknown[] } }) => (i === 0 || i === node.table.widths.length ? 0.6 : 0),
       hLineColor: () => COLOR_TEXT,
       vLineColor: () => COLOR_TEXT,
-      paddingTop: () => 4,
-      paddingBottom: () => 4,
+      paddingTop: () => 2,
+      paddingBottom: () => 2,
       paddingLeft: () => 8,
       paddingRight: () => 8,
     },
