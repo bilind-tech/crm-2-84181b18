@@ -114,6 +114,31 @@ function Page() {
     if (!sichtbareTabs.find((t) => t.id === tab)) setTab("firmendaten");
   }, [sichtbareTabs, tab]);
 
+  // Google-Drive OAuth-Callback: Wenn wir mit ?status=ok|err&msg=... aus dem
+  // Backend-Redirect zurückkommen, Toast zeigen und Tab auf "drive" setzen.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const status = params.get("status");
+    const tabParam = params.get("tab");
+    if (!status || tabParam !== "drive") return;
+    const msg = params.get("msg") ?? "";
+    if (status === "ok") {
+      toast.success("Google Drive verbunden");
+      // Im Mock-Modus: Verbindung scharf schalten
+      if (params.get("mock") === "1") {
+        void fetch("/einstellungen/google-drive/mock-callback").catch(() => undefined);
+      }
+    } else {
+      toast.error("Google-Drive-Verbindung fehlgeschlagen" + (msg ? `: ${msg}` : ""));
+    }
+    setTab("drive");
+    // QueryParams entfernen
+    const url = new URL(window.location.href);
+    ["status", "msg", "tab", "mock"].forEach((k) => url.searchParams.delete(k));
+    window.history.replaceState({}, "", url.toString());
+  }, []);
+
   const aktiverTab = sichtbareTabs.find((t) => t.id === tab) ?? sichtbareTabs[0];
 
   return (
