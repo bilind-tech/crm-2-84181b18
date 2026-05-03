@@ -1,10 +1,14 @@
 // Layout-Bauer für Belege — 1:1-Port aus src/lib/pdf/belegPdf.ts
-// (selbe Struktur, selbe Margins, selbe Farben). Kein React/Browser-Import.
+// Schwarz/weiß, dünne graue Linien, Logo rechts, kompakter 4-spaltiger Footer.
 
 import type { ApiPosition, ApiAngebot, ApiRechnung } from "../belege/mappers.js";
 import type { ApiKunde, ApiAnsprechpartner } from "../kunden/mappers.js";
 import type { FirmaForPdf } from "./types.js";
 import { DEFAULT_FONT } from "./printer.js";
+
+const COLOR_TEXT = "#000000";
+const COLOR_MUTED = "#555555";
+const COLOR_LINE = "#bdbdbd";
 
 function eur(n: number): string {
   return n.toLocaleString("de-DE", { style: "currency", currency: "EUR", minimumFractionDigits: 2 });
@@ -16,9 +20,7 @@ function dt(iso?: string | null): string {
 }
 
 function summe(p: ApiPosition): number {
-  if (p.modus === "pauschal") {
-    return (p.pauschalpreisNetto ?? 0) * (1 - (p.rabatt || 0) / 100);
-  }
+  if (p.modus === "pauschal") return (p.pauschalpreisNetto ?? 0) * (1 - (p.rabatt || 0) / 100);
   return p.menge * p.einzelpreisNetto * (1 - (p.rabatt || 0) / 100);
 }
 
@@ -42,11 +44,11 @@ function beschreibungBlock(text: string): unknown {
     else if (!titel && bullets.length === 0) titel = t;
     else bullets.push(t);
   }
-  if (titel) items.push({ text: titel, fontSize: 9, bold: true, margin: [0, 0, 0, 2] });
+  if (titel) items.push({ text: titel, fontSize: 10, bold: true, margin: [0, 0, 0, 2] });
   if (bullets.length > 0) {
-    items.push({ ul: bullets.map((b) => ({ text: b, fontSize: 9 })), margin: [0, 0, 0, 0] });
+    items.push({ ul: bullets.map((b) => ({ text: b, fontSize: 10 })), margin: [0, 0, 0, 0] });
   } else if (!titel) {
-    items.push({ text: text || "", fontSize: 9 });
+    items.push({ text: text || "", fontSize: 10 });
   }
   return { stack: items };
 }
@@ -64,162 +66,197 @@ function kundeAdresse(k: ApiKunde): string[] {
 }
 
 function absenderzeile(f: FirmaForPdf): string {
-  return `${f.firmenname} · ${f.strasse ?? ""} · ${f.plz ?? ""} ${f.ort ?? ""}`.trim();
+  const teile = [f.firmenname, f.strasse, `${f.plz ?? ""} ${f.ort ?? ""}`.trim()].filter(Boolean);
+  return teile.join(" – ");
 }
 
 function header(f: FirmaForPdf, logoDataUrl: string | null) {
   return {
-    margin: [40, 30, 40, 0] as [number, number, number, number],
+    margin: [55, 35, 55, 0] as [number, number, number, number],
     columns: [
-      logoDataUrl
-        ? { image: logoDataUrl, width: 110 }
-        : { text: f.firmenname.toUpperCase(), bold: true, fontSize: 18, color: "#1e3a8a" },
       {
-        text: absenderzeile(f),
-        alignment: "right" as const,
-        fontSize: 8,
-        color: "#475569",
-        margin: [0, 24, 0, 0] as [number, number, number, number],
+        width: "*",
+        stack: [
+          { text: absenderzeile(f), fontSize: 8, color: COLOR_TEXT, decoration: "underline", margin: [0, 22, 0, 0] },
+        ],
       },
+      logoDataUrl
+        ? { width: 150, image: logoDataUrl, fit: [150, 70], alignment: "right" }
+        : { width: 150, text: f.firmenname.toUpperCase(), bold: true, fontSize: 16, color: COLOR_TEXT, alignment: "right" },
     ],
   };
 }
 
 function footer(f: FirmaForPdf) {
   return function () {
+    const cell = (lines: (string | null | undefined)[]) => ({
+      stack: lines.filter(Boolean).map((l) => ({ text: l as string, fontSize: 7, color: COLOR_TEXT })),
+    });
     return {
-      margin: [40, 0, 40, 20] as [number, number, number, number],
-      columns: [
+      margin: [55, 0, 55, 25] as [number, number, number, number],
+      stack: [
+        { canvas: [{ type: "line", x1: 0, y1: 0, x2: 485, y2: 0, lineWidth: 0.5, lineColor: COLOR_LINE }] },
         {
-          stack: [
-            { text: f.firmenname, bold: true, fontSize: 8 },
-            { text: f.strasse ?? "", fontSize: 7 },
-            { text: `${f.plz ?? ""} ${f.ort ?? ""}`, fontSize: 7 },
+          margin: [0, 8, 0, 0] as [number, number, number, number],
+          columns: [
+            cell([
+              f.firmenname,
+              f.geschaeftsfuehrer ? `Geschäftsführer: ${f.geschaeftsfuehrer}` : null,
+              [f.strasse, [f.plz, f.ort].filter(Boolean).join(" ")].filter(Boolean).join(" - "),
+            ]),
+            cell(["Bank", f.bankName, f.iban]),
+            cell([f.telefon, f.email]),
+            cell([f.handelsregister, f.ustId ? `USt-ID: ${f.ustId}` : null, f.webseite]),
           ],
-        },
-        {
-          stack: [
-            { text: "Bankverbindung", bold: true, fontSize: 8 },
-            { text: f.bankName ?? "", fontSize: 7 },
-            { text: `IBAN: ${f.iban ?? ""}`, fontSize: 7 },
-            { text: `BIC: ${f.bic ?? ""}`, fontSize: 7 },
-          ],
-        },
-        {
-          stack: [
-            { text: "Kontakt", bold: true, fontSize: 8 },
-            { text: `Tel: ${f.telefon ?? ""}`, fontSize: 7 },
-            { text: f.email ?? "", fontSize: 7 },
-            { text: f.webseite ?? "", fontSize: 7 },
-          ],
-        },
-        {
-          stack: [
-            { text: "Steuer & Register", bold: true, fontSize: 8 },
-            { text: `USt-IdNr.: ${f.ustId ?? ""}`, fontSize: 7 },
-            { text: f.handelsregister ?? "", fontSize: 7 },
-            { text: `GF: ${f.geschaeftsfuehrer ?? ""}`, fontSize: 7 },
-          ],
+          columnGap: 12,
         },
       ],
-      columnGap: 14,
-      color: "#64748b",
     };
   };
 }
 
-function leistungstabelle(positionen: ApiPosition[]) {
-  const hatPauschal = positionen.some((p) => p.modus === "pauschal");
-  if (hatPauschal) {
-    const body: unknown[][] = [
-      [
-        { text: "Ausführung", bold: true, fillColor: "#1e3a8a", color: "#fff", fontSize: 9 },
-        { text: "Leistung", bold: true, fillColor: "#1e3a8a", color: "#fff", fontSize: 9 },
-        { text: "Preis", bold: true, fillColor: "#1e3a8a", color: "#fff", fontSize: 9, alignment: "right" },
-      ],
-    ];
-    positionen.forEach((p) => {
-      const ausf =
-        p.ausfuehrung ?? (p.modus === "pauschal" ? "Pauschal" : `${p.menge.toLocaleString("de-DE")} ${p.einheit}`);
-      body.push([
-        { text: ausf, fontSize: 9, bold: true },
-        beschreibungBlock(p.beschreibung || ""),
-        { text: eur(summe(p)), fontSize: 9, alignment: "right", bold: true },
-      ]);
-    });
-    return {
-      table: { headerRows: 1, widths: [90, "*", 70], body },
-      layout: {
-        hLineWidth: () => 0.5,
-        vLineWidth: () => 0,
-        hLineColor: () => "#e2e8f0",
-        paddingTop: () => 8,
-        paddingBottom: () => 8,
-      },
-    };
-  }
-  const body: unknown[][] = [
-    [
-      { text: "Pos.", bold: true, fillColor: "#1e3a8a", color: "#fff", fontSize: 9 },
-      { text: "Beschreibung", bold: true, fillColor: "#1e3a8a", color: "#fff", fontSize: 9 },
-      { text: "Menge", bold: true, fillColor: "#1e3a8a", color: "#fff", fontSize: 9, alignment: "right" },
-      { text: "Einheit", bold: true, fillColor: "#1e3a8a", color: "#fff", fontSize: 9 },
-      { text: "Einzelpreis", bold: true, fillColor: "#1e3a8a", color: "#fff", fontSize: 9, alignment: "right" },
-      { text: "Summe", bold: true, fillColor: "#1e3a8a", color: "#fff", fontSize: 9, alignment: "right" },
-    ],
+function pauschalTabelle(positionen: ApiPosition[], totalsT: { netto: number; steuer: number; brutto: number }, steuersatz: number) {
+  const headerRow = [
+    { text: "Ausführung", bold: true, fontSize: 10, color: COLOR_TEXT, margin: [0, 4, 0, 4] },
+    { text: "Leistung", bold: true, fontSize: 10, color: COLOR_TEXT, margin: [0, 4, 0, 4] },
+    { text: "Preis ohne MwSt.", bold: true, fontSize: 10, color: COLOR_TEXT, alignment: "right", margin: [0, 4, 0, 4] },
   ];
-  positionen.forEach((p, i) => {
+  const body: unknown[][] = [headerRow];
+  positionen.forEach((p) => {
+    const ausf = p.ausfuehrung ?? (p.modus === "pauschal" ? "Pauschal" : `${p.menge.toLocaleString("de-DE")} ${p.einheit}`);
     body.push([
-      { text: String(i + 1), fontSize: 9 },
+      { text: ausf, fontSize: 10 },
       beschreibungBlock(p.beschreibung || ""),
-      { text: p.menge.toLocaleString("de-DE"), fontSize: 9, alignment: "right" },
-      { text: p.einheit, fontSize: 9 },
-      { text: eur(p.einzelpreisNetto), fontSize: 9, alignment: "right" },
-      { text: eur(summe(p)), fontSize: 9, alignment: "right", bold: true },
+      { text: eur(summe(p)), fontSize: 10, alignment: "right" },
     ]);
   });
+  body.push([
+    { text: `Zzgl. Gesetzlicher Mehrwertsteuer ${steuersatz}%`, colSpan: 2, fontSize: 10 },
+    {},
+    { text: eur(totalsT.steuer), fontSize: 10, alignment: "right" },
+  ]);
+  body.push([
+    { text: "Gesamtbetrag inkl. MwSt.", colSpan: 2, fontSize: 10, bold: true },
+    {},
+    { text: eur(totalsT.brutto), fontSize: 10, alignment: "right", bold: true },
+  ]);
+  const totalRows = body.length;
   return {
-    table: { headerRows: 1, widths: [22, "*", 40, 40, 60, 60], body },
+    table: {
+      headerRows: 1,
+      keepWithHeaderRows: 1,
+      dontBreakRows: true,
+      widths: [95, "*", 90],
+      body,
+    },
     layout: {
-      hLineWidth: () => 0.5,
-      vLineWidth: () => 0,
-      hLineColor: () => "#e2e8f0",
-      paddingTop: () => 6,
-      paddingBottom: () => 6,
+      hLineWidth: (i: number) => (i === 0 || i === totalRows ? 0.7 : 0.4),
+      vLineWidth: () => 0.4,
+      hLineColor: () => COLOR_LINE,
+      vLineColor: () => COLOR_LINE,
+      paddingTop: () => 8,
+      paddingBottom: () => 8,
+      paddingLeft: () => 6,
+      paddingRight: () => 6,
     },
   };
 }
 
-function summenBlock(t: { netto: number; steuer: number; brutto: number }, steuersatz: number) {
+function klassischTabelle(positionen: ApiPosition[], totalsT: { netto: number; steuer: number; brutto: number }, steuersatz: number) {
+  const headerRow = [
+    { text: "Pos.", bold: true, fontSize: 10, color: COLOR_TEXT, margin: [0, 4, 0, 4] },
+    { text: "Beschreibung", bold: true, fontSize: 10, color: COLOR_TEXT, margin: [0, 4, 0, 4] },
+    { text: "Menge", bold: true, fontSize: 10, color: COLOR_TEXT, alignment: "right", margin: [0, 4, 0, 4] },
+    { text: "Einheit", bold: true, fontSize: 10, color: COLOR_TEXT, margin: [0, 4, 0, 4] },
+    { text: "Einzelpreis", bold: true, fontSize: 10, color: COLOR_TEXT, alignment: "right", margin: [0, 4, 0, 4] },
+    { text: "Summe", bold: true, fontSize: 10, color: COLOR_TEXT, alignment: "right", margin: [0, 4, 0, 4] },
+  ];
+  const body: unknown[][] = [headerRow];
+  positionen.forEach((p, i) => {
+    body.push([
+      { text: String(i + 1), fontSize: 10 },
+      beschreibungBlock(p.beschreibung || ""),
+      { text: p.menge.toLocaleString("de-DE"), fontSize: 10, alignment: "right" },
+      { text: p.einheit, fontSize: 10 },
+      { text: eur(p.einzelpreisNetto), fontSize: 10, alignment: "right" },
+      { text: eur(summe(p)), fontSize: 10, alignment: "right" },
+    ]);
+  });
+  body.push([
+    { text: "Netto", colSpan: 5, fontSize: 10, alignment: "right" },
+    {}, {}, {}, {},
+    { text: eur(totalsT.netto), fontSize: 10, alignment: "right" },
+  ]);
+  body.push([
+    { text: `MwSt ${steuersatz}%`, colSpan: 5, fontSize: 10, alignment: "right" },
+    {}, {}, {}, {},
+    { text: eur(totalsT.steuer), fontSize: 10, alignment: "right" },
+  ]);
+  body.push([
+    { text: "Gesamtbetrag inkl. MwSt.", colSpan: 5, fontSize: 10, alignment: "right", bold: true },
+    {}, {}, {}, {},
+    { text: eur(totalsT.brutto), fontSize: 10, alignment: "right", bold: true },
+  ]);
+  const totalRows = body.length;
   return {
-    margin: [0, 8, 0, 0] as [number, number, number, number],
-    columns: [
-      { text: "" },
-      {
-        width: 220,
-        table: {
-          widths: ["*", "auto"],
-          body: [
-            [{ text: "Netto", fontSize: 9, color: "#475569" }, { text: eur(t.netto), fontSize: 9, alignment: "right" }],
-            [
-              { text: `MwSt ${steuersatz}%`, fontSize: 9, color: "#475569" },
-              { text: eur(t.steuer), fontSize: 9, alignment: "right" },
-            ],
-            [
-              { text: "Gesamt brutto", bold: true, fontSize: 11, color: "#1e3a8a" },
-              { text: eur(t.brutto), bold: true, fontSize: 11, alignment: "right", color: "#1e3a8a" },
-            ],
-          ],
-        },
-        layout: {
-          hLineWidth: (i: number) => (i === 2 ? 1 : 0),
-          vLineWidth: () => 0,
-          hLineColor: () => "#1e3a8a",
-          paddingTop: () => 4,
-          paddingBottom: () => 4,
-        },
-      },
-    ],
+    table: {
+      headerRows: 1,
+      keepWithHeaderRows: 1,
+      dontBreakRows: true,
+      widths: [22, "*", 38, 38, 60, 60],
+      body,
+    },
+    layout: {
+      hLineWidth: (i: number) => (i === 0 || i === totalRows ? 0.7 : 0.4),
+      vLineWidth: () => 0.4,
+      hLineColor: () => COLOR_LINE,
+      vLineColor: () => COLOR_LINE,
+      paddingTop: () => 6,
+      paddingBottom: () => 6,
+      paddingLeft: () => 5,
+      paddingRight: () => 5,
+    },
+  };
+}
+
+function leistungstabelle(positionen: ApiPosition[], totalsT: { netto: number; steuer: number; brutto: number }, steuersatz: number) {
+  const hatPauschal = positionen.some((p) => p.modus === "pauschal");
+  return hatPauschal
+    ? pauschalTabelle(positionen, totalsT, steuersatz)
+    : klassischTabelle(positionen, totalsT, steuersatz);
+}
+
+function metaBox(meta: { label: string; wert: string }[], variant: "box" | "plain") {
+  if (variant === "plain") {
+    return {
+      width: 200,
+      stack: meta.map((m) => ({
+        text: `${m.label}: ${m.wert}`,
+        fontSize: 10,
+        alignment: "right",
+        margin: [0, 0, 0, 2],
+      })),
+    };
+  }
+  return {
+    width: 230,
+    table: {
+      widths: ["auto", "*"],
+      body: meta.map((m) => [
+        { text: m.label, fontSize: 10, border: [false, false, false, false], margin: [0, 1, 8, 1] },
+        { text: m.wert, fontSize: 10, alignment: "right", border: [false, false, false, false], margin: [0, 1, 0, 1] },
+      ]),
+    },
+    layout: {
+      hLineWidth: (i: number, node: { table: { body: unknown[] } }) => (i === 0 || i === node.table.body.length ? 0.7 : 0),
+      vLineWidth: (i: number, node: { table: { widths: unknown[] } }) => (i === 0 || i === node.table.widths.length ? 0.7 : 0),
+      hLineColor: () => COLOR_TEXT,
+      vLineColor: () => COLOR_TEXT,
+      paddingTop: () => 6,
+      paddingBottom: () => 6,
+      paddingLeft: () => 8,
+      paddingRight: () => 8,
+    },
   };
 }
 
@@ -237,26 +274,40 @@ function anrede(k: ApiKunde, ap?: ApiAnsprechpartner): string {
 
 function defaultIntroAngebot(a: ApiAngebot, intro?: string): string {
   if (intro) return intro;
-  return `vielen Dank für Ihre Anfrage. Wir freuen uns, Ihnen folgendes Angebot „${a.titel}" unterbreiten zu dürfen:`;
+  return `gerne unterbreiten wir Ihnen ein Angebot für „${a.titel}" und folgende Leistungen:`;
 }
 function defaultOutroAngebot(a: ApiAngebot, outro?: string): string {
   if (outro) return outro;
   return [
     a.gueltigBis ? `Dieses Angebot ist gültig bis ${dt(a.gueltigBis)}.` : null,
-    "Wir freuen uns auf Ihre Rückmeldung.",
-    "Mit freundlichen Grüßen",
+    "Sofern Sie Interesse an dem Angebot haben, bestätigen Sie uns dies.",
+    "Über eine Rückmeldung Ihrerseits würden wir uns freuen. Sollten Sie zu diesem Angebot noch Fragen haben, sind wir für Sie jederzeit telefonisch oder auch per E-Mail zu erreichen.",
   ].filter(Boolean).join("\n\n");
 }
 function defaultIntroRechnung(_r: ApiRechnung, intro?: string): string {
   if (intro) return intro;
-  return `wir bedanken uns für Ihren Auftrag und stellen die folgenden Leistungen in Rechnung:`;
+  return `hiermit übersenden wir Ihnen die Rechnung für folgende Leistungen:`;
 }
 function defaultOutroRechnung(r: ApiRechnung, outro?: string): string {
   if (outro) return outro;
-  return [
-    `Bitte überweisen Sie den Rechnungsbetrag bis zum ${dt(r.faelligkeitsdatum)} auf das untenstehende Konto.`,
-    "Mit freundlichen Grüßen",
-  ].join("\n\n");
+  const tage = ziel(r);
+  return `Wir möchten Sie bitten, den Rechnungsbetrag innerhalb von ${tage} Tagen nach Rechnungszustellung auf unser unten genanntes Bankkonto zu überweisen.`;
+}
+function ziel(r: ApiRechnung): number {
+  if (!r.rechnungsdatum || !r.faelligkeitsdatum) return 14;
+  const a = new Date(r.rechnungsdatum).getTime();
+  const b = new Date(r.faelligkeitsdatum).getTime();
+  const d = Math.round((b - a) / 86400000);
+  return d > 0 ? d : 14;
+}
+
+function signaturFromFirma(f: FirmaForPdf): string[] {
+  const lines: string[] = [];
+  if (f.geschaeftsfuehrer) {
+    lines.push(f.geschaeftsfuehrer);
+    lines.push("Geschäftsführer");
+  }
+  return lines;
 }
 
 interface BuildArgs {
@@ -266,6 +317,7 @@ interface BuildArgs {
   logoDataUrl: string | null;
   titel: string;
   meta: { label: string; wert: string }[];
+  metaVariant: "box" | "plain";
   positionen: ApiPosition[];
   rabattGesamt: number;
   steuersatz: number;
@@ -275,42 +327,45 @@ interface BuildArgs {
 
 function buildDoc(args: BuildArgs) {
   const t = totals(args.positionen, args.rabattGesamt, args.steuersatz);
+  const signatur = signaturFromFirma(args.firma);
   return {
     pageSize: "A4" as const,
-    pageMargins: [40, 90, 40, 110] as [number, number, number, number],
-    defaultStyle: { font: DEFAULT_FONT, fontSize: 10, color: "#0f172a" },
+    pageMargins: [55, 110, 55, 130] as [number, number, number, number],
+    defaultStyle: { font: DEFAULT_FONT, fontSize: 10, color: COLOR_TEXT, lineHeight: 1.25 },
     header: header(args.firma, args.logoDataUrl),
     footer: footer(args.firma),
     content: [
       {
-        margin: [0, 10, 0, 0],
         columns: [
           {
-            stack: [
-              { text: absenderzeile(args.firma), fontSize: 7, color: "#64748b", decoration: "underline" },
-              { text: "\n" },
-              ...kundeAdresse(args.kunde).map((l) => ({ text: l, fontSize: 10 })),
-            ],
-          },
-          {
-            width: 200,
-            stack: args.meta.map((m) => ({
-              columns: [
-                { text: m.label, fontSize: 9, color: "#64748b" },
-                { text: m.wert, fontSize: 9, alignment: "right", bold: true },
-              ],
-              margin: [0, 1, 0, 1] as [number, number, number, number],
+            width: "*",
+            stack: kundeAdresse(args.kunde).map((l, i) => ({
+              text: l,
+              fontSize: 10,
+              bold: i === 0,
             })),
           },
+          metaBox(args.meta, args.metaVariant),
         ],
+        columnGap: 20,
       },
-      { text: args.titel, fontSize: 18, bold: true, color: "#1e3a8a", margin: [0, 24, 0, 12] },
-      { text: anrede(args.kunde, args.ansprechpartner), margin: [0, 0, 0, 8] },
-      { text: args.intro, margin: [0, 0, 0, 14] },
-      leistungstabelle(args.positionen),
-      summenBlock(t, args.steuersatz),
-      { text: args.outro, margin: [0, 20, 0, 0] },
-      { text: args.firma.geschaeftsfuehrer ?? "", margin: [0, 24, 0, 0], italics: true },
+      { text: args.titel, fontSize: 22, bold: true, color: COLOR_TEXT, margin: [0, 30, 0, 14] },
+      {
+        stack: [
+          { text: anrede(args.kunde, args.ansprechpartner), margin: [0, 0, 0, 8] },
+          { text: args.intro, margin: [0, 0, 0, 14] },
+        ],
+        unbreakable: true,
+      },
+      leistungstabelle(args.positionen, t, args.steuersatz),
+      {
+        stack: [
+          { text: args.outro, margin: [0, 16, 0, 0] },
+          { text: "Mit freundlichen Grüßen", margin: [0, 18, 0, 0] },
+          ...signatur.map((s) => ({ text: s, margin: [0, 0, 0, 0], color: COLOR_MUTED })),
+        ],
+        unbreakable: true,
+      },
     ],
   };
 }
@@ -323,22 +378,19 @@ export function angebotDocDef(args: {
   logoDataUrl: string | null;
 }) {
   const { angebot, kunde, firma, ansprechpartner, logoDataUrl } = args;
-  const opts = (angebot.optionen ?? {}) as {
-    eigenesIntro?: string;
-    eigenesOutro?: string;
-  };
+  const opts = (angebot.optionen ?? {}) as { eigenesIntro?: string; eigenesOutro?: string };
   const intro = defaultIntroAngebot(angebot, opts.eigenesIntro || angebot.introText);
   const outro = defaultOutroAngebot(angebot, opts.eigenesOutro || angebot.outroText);
   const meta: { label: string; wert: string }[] = [
     { label: "Angebot-Nr.", wert: angebot.nummer },
-    { label: "Datum", wert: dt(angebot.erstelltAm) },
+    { label: "Angebotsdatum", wert: dt(angebot.erstelltAm) },
     ...(angebot.gueltigBis ? [{ label: "Gültig bis", wert: dt(angebot.gueltigBis) }] : []),
-    { label: "Kunden-Nr.", wert: kunde.nummer },
   ];
   return buildDoc({
     firma, kunde, ansprechpartner, logoDataUrl,
-    titel: `Angebot ${angebot.nummer}`,
+    titel: `Angebot ${angebot.titel || ""}`.trim(),
     meta,
+    metaVariant: "plain",
     positionen: angebot.positionen,
     rabattGesamt: angebot.rabattGesamt,
     steuersatz: angebot.steuersatz,
@@ -354,22 +406,19 @@ export function rechnungDocDef(args: {
   logoDataUrl: string | null;
 }) {
   const { rechnung, kunde, firma, ansprechpartner, logoDataUrl } = args;
-  const opts = (rechnung.optionen ?? {}) as {
-    eigenesIntro?: string;
-    eigenesOutro?: string;
-  };
+  const opts = (rechnung.optionen ?? {}) as { eigenesIntro?: string; eigenesOutro?: string };
   const intro = defaultIntroRechnung(rechnung, opts.eigenesIntro || rechnung.introText);
   const outro = defaultOutroRechnung(rechnung, opts.eigenesOutro || rechnung.outroText);
   const meta: { label: string; wert: string }[] = [
     { label: "Rechnung-Nr.", wert: rechnung.nummer },
     { label: "Rechnungsdatum", wert: dt(rechnung.rechnungsdatum) },
     { label: "Fällig am", wert: dt(rechnung.faelligkeitsdatum) },
-    { label: "Kunden-Nr.", wert: kunde.nummer },
   ];
   return buildDoc({
     firma, kunde, ansprechpartner, logoDataUrl,
-    titel: `Rechnung ${rechnung.nummer}`,
+    titel: "Rechnung",
     meta,
+    metaVariant: "box",
     positionen: rechnung.positionen,
     rabattGesamt: rechnung.rabattGesamt,
     steuersatz: rechnung.steuersatz,
