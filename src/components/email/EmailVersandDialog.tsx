@@ -9,6 +9,7 @@
 // =============================================================================
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Link } from "@tanstack/react-router";
 import {
   Send,
   Mail,
@@ -22,6 +23,7 @@ import {
   Pencil,
   Check,
   Plus,
+  Settings,
 } from "lucide-react";
 import { toast } from "sonner";
 
