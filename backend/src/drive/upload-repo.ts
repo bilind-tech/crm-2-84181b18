@@ -4,7 +4,7 @@ import { getDatabase } from "../db/index.js";
 import { emit } from "../events/bus.js";
 
 export type DriveUploadStatus = "pending" | "running" | "erfolg" | "fehler" | "manuell";
-export type BelegArt = "angebot" | "rechnung";
+export type BelegArt = "angebot" | "rechnung" | "dokument";
 
 export interface DriveUpload {
   id: string;
