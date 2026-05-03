@@ -514,6 +514,7 @@ export function SmtpTab() {
   // Schnelltest entfernt — Verbindung-prüfen (verify) ist die robuste Variante.
   const verify = useVerifySmtp();
   const sendTest = useSendTestMail();
+  const demoModus = !isBackendUrlExplicit();
   const [form, setForm] = useState({
     server: smtp?.server ?? "",
     port: smtp?.port ?? 587,
