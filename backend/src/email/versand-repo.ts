@@ -74,6 +74,7 @@ export interface EnqueueInput {
   belegId?: string;
   vorlageId?: string;
   signaturId?: string;
+  mahnStufe?: number;
   idempotenzKey: string;
   /** ABSOLUTE Schutzschicht: nur 'manuell' ist erlaubt — d. h. ein direkter
    *  User-Klick aus dem EmailVersandDialog. Jede andere Quelle wirft. */
