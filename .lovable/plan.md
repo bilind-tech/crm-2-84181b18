@@ -1,96 +1,91 @@
-# PDF-Redesign: My-Clean-Center-Look
 
-## Ziel
+# PDF-Verbesserungen: Logo, Rechnungs-Meta-Box, Tabellen-Layout
 
-Das aktuelle blaue, „moderne" Layout durch das Original-Design der Beispiel-PDFs ersetzen — schlicht, schwarz auf weiß, dünne Linien, klarer Briefkopf mit Logo rechts, kompakter 4-spaltiger Footer. Beleg-Engine (Frontend `src/lib/pdf/belegPdf.ts` + Backend `backend/src/pdf/layout.ts`) wird parallel umgebaut, damit Vorschau, Hotspot-Editor und Server-PDF identisch aussehen.
+Drei klar abgegrenzte Fixes an der PDF-Erzeugung (Frontend-Preview + Backend-Generator), damit das Ergebnis 1:1 zur mitgeschickten Vorlage passt.
 
-## Design-Spezifikation (aus den Beispielen abgeleitet)
+## 1. Logo aus den Firmendaten übernehmen
 
-```
-┌──────────────────────────────────────────────────────────┐
-│ Absenderzeile (klein, unterstrichen)        [LOGO 140pt] │   ← Header
-│                                                          │
-│ Kundenadresse                       ┌──────────────────┐ │
-│ Firma XY                            │ Bei Zahlung bitte│ │   (nur Rechnung)
-│ Straße                              │ die Rechnungs-Nr.│ │
-│ PLZ Ort                             │ Rechn.-Nr: …     │ │
-│                                     │ Datum:      …    │ │
-│                                     └──────────────────┘ │
-│                                                          │
-│ Rechnung   /   Angebot <Titel>          ← H1, schwarz    │
-│                                                          │
-│ Sehr geehrte … ,                                         │
-│ Intro-Absatz …                                           │
-│                                                          │
-│ ┌───────────┬────────────────────────────┬─────────────┐ │
-│ │ Ausführung│ Leistung                   │ Preis       │ │   ← Tabelle
-│ │ Pauschal  │ Büro Unterhalts- + …       │ 350,00 Euro │ │     dünne
-│ ├───────────┴────────────────────────────┼─────────────┤ │     graue
-│ │ Zzgl. Gesetzlicher Mehrwertsteuer 19 %│  66,50 Euro │ │     Linien
-│ ├───────────────────────────────────────┼─────────────┤ │
-│ │ Gesamtbetrag inkl. MwSt.    (fett)    │ 416,50 Euro │ │
-│ └───────────────────────────────────────┴─────────────┘ │
-│                                                          │
-│ Outro …                                                  │
-│ Mit freundlichen Grüßen                                  │
-│ Raed Mustafa                                             │
-│ Geschäftsführer                                          │
-│                                                          │
-├──────────────────────────────────────────────────────────┤   ← Footer
-│ Firma          Bankverbindung   Kontakt       Register   │
-│ Zeile1         Bank             Tel           HRB        │
-│ Zeile2         IBAN             Tel2          GF         │
-│ Zeile3                          Mail / Web    USt-ID     │
-└──────────────────────────────────────────────────────────┘
-```
+**Problem:** Aktuell lädt der Frontend-PDF-Builder das Logo aus `@/assets/logo.png` (`belegPdf.ts` → `logoDataUrl()`). Das in den Einstellungen hochgeladene Logo (`firma.logoUrl`, als Data-URL in den Settings gespeichert) wird ignoriert. Im Backend liest `loadLogoDataUrl()` nur eine Datei `${dataDir}/branding/logo.png` — die Settings-Variante wird auch dort nicht beachtet, und es gibt keinen Upload-Endpoint, der die Datei dort ablegt.
 
-Konkrete Tokens:
-- **Farben**: nur `#000` (Text/Linien), `#666` (Hilfslabels), `#cfcfcf` (Tabellenlinien/Trennlinie über Footer). Keine blauen Headerzellen, kein Akzentblau mehr.
-- **Schrift**: Roboto, Body 10 pt, Tabelleninhalt 9–10 pt, Header H1 22 pt **bold**, Meta-Box 10 pt, Footer 7 pt.
-- **Margins**: `[55, 110, 55, 130]` (mehr Luft, damit Footer-Block nie kollidiert).
-- **Logo**: rechts oben, 140 pt breit; Absenderzeile links auf gleicher Höhe, klein + unterstrichen.
-- **Meta-Box (nur Rechnung)**: rechts unter Logo, 230 pt breit, dünner schwarzer Rahmen, Padding 8 pt, zwei Spalten Label / Wert.
-- **Tabelle**:
-  - Mit Pauschal-Positionen: Spalten `Ausführung | Leistung | Preis` (95 / * / 90).
-  - Klassische Positionen: `Pos | Beschreibung | Menge | Einheit | Einzelpreis | Summe`.
-  - **Header-Zeile**: weißer Hintergrund, schwarze Schrift, oben + unten 0.7 pt Linie.
-  - **Zellen**: nur horizontale Linien (0.4 pt `#cfcfcf`), keine Vertikalen → entspricht dem Beispiel.
-  - **Summenzeilen** als zwei zusätzliche Tabellenrows (MwSt + Gesamt fett) statt separatem rechtem Block — passt 1:1 zur Vorlage.
-- **Footer**: 4 Spalten (Firma · Bank · Kontakt · Register), 7 pt grau, oberhalb 0.5 pt graue Trennlinie.
+**Lösung:**
+- **Frontend (`src/lib/pdf/belegPdf.ts`)**: `header(...)` bekommt zusätzlich die `firma` rein, das Logo wird in dieser Reihenfolge gewählt:
+  1. `optionen.logoOverride` (bestehender Per-Beleg-Override)
+  2. `firma.logoUrl` (Einstellungen → Firmendaten → Logo hochladen)
+  3. Fallback `@/assets/logo.png`
+  4. Wenn nichts vorhanden → Textmarke mit Firmenname.
+- **Backend (`backend/src/pdf/firma.ts`)**: `loadLogoDataUrl()` zusätzlich `getSetting("firma").logoUrl` als Data-URL prüfen, bevor auf die Datei `${dataDir}/branding/logo.png` zurückgegriffen wird. So funktioniert das Logo sofort, ohne neuen Upload-Endpoint, weil der Frontend-Settings-PATCH das `logoUrl`-Feld bereits persistiert.
+- Andere Firmendaten (Name oben links, Footer-Spalten) werden bereits aus `firma` gelesen — wir verifizieren nur, dass die Settings → Firma per `useFirmendaten()` geladen sind und im Doc landen (ist bereits der Fall, kein zusätzlicher Code nötig).
 
-## Robuste Mehrseiten-Logik (kein Überlauf!)
+## 2. Rechnungs-Meta-Box wie in der Vorlage (oben rechts mit Hinweistext)
 
-1. **`pageBreakBefore`-Hook** im pdfmake-Doc: bricht eine Tabellenzeile auf neue Seite, wenn `node.startPosition.top + node.startPosition.pageInnerHeight > availableHeight`.
-2. **`dontBreakRows: true`** auf der Tabelle → eine Leistungszeile wird nie mittendrin getrennt.
-3. **`keepWithHeaderRows: 1`** → Header wandert mit, falls die erste Datenzeile auf Folgeseite rutscht.
-4. **`headerRows: 1`** + Wiederholung des Tabellen-Headers auf jeder Folgeseite.
-5. **Summenzeilen** (MwSt / Gesamt) in eigene `unbreakable: true`-Gruppe → Summe steht nie isoliert oben auf einer neuen Seite.
-6. **Outro / Grußformel** ebenfalls als `{ stack: [...], unbreakable: true }` → bleibt zusammen.
-7. **pageMargins-Bottom 130 pt** garantiert, dass der 4-spaltige Footer nicht in den Content ragt.
-8. **Lange Beschreibungen**: bleiben weiterhin als `stack` mit `ul`-Bullets — pdfmake umbricht Wörter automatisch innerhalb der Spalte, kein horizontales Überlaufen mehr (Spalte hat feste Maximalbreite `*`).
+**Problem:** Heute ist die Rechnungs-Meta-Box ein einfaches Tabellenrahmen mit „Rechnung-Nr / Datum / Fällig am". In der Vorlage steht oben rechts ein größerer Kasten mit:
+- Rechnungsnummer
+- Rechnungsdatum
+- Leistungsdatum/-zeitraum
+- Zahlungsziel / Fälligkeitsdatum
+- Hinweis-Zeile darunter: „Bitte überweisen Sie den Betrag bis zum {Fälligkeitsdatum} unter Angabe der Rechnungsnummer {Nummer} auf das unten genannte Konto."
 
-## Code-Änderungen
+**Lösung:**
+- `metaBox(..., variant: "box")` in `src/lib/pdf/belegPdf.ts` und `backend/src/pdf/layout.ts` so erweitern, dass:
+  - Die Box optional einen Footer-Bereich („note") akzeptiert, der unterhalb der Werte über die volle Box-Breite läuft, gleicher Rahmen, Schrift 9pt.
+  - Bei Rechnung wird dieser Note-Text gesetzt:  
+    `„Bitte überweisen Sie den Rechnungsbetrag bis zum {faellig} unter Angabe der Rechnungsnummer {nummer} auf unser unten angegebenes Konto."`
+  - Der bestehende `outro` (im Brief darunter) bleibt unverändert, ist aber nicht mehr redundant nötig — Default-Outro nur noch „Vielen Dank für Ihren Auftrag." statt der Überweisungs-Aufforderung, damit es nicht doppelt steht.
+- Beim Angebot bleibt die `plain`-Variante (kein Kasten, rechts ausgerichteter Stack) — nur ohne Note.
+- Meta-Felder für Rechnung neu zusammenstellen in `generateRechnungPdf` und `rechnungDocDef`:
+  - „Rechnung-Nr." / Nummer
+  - „Rechnungsdatum" / Datum
+  - „Leistungsdatum" / aus Position-Zeitraum oder Rechnungsdatum, falls leer
+  - „Fällig am" / `faelligkeitsdatum`
 
-**`src/lib/pdf/belegPdf.ts`**
-- `header()` umbauen: links Absenderzeile (klein, unterstrichen), rechts Logo (140 pt) — keine doppelte Absenderzeile mehr im Body.
-- `footer()` umbauen: 4 gleichbreite Spalten, oben 0.5 pt graue Linie via `canvas`.
-- Neue Funktion `metaBox(meta)` mit umrandeter Box für Rechnungen (Angebote: schlichte rechtsbündige Datumszeile wie im Angebots-Beispiel).
-- `leistungstabelle()` neu: schwarz/weiß, MwSt + Gesamt als integrierte Tabellenzeilen, `dontBreakRows`, `keepWithHeaderRows`.
-- `summenBlock()` entfällt (in Tabelle integriert).
-- `buildDocWithOverrides()`: Margins, `pageBreakBefore` mit Höhen-Check, Outro als `{ stack, unbreakable: true }`.
-- Hotspot-IDs (`tabelle`, `summe`, `outro`, `pos:<id>` …) bleiben erhalten, damit der Live-Editor weiterläuft.
+## 3. Tabelle 1:1 nach Vorlage (keine Menge/Einheit/Einzelpreis-Spalten mehr)
 
-**`backend/src/pdf/layout.ts`**
-- Identische Änderungen 1:1 portieren (gleiche Funktionsnamen, gleiche Struktur).
-- Damit bleibt Server-Cache-Hash deterministisch und Server- und Browser-PDF sind pixelgleich.
+**Problem:** Aktuell zeigt der „klassisch"-Pfad sechs Spalten (`Pos. | Beschreibung | Menge | Einheit | Einzelpreis | Summe`). Die Vorlage nutzt nur **drei Spalten** mit Pauschal-Stil — auch wenn klassisch (Menge/Einzelpreis) erfasst wurde. Menge/Einheit gehört in die Beschreibung.
 
-**Keine Änderungen** an Hooks, Viewer, Editor-Layout, Routing, Tests-Setup nötig. Backend-Snapshot-Test (`backend/test/pdf.spec.ts`) prüft nur „beginnt mit %PDF-" und Belegnummer im Dateinamen — bleibt grün.
+**Lösung:**
+- `klassischTabelle()` und `pauschalTabelle()` werden zu **einer** einheitlichen Funktion `leistungstabelle()` zusammengefasst. Spalten exakt wie Vorlage:
 
-## QA
+  ```text
+  | Ausführung            | Leistung                          | Preis ohne MwSt. |
+  |-----------------------|-----------------------------------|-----------------:|
+  | Pauschal              | Titel + Bullet-Liste              |          XX,XX € |
+  | 12,00 Std (à 35,00 €) | Beschreibung + Bullets            |         420,00 € |
+  | ...                   | ...                               |              ... |
+  | Zwischensumme (netto) |                                   |        1.234,56 € |
+  | Zzgl. MwSt 19 %       |                                   |          234,57 € |
+  | Gesamtbetrag inkl. MwSt|                                  |        1.469,13 € |  (bold)
+  ```
 
-1. Frontend-Vorschau (`/rechnungen/:id`, `/angebote/:id`) hart neu laden → Look prüfen.
-2. Im Editor `/…/bearbeiten` 15+ Positionen mit langen Beschreibungen anlegen → muss sauber auf Seite 2/3 umbrechen, Footer überall vorhanden, kein Text außerhalb der Zellen.
-3. Eye-Icon-Dialog auf Liste prüfen.
-4. Backend-Tests (`bun test` im `backend/`) müssen grün bleiben.
+- `Ausführung`-Spalte enthält:
+  - Modus „pauschal" → Text „Pauschal" (oder `p.ausfuehrung` falls gesetzt).
+  - Modus „klassisch" → `{menge} {einheit} (à {einzelpreis})`, z. B. `12,00 Std (à 35,00 €)`. So bleibt die Information erhalten, aber ohne die hässlichen Extra-Spalten.
+- `Leistung`-Spalte: weiter `beschreibungBlock(p.beschreibung)` mit fettem Titel + Bullet-Liste.
+- Spaltenbreiten `[110, "*", 90]`, dünne graue horizontale Linien (`#bdbdbd`), keine vertikalen Linien innerhalb der Datenzeilen — 1:1 zur Vorlage. Header-Zeile und letzte Summenzeile etwas dicker (0.7pt), dazwischen 0.4pt.
+- `dontBreakRows: true` und `keepWithHeaderRows: 1` bleiben für den Mehrseiten-Schutz.
+- Identische Implementierung in **`src/lib/pdf/belegPdf.ts`** *und* **`backend/src/pdf/layout.ts`** (beide Pfade müssen synchron bleiben).
 
-Nach Freigabe setze ich die Änderungen direkt um.
+## 4. Konsistenz-Check / kleinere Aufräum-Arbeiten
+
+- `defaultOutroRechnung` kürzen, da der Überweisungstext jetzt in der Meta-Box steht.
+- Sicherstellen, dass `useFirmendaten()` (bereits vorhanden) den vollständigen Datensatz inkl. `logoUrl`, Geschäftsführer, Bank, Handelsregister liefert — ist via Mock-Backend `/einstellungen/firma` gegeben.
+- Header-Spalten-Höhe leicht erhöhen, falls das Logo aus den Settings größere Proportionen hat (`fit: [150, 70]` bleibt — Bild wird proportional eingepasst).
+
+## Technische Details / betroffene Dateien
+
+- `src/lib/pdf/belegPdf.ts`
+  - `header(firma, logo)` Signatur erweitern, Logo-Resolution-Kette ergänzen
+  - `metaBox(..., note?: string)` Option für untere Hinweiszeile
+  - `klassischTabelle` + `pauschalTabelle` → `leistungstabelle` (3 Spalten)
+  - `defaultOutroRechnung` kürzen
+  - `generateRechnungPdf`: Meta-Box-Note + Leistungsdatum
+- `backend/src/pdf/layout.ts` — gleiche Änderungen spiegeln
+- `backend/src/pdf/firma.ts` — `loadLogoDataUrl()` zuerst aus `getSetting("firma").logoUrl`
+- Keine neuen Migrations / keine Daten-Änderungen nötig (Logo-Feld existiert bereits in Settings).
+
+## Verifikation
+
+Nach Umsetzung:
+1. Logo in Einstellungen → Firmendaten hochladen → in Rechnungs-/Angebots-PDF (Vorschau & Download) erscheint es oben rechts.
+2. Rechnung öffnen → Meta-Box oben rechts zeigt Nummer, Datum, Leistungsdatum, Fälligkeit + Hinweis-Satz.
+3. Tabelle zeigt nur 3 Spalten, auch bei klassischen Positionen — Menge/Einheit/Einzelpreis stehen in der ersten Spalte als kompakte Zeile.
+4. Mehrseitiger Test mit 30+ Positionen: Header-Zeile wiederholt sich nicht doppelt, keine zerschnittenen Zeilen, Footer überlappt nicht.
