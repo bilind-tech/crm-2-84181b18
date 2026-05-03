@@ -95,7 +95,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     };
   });
 
-  app.post("/auth/setup", async (req, reply) => {
+  app.post("/auth/setup", { config: { rateLimit: { max: 5, timeWindow: "1 minute" } } }, async (req, reply) => {
     const parsed = SetupSchema.safeParse(req.body);
     if (!parsed.success) {
       reply.status(422);
