@@ -83,8 +83,9 @@ async function processDokument(row: DriveUpload): Promise<void> {
   const settings = loadDriveSettings();
   const dok = getDokument(row.belegId);
   if (!dok) throw new Error(`Dokument ${row.belegId} nicht gefunden`);
-  const file = await readDokumentDatei(row.belegId);
-  if (!file) throw new Error("Dokument-Datei nicht lesbar");
+  const raw = getDokumentRaw(row.belegId);
+  if (!raw?.storage_path) throw new Error("Dokument-Storage-Pfad fehlt");
+  const buf = await readFile(absolutePath(raw.storage_path));
 
   const dateStr = dok.erstelltAm ?? new Date().toISOString();
   const d = new Date(dateStr);
