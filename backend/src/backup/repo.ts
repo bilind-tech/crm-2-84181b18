@@ -21,6 +21,10 @@ interface Raw {
   schema_version: number | null;
   app_version: string | null;
   error: string | null;
+  drive_status: string | null;
+  drive_file_id: string | null;
+  drive_error: string | null;
+  drive_synced_at: string | null;
 }
 
 function map(r: Raw): BackupRow {
@@ -37,6 +41,10 @@ function map(r: Raw): BackupRow {
     schemaVersion: r.schema_version,
     appVersion: r.app_version,
     error: r.error,
+    driveStatus: ((r.drive_status as BackupRow["driveStatus"]) ?? "skip") as BackupRow["driveStatus"],
+    driveFileId: r.drive_file_id,
+    driveError: r.drive_error,
+    driveSyncedAt: r.drive_synced_at,
   };
 }
 

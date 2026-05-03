@@ -10,6 +10,8 @@ export type BackupTrigger = "auto" | "manual" | "pre-restore" | "pre-update";
 
 export type BackupStatus = "in_progress" | "success" | "failed";
 
+export type DriveMirrorStatus = "skip" | "pending" | "synced" | "error";
+
 export interface BackupRow {
   id: string;
   filename: string;
@@ -23,6 +25,10 @@ export interface BackupRow {
   schemaVersion: number | null;
   appVersion: string | null;
   error: string | null;
+  driveStatus: DriveMirrorStatus;
+  driveFileId: string | null;
+  driveError: string | null;
+  driveSyncedAt: string | null;
 }
 
 export interface BackupManifest {
