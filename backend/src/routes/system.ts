@@ -30,7 +30,8 @@ import {
   listHistorie,
   listInstalledVersions,
 } from "../system/repo.js";
-import { isUpdateRunning, manualRollback, startInstall } from "../system/runner.js";
+import { isUpdateRunning, manualRollback, startInstall, getPreviousVersionStamp } from "../system/runner.js";
+import { computeMigrationsDiff } from "../system/migrations-diff.js";
 import type { UpdateLauf } from "../system/types.js";
 
 // In-memory Rollback-Lockout: 3 Fehlversuche → 15 min sperren.
