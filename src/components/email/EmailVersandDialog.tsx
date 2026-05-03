@@ -22,7 +22,6 @@ import {
   Pencil,
   Check,
   Plus,
-  Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
 
