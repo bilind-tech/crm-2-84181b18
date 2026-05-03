@@ -1,6 +1,6 @@
 // Hängt sich an Dokument-Erstellung und enqueued einen Drive-Upload,
 // wenn Auto-Upload aktiv und Drive verbunden ist.
-import { onEvent } from "../events/bus.js";
+import { on } from "../events/bus.js";
 import { enqueue } from "../drive/upload-repo.js";
 import { loadDriveSettings } from "../drive/oauth.js";
 import { getDokument } from "./repo.js";
