@@ -1,91 +1,79 @@
 
-# PDF-Verbesserungen: Logo, Rechnungs-Meta-Box, Tabellen-Layout
+# PDF-Layout 1:1 nach Vorlage (Rechnung & Angebot)
 
-Drei klar abgegrenzte Fixes an der PDF-Erzeugung (Frontend-Preview + Backend-Generator), damit das Ergebnis 1:1 zur mitgeschickten Vorlage passt.
+Anhand des neuen Referenz-Screenshots werden Tabelle, Meta-Box, Logo und Outro exakt an die My-Clean-Center-Vorlage angepasst. Identisch in Frontend (`src/lib/pdf/belegPdf.ts`) und Backend (`backend/src/pdf/layout.ts`).
 
-## 1. Logo aus den Firmendaten übernehmen
+## 1. Tabelle: vollständiger Rahmen + 4 Spalten
 
-**Problem:** Aktuell lädt der Frontend-PDF-Builder das Logo aus `@/assets/logo.png` (`belegPdf.ts` → `logoDataUrl()`). Das in den Einstellungen hochgeladene Logo (`firma.logoUrl`, als Data-URL in den Settings gespeichert) wird ignoriert. Im Backend liest `loadLogoDataUrl()` nur eine Datei `${dataDir}/branding/logo.png` — die Settings-Variante wird auch dort nicht beachtet, und es gibt keinen Upload-Endpoint, der die Datei dort ablegt.
+Aktuell: nur dünne horizontale Linien, 3 Spalten. Vorlage zeigt aber **komplett umrandete Zellen** (alle 4 Seiten) und **4 Spalten**:
 
-**Lösung:**
-- **Frontend (`src/lib/pdf/belegPdf.ts`)**: `header(...)` bekommt zusätzlich die `firma` rein, das Logo wird in dieser Reihenfolge gewählt:
-  1. `optionen.logoOverride` (bestehender Per-Beleg-Override)
-  2. `firma.logoUrl` (Einstellungen → Firmendaten → Logo hochladen)
-  3. Fallback `@/assets/logo.png`
-  4. Wenn nichts vorhanden → Textmarke mit Firmenname.
-- **Backend (`backend/src/pdf/firma.ts`)**: `loadLogoDataUrl()` zusätzlich `getSetting("firma").logoUrl` als Data-URL prüfen, bevor auf die Datei `${dataDir}/branding/logo.png` zurückgegriffen wird. So funktioniert das Logo sofort, ohne neuen Upload-Endpoint, weil der Frontend-Settings-PATCH das `logoUrl`-Feld bereits persistiert.
-- Andere Firmendaten (Name oben links, Footer-Spalten) werden bereits aus `firma` gelesen — wir verifizieren nur, dass die Settings → Firma per `useFirmendaten()` geladen sind und im Doc landen (ist bereits der Fall, kein zusätzlicher Code nötig).
+```text
+| Leistung               | Stunden | Abrechnungsart | Preis ohne MwSt. |
+| Büro Unterhalts- + ... |         | Pauschal       |        350,00 € |
+| Zzgl. gesetzl. MwSt 19%|                                    66,50 € |
+| Gesamtbetrag inkl. MwSt|                                   416,50 € |  (bold)
+```
 
-## 2. Rechnungs-Meta-Box wie in der Vorlage (oben rechts mit Hinweistext)
+Anpassungen in `leistungstabelle()`:
+- Spalten + Breiten: `[ "*", 70, 90, 90 ]` mit Headern `Leistung | Stunden | Abrechnungsart | Preis ohne MwSt.`.
+- `Stunden`-Zelle: bei `modus === "klassisch"` → `{menge} {einheit}` (z. B. `12,00 Std`), bei Pauschal leer.
+- `Abrechnungsart`-Zelle: bei Pauschal `Pauschal`, bei klassisch `à {einzelpreis}` (mittig).
+- `Leistung`-Zelle: weiterhin `beschreibungBlock` (Titel fett + Bullet-Liste).
+- Layout-Funktion: **alle Linien aktiv** — `hLineWidth: 0.6`, `vLineWidth: 0.6`, Farbe `#000000` (schwarz, nicht grau). Header-Zeile + Summenzeile etwas dicker (0.8).
+- Die Summenzeilen (`Zwischensumme`, `MwSt`, `Gesamtbetrag`) nutzen `colSpan: 3` über die ersten drei Spalten, Wert rechts.
+- `dontBreakRows: true`, `keepWithHeaderRows: 1` bleiben für Mehrseiten-Schutz.
 
-**Problem:** Heute ist die Rechnungs-Meta-Box ein einfaches Tabellenrahmen mit „Rechnung-Nr / Datum / Fällig am". In der Vorlage steht oben rechts ein größerer Kasten mit:
-- Rechnungsnummer
-- Rechnungsdatum
-- Leistungsdatum/-zeitraum
-- Zahlungsziel / Fälligkeitsdatum
-- Hinweis-Zeile darunter: „Bitte überweisen Sie den Betrag bis zum {Fälligkeitsdatum} unter Angabe der Rechnungsnummer {Nummer} auf das unten genannte Konto."
+## 2. Meta-Box (Rechnung): Hinweis OBEN IN der Box
 
-**Lösung:**
-- `metaBox(..., variant: "box")` in `src/lib/pdf/belegPdf.ts` und `backend/src/pdf/layout.ts` so erweitern, dass:
-  - Die Box optional einen Footer-Bereich („note") akzeptiert, der unterhalb der Werte über die volle Box-Breite läuft, gleicher Rahmen, Schrift 9pt.
-  - Bei Rechnung wird dieser Note-Text gesetzt:  
-    `„Bitte überweisen Sie den Rechnungsbetrag bis zum {faellig} unter Angabe der Rechnungsnummer {nummer} auf unser unten angegebenes Konto."`
-  - Der bestehende `outro` (im Brief darunter) bleibt unverändert, ist aber nicht mehr redundant nötig — Default-Outro nur noch „Vielen Dank für Ihren Auftrag." statt der Überweisungs-Aufforderung, damit es nicht doppelt steht.
-- Beim Angebot bleibt die `plain`-Variante (kein Kasten, rechts ausgerichteter Stack) — nur ohne Note.
-- Meta-Felder für Rechnung neu zusammenstellen in `generateRechnungPdf` und `rechnungDocDef`:
-  - „Rechnung-Nr." / Nummer
-  - „Rechnungsdatum" / Datum
-  - „Leistungsdatum" / aus Position-Zeitraum oder Rechnungsdatum, falls leer
-  - „Fällig am" / `faelligkeitsdatum`
+Vorlage zeigt:
 
-## 3. Tabelle 1:1 nach Vorlage (keine Menge/Einheit/Einzelpreis-Spalten mehr)
+```text
+┌──────────────────────────────────────┐
+│ Bei Zahlung bitte                    │
+│ die Rechnungs-Nr. angeben            │
+├──────────────────┬───────────────────┤
+│ Rechnung-Nr.:    │ Fabiola0326/0026  │
+│ Rechnungsdatum:  │     28.03.2026    │
+└──────────────────┴───────────────────┘
+```
 
-**Problem:** Aktuell zeigt der „klassisch"-Pfad sechs Spalten (`Pos. | Beschreibung | Menge | Einheit | Einzelpreis | Summe`). Die Vorlage nutzt nur **drei Spalten** mit Pauschal-Stil — auch wenn klassisch (Menge/Einzelpreis) erfasst wurde. Menge/Einheit gehört in die Beschreibung.
+Anpassungen in `metaBox(..., variant: "box")`:
+- Neuer Param `headerNote` (statt `note` als Footer): kleiner kursiver/normaler Hinweistext **oberhalb** der Daten-Reihen, mit unterer Trennlinie.
+- Volle Außen-Umrandung (oben, unten, links, rechts) in **schwarz** statt grau, Linienbreite 0.7.
+- Innere Trennlinie nur zwischen Hinweisblock und Daten.
+- Default-Hinweis bei Rechnung: `"Bei Zahlung bitte\ndie Rechnungs-Nr. angeben"`.
+- Felder reduzieren auf das, was in der Vorlage steht: `Rechnung-Nr.` + `Rechnungsdatum` (Fälligkeit ist nicht in der Box, sondern wird im Outro-Text erwähnt). Optional Konfiguration über `BuildOptions`, aber Default = nur diese zwei Zeilen.
 
-**Lösung:**
-- `klassischTabelle()` und `pauschalTabelle()` werden zu **einer** einheitlichen Funktion `leistungstabelle()` zusammengefasst. Spalten exakt wie Vorlage:
+## 3. Outro-Satz mit Betrag und Frist
 
-  ```text
-  | Ausführung            | Leistung                          | Preis ohne MwSt. |
-  |-----------------------|-----------------------------------|-----------------:|
-  | Pauschal              | Titel + Bullet-Liste              |          XX,XX € |
-  | 12,00 Std (à 35,00 €) | Beschreibung + Bullets            |         420,00 € |
-  | ...                   | ...                               |              ... |
-  | Zwischensumme (netto) |                                   |        1.234,56 € |
-  | Zzgl. MwSt 19 %       |                                   |          234,57 € |
-  | Gesamtbetrag inkl. MwSt|                                  |        1.469,13 € |  (bold)
-  ```
+Statt Box-Note jetzt im Fließtext nach der Tabelle, exakt wie in Vorlage:
 
-- `Ausführung`-Spalte enthält:
-  - Modus „pauschal" → Text „Pauschal" (oder `p.ausfuehrung` falls gesetzt).
-  - Modus „klassisch" → `{menge} {einheit} (à {einzelpreis})`, z. B. `12,00 Std (à 35,00 €)`. So bleibt die Information erhalten, aber ohne die hässlichen Extra-Spalten.
-- `Leistung`-Spalte: weiter `beschreibungBlock(p.beschreibung)` mit fettem Titel + Bullet-Liste.
-- Spaltenbreiten `[110, "*", 90]`, dünne graue horizontale Linien (`#bdbdbd`), keine vertikalen Linien innerhalb der Datenzeilen — 1:1 zur Vorlage. Header-Zeile und letzte Summenzeile etwas dicker (0.7pt), dazwischen 0.4pt.
-- `dontBreakRows: true` und `keepWithHeaderRows: 1` bleiben für den Mehrseiten-Schutz.
-- Identische Implementierung in **`src/lib/pdf/belegPdf.ts`** *und* **`backend/src/pdf/layout.ts`** (beide Pfade müssen synchron bleiben).
+> „Wir möchten Sie bitten, den Rechnungsbetrag in Höhe von **{Brutto}** innerhalb von **{N} Tagen** nach Rechnungszustellung auf unser unten genanntes Bankkonto zu überweisen."
 
-## 4. Konsistenz-Check / kleinere Aufräum-Arbeiten
+- N berechnet aus Differenz `faelligkeitsdatum - rechnungsdatum` in Tagen, Fallback `14`.
+- Direkt nach der Tabelle, **vor** „Mit freundlichen Grüßen".
+- `defaultOutroRechnung` entsprechend umbauen.
 
-- `defaultOutroRechnung` kürzen, da der Überweisungstext jetzt in der Meta-Box steht.
-- Sicherstellen, dass `useFirmendaten()` (bereits vorhanden) den vollständigen Datensatz inkl. `logoUrl`, Geschäftsführer, Bank, Handelsregister liefert — ist via Mock-Backend `/einstellungen/firma` gegeben.
-- Header-Spalten-Höhe leicht erhöhen, falls das Logo aus den Settings größere Proportionen hat (`fit: [150, 70]` bleibt — Bild wird proportional eingepasst).
+## 4. Logo deutlich größer
 
-## Technische Details / betroffene Dateien
+Header `header(firma, logo)`:
+- Logo-Spalte von `width: 150` / `fit: [150, 70]` auf `width: 220` / `fit: [220, 95]`.
+- Absender-Top-Margin entsprechend nachziehen, damit Logo + Absender-Zeile vertikal harmonieren.
+- `pageMargins.top` von `110` auf `125` erhöhen, damit das größere Logo nicht in den Inhalt überlappt.
 
-- `src/lib/pdf/belegPdf.ts`
-  - `header(firma, logo)` Signatur erweitern, Logo-Resolution-Kette ergänzen
-  - `metaBox(..., note?: string)` Option für untere Hinweiszeile
-  - `klassischTabelle` + `pauschalTabelle` → `leistungstabelle` (3 Spalten)
-  - `defaultOutroRechnung` kürzen
-  - `generateRechnungPdf`: Meta-Box-Note + Leistungsdatum
-- `backend/src/pdf/layout.ts` — gleiche Änderungen spiegeln
-- `backend/src/pdf/firma.ts` — `loadLogoDataUrl()` zuerst aus `getSetting("firma").logoUrl`
-- Keine neuen Migrations / keine Daten-Änderungen nötig (Logo-Feld existiert bereits in Settings).
+## 5. Konsistenz zwischen Frontend & Backend
+
+Identische Änderungen werden in `backend/src/pdf/layout.ts` gespiegelt — gleiche Spalten, gleiches Layout, gleiche Meta-Box, gleiches Outro. Keine Backend-API-Änderung, kein Migrationsbedarf.
+
+## Betroffene Dateien
+
+- `src/lib/pdf/belegPdf.ts` — `header`, `metaBox` (headerNote), `leistungstabelle` (4 Spalten + Vollrahmen), `defaultOutroRechnung`, `generateRechnungPdf` (kein note-Param mehr, dynamische Tage)
+- `backend/src/pdf/layout.ts` — gleiche Änderungen
+- Keine Änderungen an Datenmodell, Routen, Settings, Cache.
 
 ## Verifikation
 
-Nach Umsetzung:
-1. Logo in Einstellungen → Firmendaten hochladen → in Rechnungs-/Angebots-PDF (Vorschau & Download) erscheint es oben rechts.
-2. Rechnung öffnen → Meta-Box oben rechts zeigt Nummer, Datum, Leistungsdatum, Fälligkeit + Hinweis-Satz.
-3. Tabelle zeigt nur 3 Spalten, auch bei klassischen Positionen — Menge/Einheit/Einzelpreis stehen in der ersten Spalte als kompakte Zeile.
-4. Mehrseitiger Test mit 30+ Positionen: Header-Zeile wiederholt sich nicht doppelt, keine zerschnittenen Zeilen, Footer überlappt nicht.
+1. Rechnung mit einer Pauschal-Position → Layout matcht Screenshot pixelnah (Box mit „Bei Zahlung bitte…", 4-spaltige Tabelle mit allen Linien, Logo groß rechts, Outro-Satz mit Betrag + 14 Tagen).
+2. Rechnung mit klassischer Position → Stunden-Spalte zeigt Menge+Einheit, Abrechnungsart zeigt `à {Einzelpreis}`.
+3. Rechnung mit 30+ Positionen → Tabelle bricht sauber, Header wiederholt sich, Footer überlappt nicht.
+4. Angebot bleibt unverändert (plain Meta, gleiche neue 4-spaltige Tabelle).
