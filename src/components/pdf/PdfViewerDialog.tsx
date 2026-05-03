@@ -166,10 +166,14 @@ export function PdfViewerDialog({
             </div>
           )}
 
-          {!isLoading && !isError && pdfUrl && containerWidth > 0 && (
+          {!isLoading && !isError && pdfUrl && containerWidth > 0 && !viewerError && (
             <Document
               file={pdfUrl}
               onLoadSuccess={({ numPages }) => setNumPages(numPages)}
+              onLoadError={(err) => {
+                console.error("[PdfViewerDialog] Document load error", err);
+                setViewerError(err?.message || String(err));
+              }}
               loading={
                 <div className="flex min-h-[40vh] items-center justify-center text-sm text-muted-foreground">
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -192,10 +196,26 @@ export function PdfViewerDialog({
                     width={Math.min(containerWidth - 4, 900)}
                     renderAnnotationLayer={false}
                     renderTextLayer={false}
+                    onRenderError={(err) => {
+                      console.error("[PdfViewerDialog] Page render error", err);
+                    }}
                   />
                 </div>
               ))}
             </Document>
+          )}
+
+          {viewerError && (
+            <div className="flex h-full min-h-[40vh] flex-col items-center justify-center gap-2 px-6 text-center text-sm text-destructive">
+              <AlertCircle className="h-6 w-6" />
+              <div className="font-medium">PDF kann nicht angezeigt werden</div>
+              <div className="text-xs text-muted-foreground">{viewerError}</div>
+              {pdfUrl && (
+                <a href={pdfUrl} download={fileName} className="mt-2 text-xs underline text-primary">
+                  PDF trotzdem herunterladen
+                </a>
+              )}
+            </div>
           )}
         </div>
       </DialogContent>
