@@ -110,20 +110,24 @@ export async function mirrorBackupToDrive(
     return;
   }
 
+  let driveArchive: string | null = null;
   try {
+    // Master-Key NIE in die Cloud — Schlüssel-freie Kopie bauen
+    driveArchive = await buildKeyfreeArchive(file, backupId);
+
     const folderId = await ensureFolderPath(
       backupTargetFolder(new Date(row.completedAt ?? row.startedAt)),
     );
     const out = await uploadStream({
       parentFolderId: folderId,
       name: row.filename,
-      stream: createReadStream(file),
+      stream: createReadStream(driveArchive),
       mimeType: "application/gzip",
     });
     setDriveStatus(backupId, "synced", out.id);
     audit({
       action: "backup.drive.mirror.ok",
-      detail: { id: backupId, fileId: out.id },
+      detail: { id: backupId, fileId: out.id, keysExcluded: true },
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
@@ -132,6 +136,10 @@ export async function mirrorBackupToDrive(
       action: "backup.drive.mirror.fail",
       detail: { id: backupId, error: msg },
     });
+  } finally {
+    if (driveArchive && existsSync(driveArchive)) {
+      try { rmSync(driveArchive, { force: true }); } catch { /* ignore */ }
+    }
   }
 }
 
