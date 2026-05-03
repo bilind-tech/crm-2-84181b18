@@ -29,7 +29,15 @@ type Props =
   | ({ kind: "angebot"; draft: Angebot } & CommonProps)
   | ({ kind: "rechnung"; draft: Rechnung } & CommonProps);
 
-const DEBOUNCE_MS = 300;
+const DEBOUNCE_MS = 600;
+const LOADER_DELAY_MS = 400;
+
+// Volatile Server-Felder aus Build-Trigger ausschließen, damit Server-Echos
+// (Timestamps) keinen erneuten PDF-Build auslösen.
+const VOLATILE_KEYS = new Set(["aktualisiertAm", "updatedAt", "erstelltAm", "createdAt"]);
+function semanticKey<T>(obj: T): string {
+  return JSON.stringify(obj, (k, v) => (VOLATILE_KEYS.has(k) ? undefined : v));
+}
 
 export function LivePdfPreview(props: Props) {
   const { draft, kunde, firma, ansprechpartner, renderEditor, kind } = props;
@@ -39,6 +47,7 @@ export function LivePdfPreview(props: Props) {
   const [hotspots, setHotspots] = useState<RuntimeHotspot[]>([]);
   const [numPages, setNumPages] = useState(0);
   const [rendering, setRendering] = useState(false);
+  const [showLoader, setShowLoader] = useState(false);
   const [buildError, setBuildError] = useState<string | null>(null);
   const [viewerError, setViewerError] = useState<string | null>(null);
   const [openHotspotId, setOpenHotspotId] = useState<string | null>(null);
@@ -59,6 +68,19 @@ export function LivePdfPreview(props: Props) {
       clearTimeout(fallback);
     };
   }, []);
+
+  // Build-Trigger nur bei semantischer Änderung des Drafts (Timestamps egal).
+  const draftKey = useMemo(() => semanticKey(draft), [draft]);
+
+  // Loader-Pille erst nach LOADER_DELAY_MS einblenden (kein Aufblitzen).
+  useEffect(() => {
+    if (!rendering) {
+      setShowLoader(false);
+      return;
+    }
+    const t = setTimeout(() => setShowLoader(true), LOADER_DELAY_MS);
+    return () => clearTimeout(t);
+  }, [rendering]);
 
   // Debounced PDF-Build — alte URL bleibt bis neue geladen ist (kein Flicker).
   useEffect(() => {
@@ -90,7 +112,8 @@ export function LivePdfPreview(props: Props) {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [draft, kunde, firma, ansprechpartner, kind]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftKey, kunde, firma, ansprechpartner, kind]);
 
   // URL-Cleanup bei Unmount
   useEffect(() => {
