@@ -154,7 +154,7 @@ function footer(firma: Firmendaten) {
       stack: lines.filter(Boolean).map((l) => ({ text: l as string, fontSize: 7, color: COLOR_TEXT })),
     });
     return {
-      margin: [55, 0, 55, 25] as [number, number, number, number],
+      margin: [55, 0, 55, 12] as [number, number, number, number],
       stack: [
         { canvas: [{ type: "line", x1: 0, y1: 0, x2: 485, y2: 0, lineWidth: 0.5, lineColor: COLOR_LINE }] },
         {
