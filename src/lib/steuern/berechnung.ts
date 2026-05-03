@@ -2,7 +2,7 @@
 // Reines Frontend — bezieht Daten aus React-Query (Rechnungen, Dokumente).
 
 import type { Rechnung, Dokument } from "@/lib/api/types";
-import { summenRechnung } from "@/lib/mock/backend";
+import { summenRechnung } from "@/lib/belege/summen";
 import type {
   SteuerEinstellungen,
   SteuerPosten,

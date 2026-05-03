@@ -18,7 +18,7 @@ import { PdfViewButton } from "@/components/pdf/PdfViewButton";
 import { PdfPreviewCard } from "@/components/pdf/PdfPreviewCard";
 import { PrintButton } from "@/components/pdf/PrintButton";
 import { formatEUR, formatDate } from "@/lib/format";
-import { summenRechnung } from "@/lib/mock/backend";
+import { summenRechnung } from "@/lib/belege/summen";
 import { DauerauftragVerwaltungCard } from "@/components/dauerauftrag/DauerauftragVerwaltungCard";
 import { toast } from "sonner";
 

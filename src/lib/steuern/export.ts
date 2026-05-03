@@ -3,7 +3,7 @@
 
 import JSZip from "jszip";
 import type { Rechnung, Dokument, Kunde } from "@/lib/api/types";
-import { summenRechnung } from "@/lib/mock/backend";
+import { summenRechnung } from "@/lib/belege/summen";
 import { aggregiereUst, gewinnYtd } from "./berechnung";
 import type { UstRhythmus } from "./types";
 

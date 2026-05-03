@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { useAddZahlung } from "@/hooks/useApi";
 import { formatEUR, todayISO } from "@/lib/format";
 import type { Rechnung } from "@/lib/api/types";
-import { summenRechnung } from "@/lib/mock/backend";
+import { summenRechnung } from "@/lib/belege/summen";
 import { toast } from "sonner";
 
 interface Props {

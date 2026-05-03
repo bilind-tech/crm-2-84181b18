@@ -9,7 +9,7 @@ import type {
   MahnStufeConfig,
   Rechnung,
 } from "@/lib/api/types";
-import { summenRechnung } from "@/lib/mock/backend";
+import { summenRechnung } from "@/lib/belege/summen";
 
 export interface MahnZustand {
   /** True wenn Rechnung überhaupt mahnfähig (offen, nicht storniert/bezahlt). */

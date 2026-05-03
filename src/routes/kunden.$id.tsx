@@ -15,7 +15,7 @@ import { RechnungForm } from "@/components/forms/RechnungForm";
 import { KundeBearbeitenDialog } from "@/components/forms/KundeBearbeitenDialog";
 import { KundeLoeschenDialog } from "@/components/forms/KundeLoeschenDialog";
 import { formatEUR, formatDate } from "@/lib/format";
-import { summenRechnung } from "@/lib/mock/backend";
+import { summenRechnung } from "@/lib/belege/summen";
 import { FlowBar } from "@/components/flow/FlowBar";
 import { angebotFlow, rechnungFlow } from "@/lib/flow/flows";
 import { DokumentUploadPanel } from "@/components/dokumente/DokumentUploadPanel";

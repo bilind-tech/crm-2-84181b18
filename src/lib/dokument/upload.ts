@@ -1,14 +1,10 @@
 // Hilfsfunktionen für Datei-Upload.
-//
-// Live-Backend: Multipart-POST (Datei + Meta-JSON) gegen `/dokumente`
+// Multipart-POST (Datei + Meta-JSON) gegen `/dokumente`
 // bzw. `/upload-sessions/:token/dokumente`.
-// Mock-Modus (kein Backend konfiguriert): base64-Data-URL als Fallback,
-// damit die UI weiterhin offline funktioniert.
 
 import type { Dokument, DokumentTyp } from "@/lib/api/types";
-import { getBackendUrl, isBackendUrlExplicit } from "@/lib/api/backendUrl";
-import { piApi, PiApiError, postWithProgress } from "@/lib/api/piClient";
-import { mockBackend } from "@/lib/mock/backend";
+import { getBackendUrl } from "@/lib/api/backendUrl";
+import { piApi, postWithProgress } from "@/lib/api/piClient";
 
 export const MAX_BYTES = 20 * 1024 * 1024; // 20 MB
 export const ACCEPT_PATTERN = "image/*,application/pdf";
@@ -120,72 +116,30 @@ export async function fetchDokumentBlobUrl(d: Pick<Dokument, "url">): Promise<st
   return URL.createObjectURL(blob);
 }
 
-async function shouldFallbackToMock(err: unknown): Promise<boolean> {
-  if (err instanceof PiApiError && err.status === 0 && !isBackendUrlExplicit()) return true;
-  return false;
-}
-
-/** Lädt Datei live ans Backend. Im Mock-Modus: base64 in JSON-POST. */
+/** Lädt Datei ans Backend. */
 export async function uploadDokument(
   file: File,
   meta: DokumentMeta,
   opts: { onProgress?: (ratio: number) => void; signal?: AbortSignal } = {},
 ): Promise<Dokument> {
   const prep = await prepareUpload(file, meta);
-  // Live: Multipart mit Upload-Progress
-  try {
-    return await postWithProgress<Dokument>(
-      "/dokumente",
-      buildFormData(prep.blob, prep.filename, prep.meta),
-      opts.onProgress,
-      opts.signal,
-    );
-  } catch (err) {
-    if (!(await shouldFallbackToMock(err))) throw err;
-  }
-  // Mock: base64
-  opts.onProgress?.(1);
-  const dataUrl = await fileToDataUrl(prep.blob);
-  return mockBackend<Dokument>("POST", "/dokumente", {
-    ...prep.meta,
-    dateiname: prep.filename,
-    mimeType: prep.mimeType,
-    groesseBytes: prep.blob.size,
-    url: dataUrl,
-  });
+  return postWithProgress<Dokument>(
+    "/dokumente",
+    buildFormData(prep.blob, prep.filename, prep.meta),
+    opts.onProgress,
+    opts.signal,
+  );
 }
 
-/** Lädt Datei live in eine Upload-Session. Mock-Fallback wie oben. */
+/** Lädt Datei in eine Upload-Session. */
 export async function uploadDokumentToSession(
   token: string,
   file: File,
   meta: DokumentMeta = {},
 ): Promise<Dokument> {
   const prep = await prepareUpload(file, meta);
-  try {
-    return await piApi.post<Dokument>(
-      `/upload-sessions/${token}/dokumente`,
-      buildFormData(prep.blob, prep.filename, prep.meta),
-    );
-  } catch (err) {
-    if (!(await shouldFallbackToMock(err))) throw err;
-  }
-  const dataUrl = await fileToDataUrl(prep.blob);
-  // Legacy-Mock-Endpoint nimmt Liste in JSON entgegen
-  const res = await mockBackend<{ dateien: Dokument[] }>(
-    "POST",
-    `/upload-sessions/${token}/dateien`,
-    {
-      dateien: [
-        {
-          ...prep.meta,
-          dateiname: prep.filename,
-          mimeType: prep.mimeType,
-          groesseBytes: prep.blob.size,
-          url: dataUrl,
-        },
-      ],
-    },
+  return piApi.post<Dokument>(
+    `/upload-sessions/${token}/dokumente`,
+    buildFormData(prep.blob, prep.filename, prep.meta),
   );
-  return res.dateien[0];
 }

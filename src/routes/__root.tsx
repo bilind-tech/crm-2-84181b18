@@ -1,7 +1,7 @@
 import { Outlet, createRootRoute, HeadContent, Scripts, useRouterState } from "@tanstack/react-router";
 import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
-import { toast } from "sonner";
+
 import appCss from "../styles.css?url";
 import { ThemeProvider } from "@/lib/theme";
 import { AuthProvider, useAuth } from "@/lib/auth";
@@ -10,12 +10,9 @@ import { AppSidebar } from "@/components/layout/AppSidebar";
 import { AppHeader } from "@/components/layout/AppHeader";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { Toaster } from "@/components/ui/sonner";
-import { startScheduler } from "@/lib/mock/scheduler";
 import { UeberfaelligPopup } from "@/components/notifications/UeberfaelligPopup";
-import { BackendStatusIndicator } from "@/components/layout/BackendStatusIndicator";
 import { GlobalDropZone } from "@/components/dokumente/GlobalDropZone";
 import { useLiveEvents } from "@/hooks/useLiveEvents";
-import { isBackendUrlExplicit } from "@/lib/api/backendUrl";
 
 export const Route = createRootRoute({
   head: () => ({
@@ -89,27 +86,24 @@ function Shell() {
   // Standalone-Routen ohne Sidebar/Header/Lock (z.B. Handy-Upload-Brücke)
   const isStandalone = pathname.startsWith("/m/");
 
-  // SSE nur, wenn ein echtes Backend hinterlegt ist und der User entsperrt hat.
-  useLiveEvents(unlocked && !isStandalone && isBackendUrlExplicit());
+  // SSE nur, wenn der User entsperrt hat.
+  useLiveEvents(unlocked && !isStandalone);
 
   useEffect(() => {
     if (!unlocked) return;
-    startScheduler({
-      onResult: (r) => {
-        const c = qcRef.current;
-        if (r.erzeugteLaeufe > 0) {
-          toast.success(`${r.erzeugteLaeufe} neue Rechnung(en) aus Daueraufträgen erzeugt`);
-          c.invalidateQueries({ queryKey: ["dauerauftraege"] });
-          c.invalidateQueries({ queryKey: ["dauerauftrag-laeufe"] });
-          c.invalidateQueries({ queryKey: ["rechnungen"] });
-          c.invalidateQueries({ queryKey: ["aktivitaeten"] });
-        }
-        if ((r.neueDokumentBenachrichtigungen ?? 0) > 0) {
-          c.invalidateQueries({ queryKey: ["dokumente"] });
-        }
-        c.invalidateQueries({ queryKey: ["benachrichtigungen"] });
-      },
-    });
+    // Einmal-Cleanup alter Mock-/Demo-LocalStorage-Reste.
+    try {
+      const drop: string[] = [];
+      for (let i = 0; i < window.localStorage.length; i++) {
+        const k = window.localStorage.key(i);
+        if (!k) continue;
+        if (k.startsWith("mcc_mock")) drop.push(k);
+      }
+      drop.forEach((k) => window.localStorage.removeItem(k));
+    } catch {
+      /* ignore */
+    }
+    void qcRef.current;
   }, [unlocked]);
 
   if (isStandalone) {
@@ -134,7 +128,7 @@ function Shell() {
         </div>
       </div>
       <UeberfaelligPopup />
-      <BackendStatusIndicator />
+      
       <GlobalDropZone />
     </SidebarProvider>
   );

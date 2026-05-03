@@ -11,7 +11,7 @@ import type {
   Rechnung,
 } from "@/lib/api/types";
 import { formatDate, formatEUR } from "@/lib/format";
-import { summenRechnung } from "@/lib/mock/backend";
+import { summenRechnung } from "@/lib/belege/summen";
 import { berechneNeueFrist, bestimmeMahnZustand, stufenLabel } from "@/lib/mahnung/regeln";
 
 export interface PlaceholderContext {

@@ -2,7 +2,7 @@
 // Liefert für die FlowBar-Komponente die Schritte + den aktuellen Index.
 
 import type { Angebot, Rechnung } from "@/lib/api/types";
-import { summenRechnung } from "@/lib/mock/backend";
+import { summenRechnung } from "@/lib/belege/summen";
 import { formatDate, formatEUR } from "@/lib/format";
 
 export type FlowTone = "neutral" | "active" | "success" | "danger" | "muted";

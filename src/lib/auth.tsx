@@ -8,7 +8,6 @@ import {
   useRef,
   useState,
 } from "react";
-import { api } from "@/lib/api/client";
 import { piApi, PiApiError } from "@/lib/api/piClient";
 import { useBackendStatus } from "@/hooks/useBackendStatus";
 import { isBackendUrlExplicit } from "@/lib/api/backendUrl";
@@ -18,7 +17,6 @@ export type AuthMode =
   | "needs-setup"
   | "logged-out"
   | "logged-in"
-  | "mock-lock"
   | "backend-offline";
 
 interface PiUser {
@@ -40,7 +38,6 @@ interface AuthState {
   logout: () => Promise<void>;
   changePassword: (alt: string, neu: string) => Promise<void>;
   refreshMe: () => Promise<void>;
-  unlock: (passwort: string) => Promise<void>;
   lock: () => Promise<void>;
   setAutoLockMinutes: (m: number) => void;
   autoLockMinutes: number;
@@ -62,12 +59,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const lastActivity = useRef<number>(Date.now());
 
   const refreshMe = useCallback(async () => {
-    // Im Demo/Mock-Modus (keine Pi-URL hinterlegt) gar nicht erst gegen
-    // localhost:8787 fetchen — das blockiert sonst beim Browser-Default-Timeout
-    // und die ganze App hängt minutenlang bei „Lade …".
     if (!isBackendUrlExplicit()) {
       setUser(null);
-      setMode("mock-lock");
+      setMode("backend-offline");
       return;
     }
     try {
@@ -144,31 +138,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await piApi.post("/auth/passwort-aendern", { alt, neu });
   }, []);
 
-  const unlock = useCallback(async (passwort: string) => {
-    setLoading(true);
-    try {
-      await api.post<void>("/auth/unlock", { passwort });
-      setMode("logged-in");
-      setUser({ id: "mock", username: "Demo" });
-      lastActivity.current = Date.now();
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
   const lock = useCallback(async () => {
-    if (mode === "logged-in" && user?.id !== "mock") {
-      await logout();
-    } else {
-      try {
-        await api.post<void>("/auth/lock");
-      } catch {
-        /* ignore */
-      }
-      setMode(isBackendUrlExplicit() ? "logged-out" : "mock-lock");
-      setUser(null);
-    }
-  }, [mode, user, logout]);
+    await logout();
+  }, [logout]);
 
   useEffect(() => {
     if (mode !== "logged-in") return;
@@ -202,12 +174,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       logout,
       changePassword,
       refreshMe,
-      unlock,
       lock,
       autoLockMinutes,
       setAutoLockMinutes,
     }),
-    [mode, user, loading, setup, login, logout, changePassword, refreshMe, unlock, lock, autoLockMinutes],
+    [mode, user, loading, setup, login, logout, changePassword, refreshMe, lock, autoLockMinutes],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

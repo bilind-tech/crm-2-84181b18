@@ -477,64 +477,6 @@ function BackendOfflineScreen() {
   );
 }
 
-function MockLockForm() {
-  const { unlock, loading } = useAuth();
-  const [passwort, setPasswort] = useState("");
-  const [fehler, setFehler] = useState<string | null>(null);
-
-  async function submit(e: FormEvent) {
-    e.preventDefault();
-    setFehler(null);
-    try {
-      await unlock(passwort);
-    } catch (err) {
-      setFehler(err instanceof Error ? err.message : "Anmeldung fehlgeschlagen");
-    }
-  }
-
-  return (
-    <Wrapper sub="Demo-Modus — kein Pi-Backend hinterlegt.">
-      <div className="mb-4 rounded-md border border-border bg-muted/40 p-3 text-xs">
-        <div className="mb-1 flex items-center gap-1.5 font-semibold text-foreground">
-          <Server className="h-3.5 w-3.5" />
-          Demo
-        </div>
-        <p className="text-muted-foreground">
-          Hinterlege in Einstellungen → Backend-Verbindung deine Pi-URL, um echte Daten zu nutzen.
-        </p>
-      </div>
-      <form onSubmit={submit} className="space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="pw">Passwort (Demo)</Label>
-          <PasswordInput id="pw" value={passwort} onChange={setPasswort} autoComplete="current-password" autoFocus />
-        </div>
-        {fehler && (
-          <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{fehler}</p>
-        )}
-        <Button type="submit" className="w-full" disabled={loading}>
-          {loading ? "Entsperren …" : "Entsperren"}
-        </Button>
-        <Button
-          type="button"
-          variant="secondary"
-          className="w-full"
-          disabled={loading}
-          onClick={async () => {
-            setFehler(null);
-            try {
-              await unlock("040506");
-            } catch (err) {
-              setFehler(err instanceof Error ? err.message : "Anmeldung fehlgeschlagen");
-            }
-          }}
-        >
-          Schnell-Login (DEV)
-        </Button>
-      </form>
-    </Wrapper>
-  );
-}
-
 export function LockScreen() {
   const { mode } = useAuth();
   const [zeigeRecovery, setZeigeRecovery] = useState(false);
@@ -550,6 +492,5 @@ export function LockScreen() {
     if (zeigeRecovery) return <RecoveryForm onZurueck={() => setZeigeRecovery(false)} />;
     return <LoginForm onRecovery={() => setZeigeRecovery(true)} />;
   }
-  if (mode === "backend-offline") return <BackendOfflineScreen />;
-  return <MockLockForm />;
+  return <BackendOfflineScreen />;
 }

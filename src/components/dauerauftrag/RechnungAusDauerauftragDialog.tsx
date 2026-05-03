@@ -16,7 +16,7 @@ import {
   useSofortLaufBulk,
 } from "@/hooks/useDauerauftraege";
 import { useKunden } from "@/hooks/useApi";
-import { summenRechnung } from "@/lib/mock/backend";
+import { summenRechnung } from "@/lib/belege/summen";
 import { formatEUR } from "@/lib/format";
 
 type Props = {

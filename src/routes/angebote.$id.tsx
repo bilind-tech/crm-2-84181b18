@@ -21,7 +21,7 @@ import { angebotFlow } from "@/lib/flow/flows";
 import { EmailVersandDialog } from "@/components/email/EmailVersandDialog";
 import { EmailVersandHistorie } from "@/components/email/EmailVersandHistorie";
 import { formatEUR, formatDate } from "@/lib/format";
-import { summenRechnung } from "@/lib/mock/backend";
+import { summenRechnung } from "@/lib/belege/summen";
 import { DauerauftragVerwaltungCard } from "@/components/dauerauftrag/DauerauftragVerwaltungCard";
 import { toast } from "sonner";
 import { useNavigate, Link, Outlet, useMatches } from "@tanstack/react-router";

@@ -10,7 +10,7 @@ import {
   setBackendUrl,
 } from "@/lib/api/backendUrl";
 import { useBackendStatus } from "@/hooks/useBackendStatus";
-import { MockDataResetCard } from "@/components/einstellungen/MockDataResetCard";
+
 import { cn } from "@/lib/utils";
 
 export function BackendVerbindungTab() {
@@ -154,7 +154,7 @@ export function BackendVerbindungTab() {
         </p>
       </div>
 
-      <MockDataResetCard />
+      
     </div>
   );
 }

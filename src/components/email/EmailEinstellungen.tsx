@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { LoadingPlaceholder } from "@/components/layout/LoadingPlaceholder";
 import { toast } from "sonner";
 import { Plus, Trash2, Pencil, Star, Check, AlertCircle, Loader2, Eye, Code2, Zap, Send, ShieldCheck, ShieldAlert, Info } from "lucide-react";
-import { isBackendUrlExplicit } from "@/lib/api/backendUrl";
+
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -514,7 +514,7 @@ export function SmtpTab() {
   // Schnelltest entfernt — Verbindung-prüfen (verify) ist die robuste Variante.
   const verify = useVerifySmtp();
   const sendTest = useSendTestMail();
-  const demoModus = !isBackendUrlExplicit();
+  
   const [form, setForm] = useState({
     server: smtp?.server ?? "",
     port: smtp?.port ?? 587,
@@ -620,21 +620,6 @@ export function SmtpTab() {
 
   return (
     <div className="space-y-4">
-      {/* Demo-Modus-Hinweis (nur im Lovable-Preview ohne Pi-Backend-URL) */}
-      {demoModus && (
-        <div className="flex items-start gap-2 rounded-xl border border-primary/40 bg-primary/5 p-4 text-sm">
-          <Info className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-          <div className="space-y-0.5">
-            <p className="font-medium text-foreground">Demo-Modus — kein echter SMTP-Test, kein realer Versand</p>
-            <p className="text-muted-foreground">
-              Du arbeitest gerade ohne Pi-Backend. Eingaben werden lokal im Browser gespeichert,
-              aber „Verbindung prüfen" und „Test-Mail" können hier nicht real ausgeführt werden.
-              Sobald der Pi läuft und die Backend-URL eingetragen ist, funktioniert alles sofort.
-            </p>
-          </div>
-        </div>
-      )}
-
       {/* Manual-Only Hinweis */}
       <div className="flex items-start gap-2 rounded-xl border border-primary/30 bg-primary/5 p-4 text-sm">
         <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-primary" />

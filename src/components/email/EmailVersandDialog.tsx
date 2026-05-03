@@ -26,7 +26,7 @@ import {
   Settings,
 } from "lucide-react";
 import { toast } from "sonner";
-import { isBackendUrlExplicit } from "@/lib/api/backendUrl";
+
 
 import {
   Dialog,
@@ -113,7 +113,7 @@ export function EmailVersandDialog({
   const { data: mahnEinstellungen } = useMahnEinstellungen();
   const { data: smtp } = useSmtp();
   const send = useSendEmail();
-  const demoModus = !isBackendUrlExplicit();
+  
 
   // Harte Voraussetzung: ohne SMTP kein Versand. UI muss das klar zeigen
   // und den Senden-Button sperren — sonst entsteht ein falsches Erfolgs-Signal.
@@ -233,7 +233,7 @@ export function EmailVersandDialog({
   const istValide = an.trim().length > 0 && betreff.trim().length > 0;
 
   const handleSend = () => {
-    if (!smtpKonfiguriert && !demoModus) {
+    if (!smtpKonfiguriert) {
       toast.error("SMTP nicht konfiguriert", {
         description:
           "Bitte unter Einstellungen → E-Mail Server, Benutzer und Passwort hinterlegen.",
@@ -379,25 +379,8 @@ export function EmailVersandDialog({
           </div>
         </div>
 
-        {/* Demo-Modus-Banner — ehrlicher Hinweis dass kein Versand stattfindet */}
-        {demoModus && (
-          <div className="mx-6 mt-4 flex items-start gap-3 rounded-xl border border-primary/40 bg-primary/5 p-3.5">
-            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-            <div className="min-w-0 flex-1 space-y-1">
-              <p className="text-sm font-semibold text-foreground">
-                Demo-Modus — kein realer Versand
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Du arbeitest gerade ohne Pi-Backend. Der Versand wird simuliert,
-                aber es geht keine echte Mail raus. Sobald der Pi läuft und die
-                Backend-URL hinterlegt ist, funktioniert der Versand sofort.
-              </p>
-            </div>
-          </div>
-        )}
-
         {/* SMTP-Warn-Banner — Versand ist ohne Konfiguration unmöglich */}
-        {!smtpKonfiguriert && !demoModus && (
+        {!smtpKonfiguriert && (
           <div className="mx-6 mt-4 flex items-start gap-3 rounded-xl border border-destructive/40 bg-destructive/10 p-3.5">
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
             <div className="min-w-0 flex-1 space-y-1">
@@ -665,7 +648,7 @@ export function EmailVersandDialog({
             onClick={handleSend}
             disabled={
               !istValide ||
-              (!smtpKonfiguriert && !demoModus) ||
+              !smtpKonfiguriert ||
               send.isPending ||
               phase !== "idle" ||
               (pdfAnhangAktiv && pdfStatus === "loading")
