@@ -719,6 +719,9 @@ export interface UpdateLauf {
   steps: UpdateStepStatus[];
   /** Bei Fehler: Schritt der fehlgeschlagen ist. */
   fehlgeschlagenBei?: UpdateStepId;
+  /** ID des automatisch angelegten Sicherheits-Backups (vor dem Update). */
+  safetyBackupId?: string | null;
+  quelle?: "upload" | "rollback";
 }
 
 export interface InstallierteVersion {

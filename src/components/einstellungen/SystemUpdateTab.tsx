@@ -199,7 +199,20 @@ export function SystemUpdateTab() {
         title="Update einspielen"
         description="Lade das neue Update-Paket (.zip) hoch — Daten bleiben unberührt."
       >
-        {!pendingPackage ? (
+        {aktuellerLauf && aktuellerLauf.status === "laeuft" ? (
+          <div className="flex items-start gap-3 rounded-xl border border-primary/30 bg-primary/5 p-4 text-sm">
+            <Loader2 className="mt-0.5 h-4 w-4 animate-spin text-primary" />
+            <div className="min-w-0 flex-1">
+              <p className="font-medium">Es läuft bereits ein Update.</p>
+              <p className="text-xs text-muted-foreground">
+                Bitte warten, bis der Vorgang abgeschlossen ist. Upload und Rollback sind so lange gesperrt.
+              </p>
+            </div>
+            <Button size="sm" variant="outline" onClick={() => setActiveLaufId(aktuellerLauf.id)}>
+              Fortschritt
+            </Button>
+          </div>
+        ) : !pendingPackage ? (
           <UpdateUploadDropzone
             onFile={handleFile}
             disabled={validate.isPending || install.isPending}
@@ -489,9 +502,23 @@ function UpdateProgressDialog({
         )}
 
         {isFailed && (
-          <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-xs text-destructive">
-            {lauf.steps.find((s) => s.status === "fehler")?.fehlerGrund ??
-              "Unbekannter Fehler — automatischer Rollback wurde gestartet."}
+          <div className="space-y-2">
+            <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-xs text-destructive">
+              {lauf.steps.find((s) => s.status === "fehler")?.fehlerGrund ??
+                "Unbekannter Fehler — automatischer Rollback wurde gestartet."}
+            </div>
+            {lauf.safetyBackupId && (
+              <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs">
+                <p className="font-medium text-amber-700 dark:text-amber-400">
+                  Sicherheits-Backup ist vorhanden
+                </p>
+                <p className="mt-0.5 text-muted-foreground">
+                  Vor dem Update wurde automatisch ein Backup angelegt
+                  (ID <span className="font-mono">{lauf.safetyBackupId.slice(0, 8)}</span>).
+                  Es kann jederzeit unter <span className="font-medium">Backup &amp; Wiederherstellung</span> eingespielt werden.
+                </p>
+              </div>
+            )}
           </div>
         )}
 

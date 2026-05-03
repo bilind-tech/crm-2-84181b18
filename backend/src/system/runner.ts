@@ -48,6 +48,30 @@ import {
   setStepStatus,
 } from "./repo.js";
 import type { UpdateStepId } from "./types.js";
+import { assertNotInDataDir } from "./data-guard.js";
+
+// --- Daten-Schutz: jede FS-Mutation läuft durch diese Wrapper ---
+function safeRename(src: string, dst: string): void {
+  assertNotInDataDir(src, "rename:src");
+  assertNotInDataDir(dst, "rename:dst");
+  renameSync(src, dst);
+}
+function safeUnlink(p: string): void {
+  assertNotInDataDir(p, "unlink");
+  unlinkSync(p);
+}
+function safeRm(p: string): void {
+  assertNotInDataDir(p, "rm");
+  rmSync(p, { recursive: true, force: true });
+}
+function safeMkdir(p: string): void {
+  assertNotInDataDir(p, "mkdir");
+  mkdirSync(p, { recursive: true });
+}
+function safeSymlink(target: string, link: string): void {
+  assertNotInDataDir(link, "symlink");
+  symlinkSync(target, link);
+}
 
 const execFileP = promisify(execFile);
 
@@ -172,22 +196,29 @@ async function runInstall(laufId: string, opts: InstallOptions): Promise<void> {
     // 3. QUARANTÄNE — Staging in versions/<stamp>/ verschieben + Symlink-Swap
     await stepRun(laufId, "quarantaene", async () => {
       ensureAppDirs();
-      mkdirSync(versionsDir(), { recursive: true });
+      assertNotInDataDir(targetVersionDir, "quarantaene:targetVersionDir");
+      safeMkdir(versionsDir());
       // Move staging → versions/<stamp>
-      renameSync(stagedRoot, targetVersionDir);
+      safeRename(stagedRoot, targetVersionDir);
 
       // previous = aktuelles current-Ziel
       const old = readCurrentTarget();
       // current.tmp -> versions/<stamp>
       const tmpLink = currentLink() + ".tmp";
-      try { unlinkSync(tmpLink); } catch { /* ignore */ }
-      symlinkSync(targetVersionDir, tmpLink);
+      try { safeUnlink(tmpLink); } catch { /* ignore */ }
+      safeSymlink(targetVersionDir, tmpLink);
       // mv -T current.tmp current
-      renameSync(tmpLink, currentLink());
-      // previous-Pointer aktualisieren
-      try { unlinkSync(previousLink()); } catch { /* ignore */ }
-      if (old) symlinkSync(old, previousLink());
+      safeRename(tmpLink, currentLink());
+      // previous-Pointer deterministisch setzen (auch entfernen, wenn kein old)
+      try { safeUnlink(previousLink()); } catch { /* ignore */ }
+      if (old) safeSymlink(old, previousLink());
       swapped = true;
+
+      // Verifikation: current zeigt jetzt wirklich auf den neuen Ordner
+      const verify = readCurrentTarget();
+      if (verify !== targetVersionDir) {
+        throw new Error(`Symlink-Swap nicht verifiziert (current=${verify})`);
+      }
       return `Symlink → ${targetVersionDir}`;
     });
 
@@ -321,18 +352,18 @@ async function runRollbackToPrevious(laufId: string, userId: string | null): Pro
   emit("system:update:phase", {
     laufId, stepId: "rollback", status: "laeuft", label: "Auto-Rollback",
   });
-  // Defekte aktuelle in broken-* sichern
+  // Defekte aktuelle in broken-* sichern (nicht löschen!)
   const cur = readCurrentTarget();
-  if (cur) {
+  if (cur && cur !== prev) {
     const broken = brokenDir(nowStamp());
-    try { renameSync(cur, broken); } catch { /* ignore */ }
+    try { safeRename(cur, broken); } catch { /* ignore */ }
   }
   // current → previous
   const tmpLink = currentLink() + ".tmp";
-  try { unlinkSync(tmpLink); } catch { /* ignore */ }
-  symlinkSync(prev, tmpLink);
-  try { unlinkSync(currentLink()); } catch { /* ignore */ }
-  renameSync(tmpLink, currentLink());
+  try { safeUnlink(tmpLink); } catch { /* ignore */ }
+  safeSymlink(prev, tmpLink);
+  try { safeUnlink(currentLink()); } catch { /* ignore */ }
+  safeRename(tmpLink, currentLink());
 
   setStepStatus(laufId, "rollback", "ok", "Symlink wieder auf vorherige Version");
   setLaufStatus(laufId, "rollback", { aktuellerStep: "rollback" });
@@ -389,11 +420,17 @@ export async function manualRollback(
         });
 
         await stepRun(laufId, "rollback", async () => {
+          // Defekte aktive Version (sofern abweichend) in broken-* sichern
+          const cur = readCurrentTarget();
+          if (cur && cur !== target) {
+            const broken = brokenDir(nowStamp());
+            try { safeRename(cur, broken); } catch { /* ignore */ }
+          }
           const tmpLink = currentLink() + ".tmp";
-          try { unlinkSync(tmpLink); } catch { /* ignore */ }
-          symlinkSync(target, tmpLink);
-          try { unlinkSync(currentLink()); } catch { /* ignore */ }
-          renameSync(tmpLink, currentLink());
+          try { safeUnlink(tmpLink); } catch { /* ignore */ }
+          safeSymlink(target, tmpLink);
+          try { safeUnlink(currentLink()); } catch { /* ignore */ }
+          safeRename(tmpLink, currentLink());
           return `Symlink → ${target}`;
         });
 
@@ -462,20 +499,53 @@ function readPreviousTarget(): string | null {
 
 function cleanupOldVersions(): void {
   try {
-    const dirs = readdirSync(versionsDir());
     const cur = readCurrentTarget();
     const prev = readPreviousTarget();
-    for (const d of dirs) {
-      const full = path.join(versionsDir(), d);
-      if (full === cur || full === prev) continue;
-      // broken-* immer löschen wenn älter 7 Tage
+    const dirs = readdirSync(versionsDir())
+      .map((d) => ({ name: d, full: path.join(versionsDir(), d) }))
+      .filter((x) => x.full !== cur && x.full !== prev);
+
+    // Eine zusätzliche, jüngste "Notnagel"-Version (kein broken-) behalten
+    const notnagel = dirs
+      .filter((x) => !x.name.startsWith("broken-"))
+      .sort((a, b) => b.name.localeCompare(a.name))[0]?.full;
+
+    for (const x of dirs) {
+      if (x.full === notnagel) continue;
       try {
-        const age = Date.now() - statSync(full).mtimeMs;
-        if (d.startsWith("broken-") && age < 7 * 86_400_000) continue;
-        rmSync(full, { recursive: true, force: true });
+        const age = Date.now() - statSync(x.full).mtimeMs;
+        if (x.name.startsWith("broken-") && age < 7 * 86_400_000) continue;
+        safeRm(x.full);
       } catch { /* ignore */ }
     }
   } catch { /* ignore */ }
+}
+
+/** Staging-Reste älter als maxAgeMs aufräumen. */
+export function cleanupStaleStaging(maxAgeMs = 60 * 60_000): number {
+  let removed = 0;
+  try {
+    const root = path.join(appRoot(), "staging");
+    if (!existsSync(root)) return 0;
+    for (const d of readdirSync(root)) {
+      if (d === ".install.lock") continue;
+      const full = path.join(root, d);
+      try {
+        const age = Date.now() - statSync(full).mtimeMs;
+        if (age > maxAgeMs) {
+          safeRm(full);
+          removed++;
+        }
+      } catch { /* ignore */ }
+    }
+  } catch { /* ignore */ }
+  return removed;
+}
+
+/** Stamp (versions/<stamp>) der aktuellen Vorgänger-Version oder null. */
+export function getPreviousVersionStamp(): string | null {
+  const t = readPreviousTarget();
+  return t ? path.basename(t) : null;
 }
 
 async function healthcheckLoop(): Promise<boolean> {

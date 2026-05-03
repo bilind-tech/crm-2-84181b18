@@ -16,12 +16,36 @@ const MAX_FILE_BYTES = 50 * 1024 * 1024;       // 50 MB pro Datei
 const MAX_FILES = 2_000;
 const MAX_RATIO = 20;                          // entpackt/gepackt
 
-// Verbotene Pfade im Paket (würden Daten überschreiben).
-const BLACKLIST = [".env", "data/", "keys/", "backups/", ".git/", "node_modules/"];
+// Verbotene Pfade im Paket (würden Daten überschreiben oder Build aufblähen).
+const BLACKLIST = [
+  ".env", "data/", "keys/", "backups/", ".git/", "node_modules/",
+  "var/", "opt/", "etc/", ".ssh/",
+];
+
+// Nur diese Top-Level-Einträge dürfen im Paket vorkommen. Alles andere → Fehler.
+// (Backslash-Pfade werden in extractZipSafe vorher ausgeschlossen.)
+const TOP_LEVEL_ALLOWLIST = new Set([
+  "manifest.json",
+  "package.json",
+  "package-lock.json",
+  "dist",
+  "migrations",
+  "public",
+  "README.md",
+  "CHANGELOG.md",
+  "LICENSE",
+]);
+
+function topLevel(rel: string): string {
+  const i = rel.indexOf("/");
+  return i < 0 ? rel : rel.slice(0, i);
+}
 
 function isPathSafe(rel: string): boolean {
-  if (rel.startsWith("/") || rel.includes("..")) return false;
-  return !BLACKLIST.some((b) => rel === b || rel.startsWith(b));
+  if (rel.startsWith("/") || rel.includes("..") || rel.includes("\\")) return false;
+  if (BLACKLIST.some((b) => rel === b || rel.startsWith(b))) return false;
+  if (!TOP_LEVEL_ALLOWLIST.has(topLevel(rel))) return false;
+  return true;
 }
 
 /**

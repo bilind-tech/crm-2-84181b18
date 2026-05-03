@@ -125,6 +125,7 @@ export function useLiveEvents(enabled: boolean): void {
           const d = data as { laufId?: string; status?: string; stepId?: string };
           qc.invalidateQueries({ queryKey: ["system", "update", "historie"] });
           qc.invalidateQueries({ queryKey: ["system", "update", "lauf"] });
+          qc.invalidateQueries({ queryKey: ["system", "update", "lauf", "aktuell"] });
           if (d?.laufId) qc.invalidateQueries({ queryKey: ["system", "update", "lauf", d.laufId] });
           if (type === "system:update:lauf" && d?.status === "erfolg") {
             toast.success("System-Update installiert");

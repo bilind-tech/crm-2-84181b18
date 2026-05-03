@@ -30,15 +30,14 @@ import {
   listHistorie,
   listInstalledVersions,
 } from "../system/repo.js";
-import { isUpdateRunning, manualRollback, startInstall } from "../system/runner.js";
+import { isUpdateRunning, manualRollback, startInstall, getPreviousVersionStamp } from "../system/runner.js";
+import { computeMigrationsDiff } from "../system/migrations-diff.js";
 import type { UpdateLauf } from "../system/types.js";
 
 // In-memory Rollback-Lockout: 3 Fehlversuche → 15 min sperren.
 const rollbackFails = new Map<string, { count: number; until: number }>();
 
 function adaptLauf(l: UpdateLauf): unknown {
-  // Frontend erwartet (src/lib/api/types.ts UpdateLauf):
-  // { id, von, zu, startetAm, beendetAm, status: "laeuft"|"erfolg"|"fehler"|"rollback", steps[] }
   return {
     id: l.id,
     von: l.vorherigeVersion,
@@ -47,6 +46,8 @@ function adaptLauf(l: UpdateLauf): unknown {
     beendetAm: l.beendetAm,
     status: l.status,
     fehlgeschlagenBei: l.steps.find((s) => s.status === "fehler")?.stepId,
+    safetyBackupId: l.safetyBackupId,
+    quelle: l.quelle,
     steps: l.steps.map((s) => ({
       id: s.stepId,
       label: s.label,
@@ -138,6 +139,28 @@ export async function systemRoutes(app: FastifyInstance): Promise<void> {
       const sha = await sha256File(zipPath);
       const sizeBytes = file.file.bytesRead;
       const gueltigBis = new Date(Date.now() + 30 * 60_000).toISOString();
+
+      // Echter Migrations-Diff aus dem entpackten Paket
+      let diff;
+      try {
+        diff = computeMigrationsDiff(extractDir);
+      } catch {
+        diff = { pending: [], downgrade: false, liveVersion: 0, paketVersion: 0 };
+      }
+      if (diff.downgrade) {
+        rmSync(stage, { recursive: true, force: true });
+        return reply.status(400).send({
+          uploadId: null, fileName: file.filename, sizeBytes: 0, version: manifest.appVersion,
+          pendingMigrations: [], warnings: [], valide: false,
+          fehlerGrund: `Schema-Downgrade verweigert: Paket bringt Migrations bis ${diff.paketVersion}, Live-DB ist bei ${diff.liveVersion}.`,
+        });
+      }
+      const warnings: string[] = [];
+      if (manifest.hinweise) warnings.push(manifest.hinweise);
+      if (diff.pending.length > 5) {
+        warnings.push(`${diff.pending.length} ausstehende Migrationen — bitte vorher Backup prüfen.`);
+      }
+
       insertPaket({
         id: uploadId,
         dateiname: file.filename,
@@ -153,7 +176,7 @@ export async function systemRoutes(app: FastifyInstance): Promise<void> {
         userId: req.user!.id,
         ip: req.ip,
         action: "system.update.validiert",
-        detail: { uploadId, version: manifest.appVersion, sizeBytes },
+        detail: { uploadId, version: manifest.appVersion, sizeBytes, pendingMigrations: diff.pending.length },
       });
 
       return {
@@ -161,8 +184,8 @@ export async function systemRoutes(app: FastifyInstance): Promise<void> {
         fileName: file.filename,
         sizeBytes,
         version: manifest.appVersion,
-        pendingMigrations: [],   // TODO später: aus extractDir Migrationen lesen
-        warnings: manifest.hinweise ? [manifest.hinweise] : [],
+        pendingMigrations: diff.pending,
+        warnings,
         valide: true,
       };
     } catch (e) {
@@ -235,6 +258,17 @@ export async function systemRoutes(app: FastifyInstance): Promise<void> {
 
     if (isUpdateRunning()) {
       return reply.status(409).send({ error: "Es läuft bereits ein Update — bitte warten" });
+    }
+
+    // Rollback NUR auf den direkten Vorgänger erlaubt — kein Mehrfach-Sprung.
+    const prev = getPreviousVersionStamp();
+    if (!prev) {
+      return reply.status(400).send({ error: "Keine vorherige Version verfügbar." });
+    }
+    if (req.params.version !== prev) {
+      return reply.status(400).send({
+        error: `Rollback nur auf den direkten Vorgänger erlaubt (${prev}).`,
+      });
     }
 
     try {

@@ -31,8 +31,8 @@ import { startDriveWorker } from "./drive/upload-worker.js";
 import { wireDriveAutoEnqueue } from "./drive/auto-enqueue.js";
 import { wireDokumenteDriveAutoEnqueue } from "./dokumente/drive-wireup.js";
 import { purgeExpiredSessions as purgeExpiredUploadSessions } from "./dokumente/repo.js";
-import { reapStaleLock } from "./system/runner.js";
-import { purgeExpiredPakete } from "./system/repo.js";
+import { reapStaleLock, cleanupStaleStaging } from "./system/runner.js";
+import { purgeExpiredPakete, markStaleLaeufeAlsFehler } from "./system/repo.js";
 import { assertCodeAndDataSeparated } from "./system/data-guard.js";
 import { cleanupOrphanRestoreTmp } from "./backup/cleanup.js";
 import { startBackupReconcileCron } from "./backup/cleanup.js";
@@ -219,6 +219,13 @@ async function main(): Promise<void> {
   // Stale Lock-File aus abgebrochenem Update aufräumen
   const staleLock = reapStaleLock();
   if (staleLock) app.log.warn("Stale System-Update Lock aufgeräumt");
+  // Hängende Update-Läufe (status='laeuft') als Fehler markieren — Backend
+  // ist neu gestartet, also kann kein Update mehr aktiv sein.
+  const reapedLaeufe = markStaleLaeufeAlsFehler();
+  if (reapedLaeufe > 0) app.log.warn({ reapedLaeufe }, "Hängende Update-Läufe als 'fehler' markiert");
+  // Staging-Reste älter 1 h aufräumen
+  const stagingRm = cleanupStaleStaging();
+  if (stagingRm > 0) app.log.info({ stagingRm }, "Update-Staging Reste entfernt");
 
   // Backup-Scheduler starten (täglicher Snapshot)
   startScheduler();
@@ -260,8 +267,9 @@ async function main(): Promise<void> {
       const ben = purgeOldWegwischte();
       const pak = purgeExpiredPakete();
       const ups = purgeExpiredUploadSessions();
-      if (sess + audit + lock + akt + ben + pak + ups > 0) {
-        app.log.info({ sess, audit, lock, akt, ben, pak, ups }, "background sweep");
+      const stg = cleanupStaleStaging();
+      if (sess + audit + lock + akt + ben + pak + ups + stg > 0) {
+        app.log.info({ sess, audit, lock, akt, ben, pak, ups, stg }, "background sweep");
       }
     } catch (e) {
       app.log.warn({ err: e }, "sweep failed");
