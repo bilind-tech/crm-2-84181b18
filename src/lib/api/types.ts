@@ -798,7 +798,13 @@ export interface GithubUpdateStatus {
   updateVerfuegbar: boolean;
 }
 
-export interface GithubInstallResult extends UpdatePackageInfo {
+export interface GithubInstallResult {
+  uploadId: ID;
+  fileName: string;
+  sizeBytes: number;
+  version: string;
+  pendingMigrations: string[];
+  warnings: string[];
   sha: string;
   lauf: UpdateLauf | null;
 }
