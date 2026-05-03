@@ -29,8 +29,8 @@ type Props =
   | ({ kind: "angebot"; draft: Angebot } & CommonProps)
   | ({ kind: "rechnung"; draft: Rechnung } & CommonProps);
 
-const DEBOUNCE_MS = 600;
-const LOADER_DELAY_MS = 400;
+const DEBOUNCE_MS = 300;
+const LOADER_DELAY_MS = 250;
 
 // Volatile Server-Felder aus Build-Trigger ausschließen, damit Server-Echos
 // (Timestamps) keinen erneuten PDF-Build auslösen.
