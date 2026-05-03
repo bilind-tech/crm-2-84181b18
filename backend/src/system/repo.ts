@@ -294,3 +294,25 @@ export function listInstalledVersions(): {
       };
     });
 }
+
+/** Beim Boot: Hängende Läufe (status='laeuft') als Fehler markieren —
+ * Backend muss neu gestartet sein, also kann kein laufender Update-Prozess
+ * mehr aktiv sein. Verhindert "ewig laufende" Einträge in der UI. */
+export function markStaleLaeufeAlsFehler(grund = "Backend-Restart während Update"): number {
+  const db = getDatabase();
+  const tx = db.transaction(() => {
+    const rows = db.prepare(`SELECT id FROM system_update_lauf WHERE status = 'laeuft'`).all() as { id: string }[];
+    for (const r of rows) {
+      db.prepare(
+        `UPDATE system_update_lauf SET status='fehler', beendet_am=datetime('now'),
+           fehler_text = COALESCE(fehler_text, ?) WHERE id = ?`,
+      ).run(grund, r.id);
+      db.prepare(
+        `UPDATE system_update_step SET status='fehler', beendet_am=datetime('now'),
+           fehler_text = COALESCE(fehler_text, ?) WHERE lauf_id = ? AND status = 'laeuft'`,
+      ).run(grund, r.id);
+    }
+    return rows.length;
+  });
+  return tx();
+}
