@@ -8,11 +8,11 @@ import {
   type EmailKontext,
 } from "../email/templates.js";
 import {
-  enqueueVersand, getById, listVersand, retry, abbrechen,
+  enqueueVersand, getById, listVersand, abbrechen,
   type EmailVersandStatus,
 } from "../email/versand-repo.js";
-import { tickEmailQueue } from "../email/worker.js";
-import { getTransport, getFromAddress, loadSmtpRuntime } from "../email/transport.js";
+import { sendNow, translateSmtpError } from "../email/worker.js";
+import { getTransport, getFromAddress, loadSmtpRuntime, verifyTransport } from "../email/transport.js";
 
 const KONTEXTE = ["rechnung", "angebot", "mahnung", "allgemein"] as const;
 
