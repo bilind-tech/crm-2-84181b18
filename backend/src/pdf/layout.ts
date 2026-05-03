@@ -376,11 +376,13 @@ export function rechnungDocDef(args: {
     { label: "Rechnungsdatum", wert: dt(rechnung.rechnungsdatum) },
     { label: "Fällig am", wert: dt(rechnung.faelligkeitsdatum) },
   ];
+  const metaNote = `Bitte überweisen Sie den Rechnungsbetrag bis zum ${dt(rechnung.faelligkeitsdatum)} unter Angabe der Rechnungsnummer ${rechnung.nummer} auf unser unten angegebenes Konto.`;
   return buildDoc({
     firma, kunde, ansprechpartner, logoDataUrl,
     titel: "Rechnung",
     meta,
     metaVariant: "box",
+    metaNote,
     positionen: rechnung.positionen,
     rabattGesamt: rechnung.rabattGesamt,
     steuersatz: rechnung.steuersatz,
