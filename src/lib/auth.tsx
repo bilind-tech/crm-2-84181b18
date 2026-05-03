@@ -62,6 +62,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const lastActivity = useRef<number>(Date.now());
 
   const refreshMe = useCallback(async () => {
+    // Im Demo/Mock-Modus (keine Pi-URL hinterlegt) gar nicht erst gegen
+    // localhost:8787 fetchen — das blockiert sonst beim Browser-Default-Timeout
+    // und die ganze App hängt minutenlang bei „Lade …".
+    if (!isBackendUrlExplicit()) {
+      setUser(null);
+      setMode("mock-lock");
+      return;
+    }
     try {
       const me = await piApi.get<MeResponse>("/auth/me");
       setUser(me.user);
@@ -81,12 +89,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
         if (err.status === 0) {
           setUser(null);
-          setMode(isBackendUrlExplicit() ? "backend-offline" : "mock-lock");
+          setMode("backend-offline");
           return;
         }
       }
       setUser(null);
-      setMode(isBackendUrlExplicit() ? "backend-offline" : "mock-lock");
+      setMode("backend-offline");
     }
   }, []);
 
