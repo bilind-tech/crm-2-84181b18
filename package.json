@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "release": "tsx scripts/build-release.ts"
+    "release": "tsx scripts/build-release.ts",
+    "release:dry": "tsx scripts/build-release.ts --skip-frontend --allow-same-version --out=dist-release-dry"
   },
   "dependencies": {
     "@cloudflare/vite-plugin": "^1.25.5",
