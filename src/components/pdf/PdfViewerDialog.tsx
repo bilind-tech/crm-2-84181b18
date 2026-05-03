@@ -100,14 +100,14 @@ export function PdfViewerDialog({
           {isLoading && (
             <div className="flex h-full min-h-[60vh] flex-col items-center justify-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="h-6 w-6 animate-spin" />
-              <span>PDF wird erzeugt …</span>
+              <span>PDF wird erstellt …</span>
             </div>
           )}
 
           {isError && (
             <div className="flex h-full min-h-[60vh] flex-col items-center justify-center gap-2 px-6 text-center text-sm text-destructive">
               <AlertCircle className="h-6 w-6" />
-              <div className="font-medium">PDF konnte nicht erzeugt werden</div>
+              <div className="font-medium">PDF konnte nicht erstellt werden</div>
               {errorMessage && <div className="text-xs text-muted-foreground">{errorMessage}</div>}
             </div>
           )}
