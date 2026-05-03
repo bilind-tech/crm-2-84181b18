@@ -1325,9 +1325,14 @@ export async function mockBackend<T>(method: string, path: string, body?: unknow
     persist();
     result = d.googleDrive;
   } else if (m === "POST" && match(path, "/einstellungen/google-drive/connect")) {
-    const incoming = body as { kontoEmail?: string };
+    // Im Mock simulieren wir den OAuth-Authorize-Schritt: wir liefern eine
+    // Pseudo-URL, die direkt auf die Einstellungs-Seite mit ?status=ok&mock=1
+    // zurückspringt. Erst dort schaltet der Mock-Callback die Verbindung scharf.
+    result = { authorizeUrl: "/einstellungen?tab=drive&status=ok&mock=1" };
+  } else if (m === "GET" && match(path, "/einstellungen/google-drive/mock-callback")) {
+    // Wird vom Frontend nach Lesen des ?status=ok&mock=1 angepingt.
     d.googleDrive.verbunden = true;
-    d.googleDrive.kontoEmail = incoming.kontoEmail ?? "konto@beispiel.de";
+    d.googleDrive.kontoEmail = d.googleDrive.kontoEmail ?? "konto@beispiel.de";
     d.googleDrive.verbundenAm = now();
     d.googleDrive.rootOrdnerId = d.googleDrive.rootOrdnerId ?? "mock-root-" + uuid().slice(0, 8);
     d.googleDrive.letzterFehler = undefined;
