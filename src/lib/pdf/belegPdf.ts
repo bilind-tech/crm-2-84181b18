@@ -575,5 +575,7 @@ export async function generateRechnungPdf(
     tracker.pageBreakBefore,
   );
   const result = await renderPdf(doc, []);
-  return { blob: result.blob, hotspots: tracker.build() };
+  const out = { blob: result.blob, hotspots: tracker.build() };
+  lruSet(cacheKey, out);
+  return out;
 }
