@@ -39,14 +39,7 @@ function Page() {
     return arr;
   }, [list.data, tab, q, kundenById]);
 
-  const neu = async (kind: ProtokollKind) => {
-    try {
-      const p = await create.mutateAsync({ kind });
-      void navigate({ to: "/protokolle/$id/bearbeiten", params: { id: p.id } });
-    } catch (e) {
-      console.error(e); toast.error("Konnte nicht anlegen");
-    }
-  };
+
 
   return (
     <div className="space-y-6 pb-24">
