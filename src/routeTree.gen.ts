@@ -20,6 +20,7 @@ import { Route as DokumenteRouteImport } from './routes/dokumente'
 import { Route as AngeboteRouteImport } from './routes/angebote'
 import { Route as AktivitaetRouteImport } from './routes/aktivitaet'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as WerkzeugeIndexRouteImport } from './routes/werkzeuge.index'
 import { Route as WerkzeugeUebergabeprotokollRouteImport } from './routes/werkzeuge.uebergabeprotokoll'
 import { Route as WerkzeugeSchluesseluebergabeRouteImport } from './routes/werkzeuge.schluesseluebergabe'
 import { Route as RechnungenNeuRouteImport } from './routes/rechnungen.neu'
@@ -88,6 +89,11 @@ const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const WerkzeugeIndexRoute = WerkzeugeIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => WerkzeugeRoute,
 } as any)
 const WerkzeugeUebergabeprotokollRoute =
   WerkzeugeUebergabeprotokollRouteImport.update({
@@ -179,6 +185,7 @@ export interface FileRoutesByFullPath {
   '/rechnungen/neu': typeof RechnungenNeuRoute
   '/werkzeuge/schluesseluebergabe': typeof WerkzeugeSchluesseluebergabeRoute
   '/werkzeuge/uebergabeprotokoll': typeof WerkzeugeUebergabeprotokollRoute
+  '/werkzeuge/': typeof WerkzeugeIndexRoute
   '/angebote/$id/bearbeiten': typeof AngeboteIdBearbeitenRoute
   '/m/upload/$session': typeof MUploadSessionRoute
   '/rechnungen/$id/bearbeiten': typeof RechnungenIdBearbeitenRoute
@@ -194,7 +201,6 @@ export interface FileRoutesByTo {
   '/rechnungen': typeof RechnungenRouteWithChildren
   '/steuern': typeof SteuernRoute
   '/stundenzettel': typeof StundenzettelRoute
-  '/werkzeuge': typeof WerkzeugeRouteWithChildren
   '/angebote/$id': typeof AngeboteIdRouteWithChildren
   '/angebote/neu': typeof AngeboteNeuRoute
   '/kunden/$id': typeof KundenIdRoute
@@ -205,6 +211,7 @@ export interface FileRoutesByTo {
   '/rechnungen/neu': typeof RechnungenNeuRoute
   '/werkzeuge/schluesseluebergabe': typeof WerkzeugeSchluesseluebergabeRoute
   '/werkzeuge/uebergabeprotokoll': typeof WerkzeugeUebergabeprotokollRoute
+  '/werkzeuge': typeof WerkzeugeIndexRoute
   '/angebote/$id/bearbeiten': typeof AngeboteIdBearbeitenRoute
   '/m/upload/$session': typeof MUploadSessionRoute
   '/rechnungen/$id/bearbeiten': typeof RechnungenIdBearbeitenRoute
@@ -232,6 +239,7 @@ export interface FileRoutesById {
   '/rechnungen/neu': typeof RechnungenNeuRoute
   '/werkzeuge/schluesseluebergabe': typeof WerkzeugeSchluesseluebergabeRoute
   '/werkzeuge/uebergabeprotokoll': typeof WerkzeugeUebergabeprotokollRoute
+  '/werkzeuge/': typeof WerkzeugeIndexRoute
   '/angebote/$id/bearbeiten': typeof AngeboteIdBearbeitenRoute
   '/m/upload/$session': typeof MUploadSessionRoute
   '/rechnungen/$id/bearbeiten': typeof RechnungenIdBearbeitenRoute
@@ -260,6 +268,7 @@ export interface FileRouteTypes {
     | '/rechnungen/neu'
     | '/werkzeuge/schluesseluebergabe'
     | '/werkzeuge/uebergabeprotokoll'
+    | '/werkzeuge/'
     | '/angebote/$id/bearbeiten'
     | '/m/upload/$session'
     | '/rechnungen/$id/bearbeiten'
@@ -275,7 +284,6 @@ export interface FileRouteTypes {
     | '/rechnungen'
     | '/steuern'
     | '/stundenzettel'
-    | '/werkzeuge'
     | '/angebote/$id'
     | '/angebote/neu'
     | '/kunden/$id'
@@ -286,6 +294,7 @@ export interface FileRouteTypes {
     | '/rechnungen/neu'
     | '/werkzeuge/schluesseluebergabe'
     | '/werkzeuge/uebergabeprotokoll'
+    | '/werkzeuge'
     | '/angebote/$id/bearbeiten'
     | '/m/upload/$session'
     | '/rechnungen/$id/bearbeiten'
@@ -312,6 +321,7 @@ export interface FileRouteTypes {
     | '/rechnungen/neu'
     | '/werkzeuge/schluesseluebergabe'
     | '/werkzeuge/uebergabeprotokoll'
+    | '/werkzeuge/'
     | '/angebote/$id/bearbeiten'
     | '/m/upload/$session'
     | '/rechnungen/$id/bearbeiten'
@@ -410,6 +420,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/werkzeuge/': {
+      id: '/werkzeuge/'
+      path: '/'
+      fullPath: '/werkzeuge/'
+      preLoaderRoute: typeof WerkzeugeIndexRouteImport
+      parentRoute: typeof WerkzeugeRoute
     }
     '/werkzeuge/uebergabeprotokoll': {
       id: '/werkzeuge/uebergabeprotokoll'
@@ -586,11 +603,13 @@ const RechnungenRouteWithChildren = RechnungenRoute._addFileChildren(
 interface WerkzeugeRouteChildren {
   WerkzeugeSchluesseluebergabeRoute: typeof WerkzeugeSchluesseluebergabeRoute
   WerkzeugeUebergabeprotokollRoute: typeof WerkzeugeUebergabeprotokollRoute
+  WerkzeugeIndexRoute: typeof WerkzeugeIndexRoute
 }
 
 const WerkzeugeRouteChildren: WerkzeugeRouteChildren = {
   WerkzeugeSchluesseluebergabeRoute: WerkzeugeSchluesseluebergabeRoute,
   WerkzeugeUebergabeprotokollRoute: WerkzeugeUebergabeprotokollRoute,
+  WerkzeugeIndexRoute: WerkzeugeIndexRoute,
 }
 
 const WerkzeugeRouteWithChildren = WerkzeugeRoute._addFileChildren(
