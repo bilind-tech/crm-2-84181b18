@@ -115,51 +115,69 @@ function footer(f: FirmaForPdf) {
   };
 }
 
+function hasStundenPositionen(positionen: ApiPosition[]): boolean {
+  return positionen.some((p) => p.modus === "stunden");
+}
+
 function stundenText(p: ApiPosition): string {
-  if (p.modus === "pauschal") return "";
+  if (p.modus !== "stunden") return "";
   const menge = p.menge.toLocaleString("de-DE", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
-  return `${menge} ${p.einheit}`;
+  return `${menge} h`;
 }
 function abrechnungsartText(p: ApiPosition): string {
   if (p.ausfuehrung && p.ausfuehrung.trim()) return p.ausfuehrung;
-  if (p.modus === "pauschal") return "Pauschal";
-  return `à ${eur(p.einzelpreisNetto)}`;
+  if (p.modus === "stunden") return "Stundensatz";
+  if (p.modus === "einzel") return "Einzelposition";
+  return "Pauschal";
 }
 
 function leistungstabelle(positionen: ApiPosition[], totalsT: { netto: number; steuer: number; brutto: number }, steuersatz: number) {
-  const headerRow = [
+  const showStunden = hasStundenPositionen(positionen);
+  const colCount = showStunden ? 4 : 3;
+
+  const headerRow: unknown[] = [
     { text: "Leistung", bold: true, fontSize: 10, color: COLOR_TEXT, margin: [0, 4, 0, 4] },
-    { text: "Stunden", bold: true, fontSize: 10, color: COLOR_TEXT, alignment: "center", margin: [0, 4, 0, 4] },
-    { text: "Abrechnungsart", bold: true, fontSize: 10, color: COLOR_TEXT, alignment: "center", margin: [0, 4, 0, 4] },
-    { text: "Preis ohne MwSt.", bold: true, fontSize: 10, color: COLOR_TEXT, alignment: "right", margin: [0, 4, 0, 4] },
   ];
+  if (showStunden) {
+    headerRow.push({ text: "Stunden", bold: true, fontSize: 10, color: COLOR_TEXT, alignment: "center", margin: [0, 4, 0, 4] });
+  }
+  headerRow.push(
+    { text: "Abrechnungsart", bold: true, fontSize: 10, color: COLOR_TEXT, alignment: "center", margin: [0, 4, 0, 4] },
+    { text: "Preis (netto)", bold: true, fontSize: 10, color: COLOR_TEXT, alignment: "right", margin: [0, 4, 0, 4] },
+  );
+
   const body: unknown[][] = [headerRow];
   positionen.forEach((p) => {
-    body.push([
-      { stack: [beschreibungBlock(p.beschreibung || "")] },
-      { text: stundenText(p), fontSize: 10, alignment: "center" },
+    const row: unknown[] = [{ stack: [beschreibungBlock(p.beschreibung || "")] }];
+    if (showStunden) row.push({ text: stundenText(p), fontSize: 10, alignment: "center" });
+    row.push(
       { text: abrechnungsartText(p), fontSize: 10, alignment: "center" },
       { text: eur(summe(p)), fontSize: 10, alignment: "right" },
-    ]);
+    );
+    body.push(row);
   });
+
+  const spanCols = colCount - 1;
+  const spanFiller = Array.from({ length: spanCols - 1 }, () => ({}));
   body.push([
-    { text: `Zzgl. gesetzlicher Mehrwertsteuer ${steuersatz}%`, colSpan: 3, fontSize: 10 },
-    {},
-    {},
+    { text: `Zzgl. gesetzlicher Mehrwertsteuer ${steuersatz}%`, colSpan: spanCols, fontSize: 10 },
+    ...spanFiller,
     { text: eur(totalsT.steuer), fontSize: 10, alignment: "right" },
   ]);
   body.push([
-    { text: "Gesamtbetrag inkl. MwSt.", colSpan: 3, fontSize: 10, bold: true },
-    {},
-    {},
+    { text: "Gesamtbetrag inkl. MwSt.", colSpan: spanCols, fontSize: 10, bold: true },
+    ...spanFiller,
     { text: eur(totalsT.brutto), fontSize: 10, alignment: "right", bold: true },
   ]);
+
+  const widths = showStunden ? ["*", 60, 90, 85] : ["*", 110, 95];
+
   return {
     table: {
       headerRows: 1,
       keepWithHeaderRows: 1,
       dontBreakRows: true,
-      widths: ["*", 60, 90, 85],
+      widths,
       body,
     },
     layout: {
