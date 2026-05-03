@@ -57,27 +57,42 @@ async function buildRechnung(rechnung: Rechnung, kunde: Kunde, firma: Firmendate
   return { blob };
 }
 
-/** Erzeugt eine stabile Blob-URL und gibt sie frei, wenn sich der Blob ändert oder die Komponente unmountet. */
+/**
+ * Erzeugt eine stabile Blob-URL pro Blob-Identität.
+ *
+ * Wichtig: In React 19 / StrictMode laufen Effekt-Cleanups doppelt. Würden wir
+ * `URL.revokeObjectURL` direkt im Cleanup aufrufen, wäre die gerade an
+ * react-pdf übergebene URL beim zweiten Mount bereits ungültig → Status 0
+ * "Unexpected server response". Wir geben die alte URL deshalb nur frei, wenn
+ * sich der Blob tatsächlich ändert, und verzögern das endgültige Revoke beim
+ * Unmount minimal, damit ein direkter Re-Mount dieselbe URL weiter nutzen kann.
+ */
 function useBlobUrl(blob: Blob | undefined): string | null {
-  const url = useMemo(() => (blob ? URL.createObjectURL(blob) : null), [blob]);
-  const lastRef = useRef<string | null>(null);
+  const entryRef = useRef<{ blob: Blob; url: string } | null>(null);
+
+  if (blob) {
+    if (!entryRef.current || entryRef.current.blob !== blob) {
+      // Vorgänger sofort freigeben — wir wechseln auf eine neue Blob-Identität.
+      if (entryRef.current) URL.revokeObjectURL(entryRef.current.url);
+      entryRef.current = { blob, url: URL.createObjectURL(blob) };
+    }
+  }
+  // Wenn `blob` (vorübergehend) undefined ist (z. B. während Refetch), behalten
+  // wir die letzte URL bewusst gültig — sonst flackert die Vorschau.
+
   useEffect(() => {
-    const prev = lastRef.current;
-    lastRef.current = url;
     return () => {
-      if (prev && prev !== url) URL.revokeObjectURL(prev);
-    };
-  }, [url]);
-  // Final-Cleanup beim Unmount
-  useEffect(() => {
-    return () => {
-      if (lastRef.current) {
-        URL.revokeObjectURL(lastRef.current);
-        lastRef.current = null;
-      }
+      const entry = entryRef.current;
+      if (!entry) return;
+      // Verzögertes Revoke: StrictMode-Doppelcleanup oder schnelles Re-Mount
+      // (Tab-Wechsel, Routenwechsel) bekommen die URL noch.
+      const url = entry.url;
+      entryRef.current = null;
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
     };
   }, []);
-  return url;
+
+  return entryRef.current?.url ?? null;
 }
 
 interface UsePdfResult {
