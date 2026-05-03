@@ -19,6 +19,7 @@ import type { Kunde, Objekt } from "@/lib/api/types";
 import {
   downloadBlob,
   generateSchluesseluebergabePdf,
+  nextProtokollNummer,
   safeFilename,
   type SchluesselRichtung,
   type SchluesselZeile,
