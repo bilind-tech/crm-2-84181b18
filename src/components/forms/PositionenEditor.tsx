@@ -43,13 +43,13 @@ const EINHEITEN: { value: Einheit; label: string }[] = [
   { value: "monat", label: "Monat" },
 ];
 
-export function emptyPosition(steuersatz = 19, modus: PositionModus = "einzel"): PositionDraft {
+export function emptyPosition(steuersatz = 19, modus: PositionModus = "pauschal"): PositionDraft {
   return {
     id: crypto.randomUUID(),
     modus,
     beschreibung: "",
-    menge: modus === "einzel" ? 1 : 1,
-    einheit: modus === "pauschal" ? "pauschal" : "stk",
+    menge: 1,
+    einheit: modus === "pauschal" ? "pauschal" : modus === "stunden" ? "h" : "stk",
     einzelpreisNetto: 0,
     pauschalpreisNetto: 0,
     ausfuehrung: "",
