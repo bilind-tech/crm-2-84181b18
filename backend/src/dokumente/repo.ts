@@ -61,7 +61,9 @@ export function createDokument(input: CreateDokumentInput): Dokument {
     input.faelligAm ?? null,
     input.quelle ?? "upload",
   );
-  return getDokument(id)!;
+  const dok = getDokument(id)!;
+  emit("dokument:erstellt", { id });
+  return dok;
 }
 
 export function getDokument(id: string): Dokument | null {
