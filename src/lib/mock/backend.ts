@@ -273,6 +273,21 @@ function simuliereDriveSync(dok: Dokument) {
   }, 1500);
 }
 
+function nextProtokollNummerMock(kuerzel: "PR" | "SU"): string {
+  const t = new Date();
+  const mm = String(t.getMonth() + 1).padStart(2, "0");
+  const yy = String(t.getFullYear()).slice(-2);
+  const d2 = load();
+  d2.zaehler = d2.zaehler ?? { kunde: 0, objekt: 0, angebot: 0, rechnung: 0, dauerauftrag: 0 };
+  const key = `protokoll:${kuerzel}:${yy}${mm}`;
+  // Speichere Zähler in zaehlerProKunde-Map (umgewidmet als generische Map)
+  d2.zaehlerProKunde = d2.zaehlerProKunde ?? {};
+  d2.zaehlerProKunde[key] = d2.zaehlerProKunde[key] ?? { _: 0 };
+  d2.zaehlerProKunde[key]._ = (d2.zaehlerProKunde[key]._ ?? 0) + 1;
+  const n = d2.zaehlerProKunde[key]._;
+  return `${kuerzel}${mm}${yy}/${String(n).padStart(2, "0")}`;
+}
+
 function nextNumber(praefix: string, n: number): string {
   const year = new Date().getFullYear();
   return praefix
