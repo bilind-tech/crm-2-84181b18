@@ -380,6 +380,53 @@ export interface Dokument {
   drive?: DriveSyncInfo;
 }
 
+// ---------- Protokolle (Übergabe / Schlüssel) ----------
+
+export type ProtokollKind = "uebergabe" | "schluessel";
+export type ProtokollStatus = "entwurf" | "abgeschlossen";
+export type UebergabeArt = "uebergabe" | "abnahme" | "beides";
+export type SchluesselRichtung = "ausgabe" | "ruecknahme";
+
+export interface SchluesselZeile {
+  bezeichnung: string;
+  anzahl: number;
+  schluesselNr: string;
+  bemerkung: string;
+}
+
+export interface ProtokollBase {
+  id: ID;
+  nummer: string;
+  status: ProtokollStatus;
+  kundeId?: ID;
+  objektId?: ID;
+  datum: ISODate;
+  uhrzeit: string;
+  vertreterAuftraggeber: string;
+  vertreterAuftragnehmer: string;
+  dokumentId?: ID;
+  erstelltAm: ISODateTime;
+  aktualisiertAm: ISODateTime;
+}
+
+export interface UebergabeProtokoll extends ProtokollBase {
+  kind: "uebergabe";
+  art: UebergabeArt;
+  leistungsumfang: string;
+  bemerkungen: string;
+  ohneVorbehalt: boolean;
+}
+
+export interface SchluesselProtokoll extends ProtokollBase {
+  kind: "schluessel";
+  richtung: SchluesselRichtung;
+  schluessel: SchluesselZeile[];
+  pfandEur?: number;
+  bestaetigt: boolean;
+}
+
+export type Protokoll = UebergabeProtokoll | SchluesselProtokoll;
+
 // ---------- Upload-Session (Handy-Scan-Brücke) ----------
 
 export interface UploadSession {
