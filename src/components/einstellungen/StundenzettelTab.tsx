@@ -10,11 +10,14 @@ import {
   useStundenzettelUrl,
   useSetStundenzettelUrl,
 } from "@/lib/stundenzettel/config";
+import { ApiError } from "@/lib/api/client";
+import { PiApiError } from "@/lib/api/piClient";
 
 export function StundenzettelTab() {
   const { url: serverUrl, isLoading } = useStundenzettelUrl();
   const setUrl = useSetStundenzettelUrl();
   const [draft, setDraft] = useState("");
+  const [serverError, setServerError] = useState<string | null>(null);
 
   useEffect(() => {
     setDraft(serverUrl);
@@ -24,13 +27,29 @@ export function StundenzettelTab() {
   const valid = !draft.trim() || /^https?:\/\/.+/i.test(draft.trim());
 
   const save = () => {
+    setServerError(null);
     if (!valid) {
       toast.error("URL muss mit http:// oder https:// beginnen.");
       return;
     }
     setUrl.mutate(draft, {
       onSuccess: () => toast.success("Stundenzettel-URL gespeichert"),
-      onError: () => toast.error("Speichern fehlgeschlagen"),
+      onError: (err) => {
+        let msg = "Speichern fehlgeschlagen";
+        if (err instanceof ApiError || err instanceof PiApiError) {
+          const body = (err as { body?: unknown }).body;
+          if (body && typeof body === "object") {
+            const m =
+              (body as { message?: string; error?: string }).message ??
+              (body as { error?: string }).error;
+            if (typeof m === "string" && m.trim()) msg = m;
+          } else if (err.message) {
+            msg = err.message;
+          }
+        }
+        setServerError(msg);
+        toast.error(msg);
+      },
     });
   };
 
