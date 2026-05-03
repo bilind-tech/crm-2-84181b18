@@ -1,64 +1,70 @@
-# Plan 2 — Demo-Modus ehrlich machen (SMTP & E-Mail-Versand)
+# Plan 3 — Technische Schulden & CI absichern
 
-## Problem (was du erlebt hast)
+Vorbereitung für die Pi-Auslieferung: was heute leise schiefgehen könnte, soll laut werden, und der Release-Build muss vor jedem Merge automatisch grün sein.
 
-Du hast SMTP konfiguriert, „Verbindung prüfen" → grün, „Test-Mail" → grüner Toast — aber **es ging keine echte Mail raus**, weil im Lovable-Preview der Mock-Backend antwortet, nicht Strato. Strato sieht nichts, dein Postfach kriegt nichts. Das Programm lügt freundlich.
+## A. Scheduler-Fehler nicht mehr verschlucken
 
-Das passiert auch beim Rechnungs-Versand: der Mock antwortet `{ ok: true, messageId: "mock-…" }` und die UI zeigt „Mail versendet". In Wahrheit: nichts.
+Heute fängt `backend/src/belege/scheduler.ts` jeden Fehler in `markOverdueRechnungen()` mit einem leeren `catch {}`. Wenn die DB-Tabellen fehlen, ein Schema-Mismatch da ist oder die Funktion abstürzt, **merkt es niemand** — keine Mahnung, keine Überfällig-Markierung, keine Spur im Log.
 
-## Ziel
+Änderungen:
+- `console.error` mit Tag `[belege-scheduler]`, Nachricht und Fehlerstack.
+- Beim ersten Tick (Bootstrap): wenn die Tabellen wirklich noch fehlen (`SQLITE_ERROR: no such table`), bleibt es ein freundlicher Info-Log statt Error — alle anderen Fehler werden lautstark geloggt.
+- Counter `consecutiveFailures` — nach 3 Fehlern in Folge kommt eine zusätzliche Warn-Zeile „Scheduler scheint dauerhaft zu scheitern, bitte prüfen". Reset bei erstem Erfolg.
 
-Im Demo-Modus (Lovable-Preview, kein Pi) sind **alle E-Mail-Aktionen ehrlich**: kein „Erfolg"-Toast, sondern ein deutlicher „Demo-Modus — kein echter Versand"-Hinweis. Sobald die Backend-URL gesetzt ist (Pi läuft), funktioniert alles ohne Code-Änderung sofort wie heute schon konzipiert.
+Datei: `backend/src/belege/scheduler.ts` (alleinstehend, ~30 Zeilen Diff).
 
-## Erkennungsmerkmal Demo-Modus
+## B. Release-Bundle validieren
 
-`isBackendUrlExplicit()` aus `src/lib/api/backendUrl.ts` ist bereits da. `false` = User hat keine Pi-URL hinterlegt → wir laufen 100% gegen Mock → Demo-Modus.
+`scripts/build-release.ts` baut das ZIP, das später per System-Update auf den Pi geschoben wird. Es gibt zwar `backend/test/release-bundle.spec.ts`, der die Signatur-Formel prüft — aber **nicht den ganzen Build**. Vor der Pi-Auslieferung will ich einmal sauber durchspielen.
 
-## Konkrete Änderungen
+Änderungen:
+- Neuer Smoke-Test `backend/test/release-bundle-smoke.spec.ts`: ruft den Builder im `--skip-frontend`-Modus auf (Frontend-Build dauert zu lange für CI), prüft danach:
+  1. ZIP existiert in `dist-release/`.
+  2. ZIP enthält `manifest.json` mit `appVersion`, `schemaVersion`, `signature`.
+  3. `validateManifest()` aus `backend/src/system/manifest.ts` akzeptiert die Signatur.
+  4. ZIP enthält `backend/dist/server.js` (also wirklich gebaut, nicht leer).
+- Ein neues npm-Script `release:dry` in `package.json`: `tsx scripts/build-release.ts --skip-frontend --allow-same-version --out=dist-release-dry`.
 
-### A. Mock-Antworten ehrlich machen
-`src/lib/mock/backend.ts` — bei diesen Endpoints statt simuliertem „ok" einen klaren Demo-Hinweis zurückgeben:
+## C. GitHub-Actions-CI
 
-| Endpoint | Heute (lügt) | Neu (ehrlich) |
-|---|---|---|
-| `POST /einstellungen/smtp/test` | „Konfiguration plausibel (Mock)." | `{ erfolg: false, demo: true, nachricht: "Demo-Modus — SMTP wird erst auf dem Pi geprüft. Kein echter Verbindungstest möglich." }` |
-| `POST /email/verify` | `{ ok: true, latencyMs: 240 }` | `{ ok: false, demo: true, errorCode: "EDEMO", error: "Demo-Modus — echte SMTP-Verbindung erst nach Pi-Deployment." }` |
-| `POST /email/test` | `{ ok: true, messageId: "mock-…" }` | `{ ok: false, demo: true, errorCode: "EDEMO", error: "Demo-Modus — Test-Mails werden erst auf dem Pi tatsächlich versendet." }` |
-| `POST /email/versenden` (Beleg-Versand) | „in Warteschlange aufgenommen" | `{ ok: false, demo: true, errorCode: "EDEMO", error: "Demo-Modus — Mail wurde NICHT versendet. Aktiv erst nach Pi-Deployment." }` |
+Die Tests existieren, aber nichts startet sie automatisch. Ich legen einen Workflow an:
 
-Wichtig: das `demo: true`-Flag dient als Marker, damit die UI einen anderen Look (blauer Info-Banner statt rot/grün) zeigen kann.
+`/.github/workflows/ci.yml`:
+- Trigger: `push` und `pull_request` auf `main`.
+- Node 20, Bun für Frontend-Lint, Vitest für Backend.
+- Jobs (parallel):
+  1. **frontend-lint**: `bun install` → `bun run lint`.
+  2. **backend-test**: `cd backend && npm ci && npm run typecheck && npm run test`.
+  3. **release-smoke**: nach `backend-test`, ruft `npm run release:dry` auf, lädt das ZIP als Artifact hoch (Retention 7 Tage) — so kannst du dir aus jedem grünen Run direkt ein Test-ZIP ziehen.
 
-### B. UI passt sich an
-- `EmailEinstellungen.tsx` (SmtpTab):
-  - Oben permanenter blauer Demo-Banner, sichtbar nur wenn `!isBackendUrlExplicit()`. Text: „**Demo-Modus** — du arbeitest gerade ohne Pi-Backend. Eingaben werden lokal im Browser gespeichert, aber **kein echter SMTP-Test und kein echter Versand** sind möglich. Sobald der Pi läuft und die Backend-URL eingetragen ist, funktioniert alles sofort."
-  - „Verbindung prüfen" und „Test-Mail senden" bleiben klickbar, zeigen aber bei Demo-Antwort einen `toast.info` (nicht `error`/`success`) mit der Demo-Message.
-  - Status-Banner-Logik: bei `demo: true` → eigener neutraler Look (blau), nicht rot.
-- `EmailVersandDialog.tsx`:
-  - Wenn `!isBackendUrlExplicit()`: zusätzlich zum bestehenden SMTP-Banner ein blauer Demo-Hinweis am oberen Rand: „**Demo-Modus** — der Versand wird simuliert, aber nicht real ausgeführt."
-  - Beim Klick „Senden": wenn Antwort `demo: true` → `toast.info` mit der Message, Dialog bleibt offen (kein „erfolgreich"-Schein).
+Frontend-Build wird bewusst ausgespart (Lovable baut den ohnehin selbst). Falls du es trotzdem willst, sag Bescheid — ich nehme es dann als 4. Job dazu.
 
-### C. Wo es bleibt wie es ist
-- Auf dem Pi (Backend-URL gesetzt) ändert sich **nichts**. Der echte Endpoint antwortet mit echtem `{ ok: true }` oder echtem Fehler — ohne `demo`-Flag.
-- Speichern der SMTP-Felder im Demo-Modus bleibt erlaubt (nützlich, um die Konfiguration vorzubereiten und später aufs Pi zu spiegeln).
-- Die Mahn-Cron / Auto-Versand-Sperren bleiben unangetastet.
+## D. Globaler Drive-Sync-Indikator (klein)
 
-## Geänderte Dateien
+Auf der Dokumente-Übersichtsseite fehlt heute ein kompakter Status „Drive: synchronisiert / X ausstehend / Fehler". Pro Beleg gibt es schon eine Anzeige, aber kein Gesamt-Glance.
 
-- `src/lib/mock/backend.ts` — 4 Endpoints umbauen (siehe Tabelle)
-- `src/components/email/EmailEinstellungen.tsx` — Demo-Banner, Status/Toast für `demo: true`
-- `src/components/email/EmailVersandDialog.tsx` — Demo-Banner, Senden-Toast für `demo: true`
-- ggf. `src/hooks/useApi.ts` — falls `useVerifySmtp`/`useSendTestMail`/`useSendVersand` ein zusätzliches `demo`-Flag im Result-Typ brauchen, Typen erweitern
+Änderung: kleines Badge oben rechts in `src/routes/dokumente.tsx` (oder dem entsprechenden Komponenten-Header), das aus dem bestehenden Drive-Status-Hook eine Aggregation rendert. Klick öffnet die Drive-Einstellungen. Keine neuen Backend-Endpoints — reines Aggregieren clientseitig.
+
+## Geänderte / neue Dateien
+
+| Datei | Änderung |
+|---|---|
+| `backend/src/belege/scheduler.ts` | echtes Logging + Failure-Counter |
+| `backend/test/release-bundle-smoke.spec.ts` | **neu**, Smoke-Test |
+| `package.json` | `release:dry`-Script |
+| `.github/workflows/ci.yml` | **neu**, 3 Jobs |
+| `src/routes/dokumente.tsx` (oder Komponente) | kleines globales Drive-Badge |
 
 ## Akzeptanzkriterien
 
-1. **Lovable-Preview, „Verbindung prüfen"**: blauer Demo-Hinweis, kein grüner Erfolg-Toast.
-2. **Lovable-Preview, „Test-Mail senden"**: blauer Demo-Hinweis, Toast `info`, kein „versendet".
-3. **Lovable-Preview, Rechnung versenden**: Dialog zeigt Demo-Hinweis vor dem Klick und nach dem Klick einen klaren „nicht versendet"-Toast.
-4. **Pi-Modus** (Backend-URL gesetzt): identisches Verhalten wie heute — echter Test, echter Versand, echte Erfolgs-/Fehlermeldungen.
-5. Keine Veränderung an Backend-Code, Mahnsperren, Cron-Guards.
+1. Ein simulierter Scheduler-Fehler (z. B. korrupte DB) erzeugt **eine** klare Error-Zeile pro Tick im Konsolen-Log, nach 3 Tries zusätzlich eine Warnung.
+2. `bun run release -- --skip-frontend` produziert ein gültiges ZIP, das `validateManifest` akzeptiert.
+3. Auf einem Push gegen `main` läuft die CI grün durch und stellt das Test-ZIP als Artifact bereit.
+4. Auf der Dokumente-Übersicht ist auf einen Blick erkennbar, ob alle Belege auf Drive synchron sind.
+5. Keine Änderung am echten Versand-, Mahn- oder Daten-Pfad.
 
 ## Risiko
 
-Sehr niedrig. Reines UI- + Mock-Refactor. Keine Datenbank-, keine echten Versand-Pfade berührt.
+Niedrig. Keine Datenbank-Migrationen, keine Änderung am Versand- oder Backup-Flow. CI ist additiv.
 
-Sag „Go", dann setze ich Plan 2 in einem Rutsch um.
+Sag „Go", dann setze ich Plan 3 um.
