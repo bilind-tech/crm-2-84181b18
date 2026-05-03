@@ -55,3 +55,14 @@ type: feature
 
 ## Dev-Modus
 `appRoot()` zeigt auf `./dev-root/` statt `/opt/mycleancenter/`, `npm ci`/`systemctl` werden übersprungen, smoketest skippt im `testMode`.
+
+## Hardening (Update-Härtung Runde)
+- `data-guard.assertCodeAndDataSeparated()` Boot-Check + `assertNotInDataDir()` vor JEDER FS-Mutation des Runners (`safeRename/safeUnlink/safeRm/safeMkdir/safeSymlink`). Daten-Verzeichnis ist technisch unschreibbar im Update.
+- ZIP-Allowlist Top-Level: `manifest.json`, `package.json`, `package-lock.json`, `dist/`, `migrations/`, `public/`, `README/CHANGELOG/LICENSE`. Backslash-Pfade verboten.
+- `/validate` liefert echten Migrations-Diff (`computeMigrationsDiff` aus entpacktem Paket). Schema-Downgrade → 400 mit `valide=false`. >5 pending Migrations → Warnung.
+- Quarantäne verifiziert nach Swap: `readCurrentTarget()===targetVersionDir`, sonst Auto-Rollback.
+- Manueller Rollback nur auf direkten Vorgänger (`getPreviousVersionStamp()`). Sonst 400.
+- `cleanupOldVersions`: behält `current`, `previous` und 1 weitere "Notnagel"-Version. `broken-*` 7-Tage-Retention. `cleanupStaleStaging` entfernt Staging-Reste >1 h (Boot + alle 10 min Sweep).
+- `markStaleLaeufeAlsFehler()` beim Boot: `status='laeuft'`-Läufe (Crash mid-update) werden auf `fehler` gesetzt mit Begründung "Backend-Restart während Update".
+- UI: OperationLockBanner sperrt Upload/Rollback wenn `aktuellerLauf.status==='laeuft'`. Schließen des Progress-Dialogs während `laeuft`/`rollback` deaktiviert. Recovery-Hinweis im Dialog zeigt `safetyBackupId` + Link-Empfehlung zu Backup-Tab nach Fehler.
+- `system:update:phase|lauf` invalidiert auch `["system","update","lauf","aktuell"]` für Page-Reload-Reconnect.
