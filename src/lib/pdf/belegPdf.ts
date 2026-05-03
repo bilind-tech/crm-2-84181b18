@@ -305,11 +305,11 @@ interface BuildOptions {
   materialBereitgestellt?: boolean;
 }
 
-function defaultIntroAngebot(a: Angebot, opts: BuildOptions) {
+export function defaultIntroAngebot(a: Angebot, opts: BuildOptions = {}) {
   if (opts.intro) return opts.intro;
   return `gerne unterbreiten wir Ihnen ein Angebot für „${a.titel}" und folgende Leistungen:`;
 }
-function defaultOutroAngebot(a: Angebot, opts: BuildOptions) {
+export function defaultOutroAngebot(a: Angebot, opts: BuildOptions = {}) {
   if (opts.outro) return opts.outro;
   const teile = [
     opts.materialBereitgestellt
