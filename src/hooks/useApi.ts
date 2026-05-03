@@ -1329,3 +1329,71 @@ export const useRollbackUpdate = () => {
     },
   });
 };
+
+// ─── Protokolle (Übergabe / Schlüssel) ───────────────────────────────────
+import type { Protokoll, ProtokollKind } from "@/lib/api/types";
+
+const qkProtokolle = (kind?: ProtokollKind, kundeId?: string) =>
+  ["protokolle", kind ?? "all", kundeId ?? "all"] as const;
+const qkProtokoll = (id: string) => ["protokolle", id] as const;
+
+export const useProtokolle = (params?: { kind?: ProtokollKind; kundeId?: string }) =>
+  useQuery({
+    queryKey: qkProtokolle(params?.kind, params?.kundeId),
+    queryFn: () => {
+      const q = new URLSearchParams();
+      if (params?.kind) q.set("kind", params.kind);
+      if (params?.kundeId) q.set("kundeId", params.kundeId);
+      const s = q.toString();
+      return api.get<Protokoll[]>(`/protokolle${s ? `?${s}` : ""}`);
+    },
+  });
+
+export const useProtokoll = (id: string) =>
+  useQuery({
+    queryKey: qkProtokoll(id),
+    queryFn: () => api.get<Protokoll>(`/protokolle/${id}`),
+    enabled: !!id,
+  });
+
+export const useCreateProtokoll = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: Partial<Protokoll> & { kind: ProtokollKind }) =>
+      api.post<Protokoll>("/protokolle", data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["protokolle"] }),
+  });
+};
+
+export const useUpdateProtokoll = (id: string) => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: Partial<Protokoll>) =>
+      api.patch<Protokoll>(`/protokolle/${id}`, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qkProtokoll(id) });
+      qc.invalidateQueries({ queryKey: ["protokolle"] });
+    },
+  });
+};
+
+export const useDeleteProtokoll = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.delete<void>(`/protokolle/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["protokolle"] }),
+  });
+};
+
+export const useAbschliessenProtokoll = (id: string) => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { dateiname: string; mimeType: string; groesseBytes: number; url: string }) =>
+      api.post<Protokoll>(`/protokolle/${id}/abschliessen`, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qkProtokoll(id) });
+      qc.invalidateQueries({ queryKey: ["protokolle"] });
+      qc.invalidateQueries({ queryKey: ["dokumente"] });
+    },
+  });
+};
