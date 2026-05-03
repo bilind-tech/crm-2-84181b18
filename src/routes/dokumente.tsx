@@ -24,7 +24,12 @@ import {
 import { Button } from "@/components/ui/button";
 import type { Dokument } from "@/lib/api/types";
 
-export const Route = createFileRoute("/dokumente")({ component: Page });
+export const Route = createFileRoute("/dokumente")({
+  component: Page,
+  validateSearch: (s: Record<string, unknown>): { focus?: string } => ({
+    focus: typeof s.focus === "string" ? s.focus : undefined,
+  }),
+});
 
 function Page() {
   const { data: alle = [] } = useDokumente();
