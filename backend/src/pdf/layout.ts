@@ -254,13 +254,6 @@ function defaultOutroRechnung(_r: ApiRechnung, outro?: string): string {
   if (outro) return outro;
   return "Vielen Dank für Ihren Auftrag.";
 }
-function ziel(r: ApiRechnung): number {
-  if (!r.rechnungsdatum || !r.faelligkeitsdatum) return 14;
-  const a = new Date(r.rechnungsdatum).getTime();
-  const b = new Date(r.faelligkeitsdatum).getTime();
-  const d = Math.round((b - a) / 86400000);
-  return d > 0 ? d : 14;
-}
 
 function signaturFromFirma(f: FirmaForPdf): string[] {
   const lines: string[] = [];
