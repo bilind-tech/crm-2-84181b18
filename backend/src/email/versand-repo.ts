@@ -94,14 +94,15 @@ export function enqueueVersand(input: EnqueueInput): { row: EmailVersand; create
   db.prepare(
     `INSERT INTO email_versand (
       id, empfaenger_to, empfaenger_cc, empfaenger_bcc, betreff, body_html,
-      beleg_art, beleg_id, vorlage_id, signatur_id, idempotenz_key,
+      beleg_art, beleg_id, vorlage_id, signatur_id, mahn_stufe, idempotenz_key,
       status, versuche, naechster_versuch_at
-    ) VALUES (?,?,?,?,?,?,?,?,?,?,?, 'pending', 0, datetime('now'))`,
+    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?, 'pending', 0, datetime('now'))`,
   ).run(
     id, input.empfaengerTo, input.empfaengerCc ?? null, input.empfaengerBcc ?? null,
     input.betreff, input.bodyHtml,
     input.belegArt ?? null, input.belegId ?? null,
     input.vorlageId ?? null, input.signaturId ?? null,
+    input.mahnStufe ?? null,
     input.idempotenzKey,
   );
   return { row: getById(id)!, created: true };
