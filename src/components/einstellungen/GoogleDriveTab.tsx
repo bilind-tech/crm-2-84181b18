@@ -202,6 +202,9 @@ export function GoogleDriveTab() {
         )}
       </Section>
 
+      {/* Synchronisation: Upload-Queue mit Retry */}
+      {form.verbunden && <SynchronisationSection />}
+
       {/* Ordnerstruktur */}
       <Section
         title="Ordnerstruktur"
