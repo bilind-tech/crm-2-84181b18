@@ -525,7 +525,7 @@ export function SmtpTab() {
     passwort: "",
   });
   const [status, setStatus] = useState<{
-    state: "unknown" | "ok" | "error";
+    state: "unknown" | "ok" | "error" | "demo";
     nachricht?: string;
     code?: string;
     latencyMs?: number;
