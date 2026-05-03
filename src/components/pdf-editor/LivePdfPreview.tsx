@@ -1,6 +1,6 @@
 // Live-PDF-Vorschau für den Editor: rendert pdfmake-PDF aus dem Draft,
 // debounced bei Änderungen, zeigt alle Seiten untereinander, mit klickbaren
-// Hotspots pro Seite (PdfFieldOverlay).
+// Hotspots pro Seite (Pixel-genau aus dem pdfmake-Layout-Tracker).
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Document, Page } from "react-pdf";
@@ -11,13 +11,16 @@ import { Loader2 } from "lucide-react";
 import { generateAngebotPdf, generateRechnungPdf } from "@/lib/pdf/belegPdf";
 import type { Angebot, Rechnung, Kunde, Firmendaten, Ansprechpartner } from "@/lib/api/types";
 import { PdfFieldOverlay } from "./PdfFieldOverlay";
-import { HOTSPOTS_SEITE_1, type Hotspot } from "@/lib/pdf/fieldMap";
+import { A4 } from "@/lib/pdf/hotspotTracker";
+import type { RuntimeHotspot } from "@/lib/pdf/hotspotTracker";
+import { FALLBACK_HOTSPOTS_SEITE_1 } from "@/lib/pdf/fieldMap";
 
 interface CommonProps {
   kunde: Kunde;
   firma: Firmendaten;
   ansprechpartner?: Ansprechpartner;
-  onHotspotClick: (h: Hotspot) => void;
+  /** Inline-Editor pro Hotspot (Render-Prop). */
+  renderEditor: (fieldId: string, close: () => void) => React.ReactNode;
 }
 
 type Props =
@@ -27,13 +30,15 @@ type Props =
 const DEBOUNCE_MS = 300;
 
 export function LivePdfPreview(props: Props) {
-  const { draft, kunde, firma, ansprechpartner, onHotspotClick, kind } = props;
+  const { draft, kunde, firma, ansprechpartner, renderEditor, kind } = props;
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [hotspots, setHotspots] = useState<RuntimeHotspot[]>([]);
   const [numPages, setNumPages] = useState(0);
   const [rendering, setRendering] = useState(false);
   const [buildError, setBuildError] = useState<string | null>(null);
+  const [openHotspotId, setOpenHotspotId] = useState<string | null>(null);
 
   // Container-Breite messen
   useEffect(() => {
@@ -43,7 +48,6 @@ export function LivePdfPreview(props: Props) {
     measure();
     const ro = new ResizeObserver(measure);
     ro.observe(el);
-    // Fallback: wenn nach 1 s noch keine Breite, setze Default — verhindert hängende Vorschau
     const fallback = setTimeout(() => {
       setContainerWidth((w) => (w === 0 ? 600 : w));
     }, 1000);
@@ -53,23 +57,24 @@ export function LivePdfPreview(props: Props) {
     };
   }, []);
 
-  // Debounced PDF-Build
+  // Debounced PDF-Build — alte URL bleibt bis neue geladen ist (kein Flicker).
   useEffect(() => {
     let cancelled = false;
     const timer = setTimeout(async () => {
       setRendering(true);
       setBuildError(null);
       try {
-        const blob =
+        const result =
           kind === "angebot"
             ? await generateAngebotPdf(draft as Angebot, kunde, firma, ansprechpartner)
             : await generateRechnungPdf(draft as Rechnung, kunde, firma, ansprechpartner);
         if (cancelled) return;
-        const newUrl = URL.createObjectURL(blob);
+        const newUrl = URL.createObjectURL(result.blob);
         setPdfUrl((prev) => {
           if (prev) URL.revokeObjectURL(prev);
           return newUrl;
         });
+        setHotspots(result.hotspots);
       } catch (e) {
         console.error(e);
         if (!cancelled) setBuildError(e instanceof Error ? e.message : "PDF konnte nicht erzeugt werden.");
@@ -91,7 +96,24 @@ export function LivePdfPreview(props: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const renderWidth = useMemo(() => Math.min(Math.max(containerWidth - 16, 280), 900), [containerWidth]);
+  const renderWidth = useMemo(
+    () => Math.min(Math.max(containerWidth - 16, 280), 900),
+    [containerWidth],
+  );
+  const scale = renderWidth / A4.width;
+
+  // Falls Tracker-Treffer leer (z.B. Rendering-Glitch), nutze Fallback (Seite 1).
+  const effectiveHotspots: RuntimeHotspot[] = useMemo(() => {
+    if (hotspots.length > 0) return hotspots;
+    return FALLBACK_HOTSPOTS_SEITE_1.map((f) => ({
+      id: f.id,
+      page: f.page,
+      x: f.box.x * A4.width,
+      y: f.box.y * A4.height,
+      w: f.box.w * A4.width,
+      h: f.box.h * A4.height,
+    }));
+  }, [hotspots]);
 
   return (
     <div ref={containerRef} className="relative h-full overflow-y-auto bg-muted/30 px-2 py-3 sm:px-4">
@@ -109,10 +131,16 @@ export function LivePdfPreview(props: Props) {
         </div>
       )}
 
-      {buildError && (
+      {buildError && !pdfUrl && (
         <div className="flex h-full min-h-[40vh] flex-col items-center justify-center gap-2 px-6 text-center text-sm">
           <p className="font-medium text-destructive">PDF konnte nicht erzeugt werden</p>
           <p className="text-xs text-muted-foreground">{buildError}</p>
+        </div>
+      )}
+
+      {buildError && pdfUrl && (
+        <div className="sticky top-2 z-20 mx-auto mb-2 w-fit max-w-[90%] rounded-md border border-destructive/40 bg-destructive/10 px-3 py-1 text-xs text-destructive">
+          Vorschau veraltet — letzter Build fehlgeschlagen: {buildError}
         </div>
       )}
 
@@ -124,25 +152,29 @@ export function LivePdfPreview(props: Props) {
           error={<div className="text-sm text-destructive">PDF kann nicht angezeigt werden.</div>}
           className="flex flex-col items-center gap-4"
         >
-          {Array.from({ length: numPages }, (_, i) => i + 1).map((pageNum) => (
-            <div
-              key={pageNum}
-              className="relative overflow-hidden rounded-md bg-background shadow-sm ring-1 ring-border"
-            >
-              <Page
-                pageNumber={pageNum}
-                width={renderWidth}
-                renderAnnotationLayer={false}
-                renderTextLayer={false}
-              />
-              {pageNum === 1 && (
-                <PdfFieldOverlay
-                  hotspots={HOTSPOTS_SEITE_1}
-                  onHotspotClick={onHotspotClick}
+          {Array.from({ length: numPages }, (_, i) => i + 1).map((pageNum) => {
+            const pageHotspots = effectiveHotspots.filter((h) => h.page === pageNum);
+            return (
+              <div
+                key={pageNum}
+                className="relative overflow-hidden rounded-md bg-background shadow-sm ring-1 ring-border"
+              >
+                <Page
+                  pageNumber={pageNum}
+                  width={renderWidth}
+                  renderAnnotationLayer={false}
+                  renderTextLayer={false}
                 />
-              )}
-            </div>
-          ))}
+                <PdfFieldOverlay
+                  hotspots={pageHotspots}
+                  scale={scale}
+                  openId={openHotspotId}
+                  onOpenChange={setOpenHotspotId}
+                  renderEditor={renderEditor}
+                />
+              </div>
+            );
+          })}
         </Document>
       )}
     </div>

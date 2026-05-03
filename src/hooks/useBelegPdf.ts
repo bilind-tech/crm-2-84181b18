@@ -32,7 +32,7 @@ export function useAngebotPdf(angebot?: Angebot) {
       }
       // 2. Fallback: Browser-Generator
       try {
-        const blob = await generateAngebotPdf(angebot, kunde, firma);
+        const { blob } = await generateAngebotPdf(angebot, kunde, firma);
         if (cancelled) return;
         blobUrl = URL.createObjectURL(blob);
         setUrl(blobUrl);
@@ -79,7 +79,7 @@ export function useRechnungPdf(rechnung?: Rechnung) {
         return;
       }
       try {
-        const blob = await generateRechnungPdf(rechnung, kunde, firma);
+        const { blob } = await generateRechnungPdf(rechnung, kunde, firma);
         if (cancelled) return;
         blobUrl = URL.createObjectURL(blob);
         setUrl(blobUrl);

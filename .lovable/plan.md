@@ -1,108 +1,93 @@
-## Ausgangslage
+# PDF-Editor v2 — Bombastischer Live-Editor
 
-Der System-Update-Flow ist im Backend bereits zu ~80 % implementiert (Manifest-HMAC, Zip-Bomb-Schutz, atomarer Symlink-Swap, Auto-Rollback, Lock-File, Sicherheits-Backup, Healthcheck) und im Frontend mit Upload + Live-Dialog. Es fehlen jedoch mehrere harte Garantien rund um **Datenschutz, Absicherung des Rollbacks und UX-Robustheit**, die wir jetzt schließen.
+## Ziel
+Der Editor unter `/angebote/:id/bearbeiten` und `/rechnungen/:id/bearbeiten` wird zum echten "WYSIWYG-Live-Editor": Hover zeigt eine saubere Box-Umrandung **um den jeweiligen PDF-Bereich** (nicht eng am Text), Klick öffnet ein Inline-Popover direkt am Hotspot zum Sofort-Tippen, alle Seiten (auch Folgeseiten) haben funktionierende Hotspots, und das gespeicherte PDF sieht **exakt** wie die Vorschau aus.
 
-## Ziele dieser Runde
+## Heutiger Stand (kurz)
+- `LivePdfPreview` rendert pdfmake-PDF debounced via `react-pdf`.
+- `PdfFieldOverlay` legt prozentuale Hotspots **nur über Seite 1** (`HOTSPOTS_SEITE_1`).
+- Hotspots sind hart in `fieldMap.ts` codiert → bei Inhaltswachstum (lange Adressen, viele Positionen → Folgeseiten) verrutschen sie.
+- Klick auf Hotspot scrollt ins rechte Panel, **kein Inline-Edit**.
+- Folgeseiten (Seite 2+) haben gar keine Hotspots.
 
-1. **Daten-Verzeichnis ist im gesamten Update-Flow garantiert tabu** (Boot-Check + Pfad-Guard greift für JEDE FS-Mutation des Runners).
-2. **Validierung greift früher und vollständiger** (Migrations-Diff vor Install statt TODO; Manifest-Allowlist von Top-Level-Pfaden; Klartext-Warnung wenn `data/`, `keys/`, `backups/` im ZIP).
-3. **Rollback-Ordner-Politik ist deterministisch** (`current` / `previous` immer konsistent, `broken-*` mit klarer Retention, manueller Rollback nur direkter Vorgänger).
-4. **Live-Step-UI bleibt verlässlich** (SSE-Reconnect → Lauf wird neu geladen, Polling-Fallback, korrekte Cache-Invalidierung).
-5. **Kein Fehler im Rollback-Pfad bleibt unentdeckt** (Rollback-eigener Lauf, eigener Health-Loop, Audit + Recovery-Hinweis).
+## Was wir bauen
 
-## Schritte
+### 1. Echte Koordinaten statt Schätzung — `pdfmake`-Layout-Tracking
+Wir hängen pro PDF-Bereich einen unsichtbaren **Anker** im pdfmake-Doc an (`id: "feld:titel"` über `pdfmake`'s `Node.id`). Nach dem Build lesen wir die tatsächlichen Positionen aus dem fertigen Layout (`pdfMakeDoc.getStream` → wir nutzen den **internen `pageBreakBeforeContext`-/`positions`-Tracker** von pdfmake; alternativ `pdfDoc.getNodePosition(id)`). Daraus erzeugen wir `RuntimeHotspot[]` mit echten `{page, x, y, w, h}` in PDF-Punkten (1 pt = 1/72 in).
 
-### 1. Daten-Schutz wirklich erzwingen
-- `data-guard.assertCodeAndDataSeparated()` in `server.ts` direkt nach `loadConfig()` aufrufen (vor jedem DB-/FS-Open). Hard-Fail beendet Boot.
-- In `system/runner.ts` jeden FS-Mutationspfad (`renameSync`, `symlinkSync`, `unlinkSync`, `rmSync`, `mkdirSync`) durch einen kleinen Helper `safeFs` schleusen, der zuerst `assertNotInDataDir(target, op)` ruft. Damit ist eine Daten-Berührung nicht "ein TODO weglassen" sondern technisch unmöglich.
-- `extractZipSafe` zusätzlich härten: explizite Allowlist von Top-Level-Verzeichnissen (`dist/`, `node_modules/` darf NICHT mit, `package.json`, `package-lock.json`, `manifest.json`, `migrations/`). Alles außerhalb → `ZipError`.
-- Beim `quarantaene`-Step vor dem `renameSync(stagedRoot, targetVersionDir)` `assertNotInDataDir(targetVersionDir)` ergänzen.
+Datei: neu `src/lib/pdf/hotspotTracker.ts`
+- Eingabe: pdfmake `TDocumentDefinitions` mit Anker-IDs
+- Ausgabe: `Map<feldId, {page, x, y, w, h}>`
+- Im Build von `belegPdf.ts` werden `id`-Felder vergeben für: logo, absender, kundeAdresse, meta, titel, anrede, intro, **jede Tabellenzeile als `pos:<id>`**, **summenblock**, outro, footer.
 
-### 2. Validate-Step liefert echten Migrations-Diff
-- Neue Funktion `system/migrations-diff.ts`: liest `extractDir/dist/db/migrations/*.sql`, vergleicht mit `pragma user_version` + ausgeführten Migrationen aus DB-Tabelle. Liefert `{pending: string[], downgrade: boolean}`.
-- Im `/system/update/validate`-Handler statt `pendingMigrations: []` echten Diff zurückgeben. Bei `downgrade=true` → `valide=false` mit klarer Begründung.
-- Frontend zeigt das schon korrekt (`UpdatePackagePreview`), keine UI-Änderung nötig — nur ehrliche Daten.
+### 2. Hotspot-Layer pro Seite
+- `PdfFieldOverlay` bekommt Props `pageNumber`, `pageWidth`, `pageHeight` (in pt), filtert Hotspots auf diese Seite und rechnet pt → CSS-px (`scale = renderWidth / pageWidthPt`).
+- `LivePdfPreview` rendert Overlay für **jede** Seite (nicht nur Seite 1) und übergibt die laufenden Hotspots aus dem Tracker.
+- Folge-Hotspots (z. B. Positionen, die auf Seite 2 umbrechen) erscheinen automatisch dort, wo pdfmake sie wirklich gerendert hat.
 
-### 3. Quarantäne / Symlink-Swap deterministischer
-- `previousLink()` IMMER neu setzen (auch wenn `old===null`, dann `previous` löschen). Aktuell verbleibt sonst ein veraltetes `previous` nach erstem Update.
-- Vor Swap einmalig `readCurrentTarget()` cachen; wenn der Cache nach Swap NICHT mehr `===targetVersionDir` ist, sofort Auto-Rollback.
-- Bei Rollback (auto + manuell): defekte Version landet in `versions/broken-<stamp>/`, NIE löschen wir `previous` selbst.
+### 3. Visuelle Border um die Box (nicht am Text)
+- Hover-Stil: `border-2 border-dashed border-primary/60 rounded-md bg-primary/5` mit kleinem `inset` (–2px) damit die Border **um** den Bereich liegt, plus Schatten-Glow `shadow-[0_0_0_3px_rgba(59,130,246,0.15)]`.
+- Padding der Box wird über pdfmake-Margin gespiegelt — der Hotspot umfasst exakt den Margin-Block, nicht nur die Glyphen.
 
-### 4. Cleanup-Politik
-- `cleanupOldVersions()`: 
-  - `current`, `previous` → niemals löschen.
-  - 1 weitere historische Version (drittälteste) behalten ("Notnagel").
-  - `broken-*` älter 7 Tage → löschen.
-  - Alles andere → löschen.
-- Staging-Reste (`staging/<uploadId>/`) älter 1 h aufräumen — neuer Cron in `server.ts` (`setInterval` 30 min).
+### 4. Inline-Edit-Popover (Click-to-edit live)
+- Klick auf Hotspot öffnet ein **Floating-Popover** (Radix `Popover`, anchored am Hotspot) mit dem passenden Mini-Editor:
+  - Titel/Anrede/Intro/Outro → `Textarea` mit Auto-Resize
+  - Meta/Datum → kleine Inputs
+  - Positions-Zeile → 3 Inputs (Bezeichnung, Menge, Einzelpreis)
+  - Adresse → strukturierte Felder
+- Live-Bind an `useBelegEditor.set()` → Tipp = sofortiger PDF-Rebuild (debounced 300 ms bleibt).
+- Buttons: "Erweitert bearbeiten" → öffnet rechtes Tab-Panel auf dem passenden Feld (heutiges Verhalten als Fallback).
+- ESC schließt, Tab navigiert zum nächsten Hotspot in Lese-Reihenfolge.
+- Auf Mobile öffnet stattdessen ein Bottom-Sheet (gleicher Inhalt).
 
-### 5. Manueller Rollback abgesichert
-- Backend prüft jetzt schon "Zielversion existiert"; zusätzlich:
-  - Nur `targetVersion === basename(previousLink())` ist erlaubt → 400 sonst. Damit kein "drei Versionen zurück"-Sprung.
-  - Healthcheck-Fail im Rollback-Lauf → Status `fehler` (nicht `rollback`), Audit `system.update.rollback_smoketest_fehler`, UI zeigt rote Banner-Box mit Anweisung "Pi neu starten".
-- Lockout (3 Fehlversuche → 15 min) bleibt; zusätzlich Audit pro Versuch.
+Neu: `src/components/pdf-editor/HotspotInlineEditor.tsx` (Switch nach `feldId`).
 
-### 6. Live-Step-UI härten
-- `useLiveEvents` für `system:update:phase` invalidiert bereits `["system","update","lauf",laufId]` — sicherstellen dass `["system","update","lauf","aktuell"]` ebenfalls invalidiert wird, damit ein Reload-Mid-Update den Dialog wieder einblendet.
-- Im `UpdateProgressDialog`: bei SSE-Disconnect (über `onSseStatus`) Polling auf 2 s reduzieren; bei `connected` zurück auf SSE-only.
-- Schließen-Knopf während `status==="laeuft"` deaktivieren — verhindert versehentliches Schließen, wenn ein User denkt es hängt.
-- Ein neuer `OperationLockBanner` oben im Tab, wenn `isUpdateRunning` (über `useAktuellerUpdateLauf`) — blockiert Upload/Rollback-Buttons, statt nur Toast.
+### 5. Stabile Vorschau ohne Flicker
+- Während Rebuild bleibt das **alte PDF sichtbar** (kein "PDF wird erzeugt …" wenn schon eines da ist) — nur das kleine Sticky-"aktualisiert…"-Badge.
+- `URL.revokeObjectURL` erst **nach** `onLoadSuccess` der neuen Doc, sonst Race.
+- `numPages` wird pro File neu gesetzt; Scrollposition via `useLayoutEffect` erhalten.
+- Build-Errors zeigen Toast + Inline-Fehlerstreifen oben, behalten aber alte Vorschau.
 
-### 7. Recovery-Pfade
-- `reapStaleLock()` beim Boot loggt Audit `system.update.lock_recovered` und schreibt einen "letzter Lauf wurde unterbrochen"-Eintrag, falls in DB ein Lauf mit `status="laeuft"` hängt → wird auf `fehler` gesetzt mit Begründung "Backend-Restart während Update". Frontend zeigt das in der Historie als roter Eintrag, mit Button "Sicherheits-Backup wiederherstellen" (verlinkt in Backup-Tab, vorausgewählt).
-- Frontend `ErrorRecoveryHint`: Wird nach `status==="fehler"` UND `safetyBackupId` gezeigt → "Sicherheits-Backup XYZ wurde vorher angelegt. Wiederherstellen?".
+### 6. Robustheit & Edge-Cases
+- Tracker-Ausfall (z. B. neue pdfmake-Version) → Fallback auf bisherige groben `HOTSPOTS_SEITE_1`-Boxen, damit der Editor nie "leer" ist.
+- Mehrere Tabellen-Seiten: jede Position bekommt eigene `pos:<id>`-Hotspot, Klick öffnet Zeilen-Editor.
+- Sehr lange Adressen / fehlende optionale Felder → Hotspots schrumpfen/verschieben sich automatisch.
+- Speichern: bestehender `useBelegEditor.save()` wird **nicht** angefasst — PDF-Generator bleibt einzige Wahrheit, Inline-Edit ändert nur den Draft.
 
-### 8. Tests / Dev-Hilfen (kurz)
-- Kleines CLI-Skript `backend/scripts/build-test-pakete.ts` (nur Dev), das ein gültig signiertes Test-ZIP gegen `dev-root/` baut — manuelle Smoke-Test des Flows ohne Pi.
+### 7. Garantie "PDF == Vorschau"
+- Anzeige & Export benutzen denselben `generateAngebotPdf` / `generateRechnungPdf` (schon der Fall).
+- Wir entfernen jegliche reinen UI-Overlays aus dem Export-Pfad (Hotspot-Layer ist DOM-only, nie Teil der pdfmake-Doc).
+- Test: nach Save vergleichen wir SHA-256 von Preview-Blob und gespeichertem PDF in einem Dev-Assert (nur `import.meta.env.DEV`).
 
-## Technisches Detail
+## Technische Details (kompakt)
 
 ```text
-/opt/mycleancenter/                 ← appRoot()
-  current   ──► versions/2026-05-03T10-12-00-000Z/   (symlink)
-  previous  ──► versions/2026-04-28T22-08-13-000Z/   (symlink)
-  staging/<uploadId>/extract/...                     (entpacktes ZIP)
-  staging/.install.lock                              (PID-Lock)
-  versions/
-    2026-05-03T10-12-00-000Z/   ← jetzt aktiv
-    2026-04-28T22-08-13-000Z/   ← previous
-    broken-2026-04-15T...       ← evtl. Reste, 7-Tage-Retention
-/var/lib/mycleancenter/            ← config.dataDir  (data-guard NIEMALS schreibbar im Update)
-  app.sqlite, backups/, keys/master.key, drive-token.enc
+LivePdfPreview
+ ├─ generate*Pdf(draft) ──► Blob + Hotspot-Map (Tracker)
+ ├─ react-pdf <Document>
+ │   └─ je Seite: <Page> + <PdfFieldOverlay pageNumber pageSize hotspots/>
+ │                          └─ <button> (Hover-Border) → onClick → Popover
+ │                                                                  └─ HotspotInlineEditor
+ └─ Sticky-Badge "aktualisiert…"
 ```
 
-State-Diagramm Update-Lauf:
-```text
-entpacken → backup → quarantaene → install → migrations → neustart → smoketest → ✓erfolg
-                          │            │          │           │           │
-                          ▼            ▼          ▼           ▼           ▼
-                       (vor Swap: einfach abbrechen, kein Rollback nötig)
-                                       │
-                                       └─ ab hier Auto-Rollback: rollback-Step → swap zurück → broken-* sichern
-```
+Dateien:
+- **neu**: `src/lib/pdf/hotspotTracker.ts`
+- **neu**: `src/components/pdf-editor/HotspotInlineEditor.tsx`
+- **edit**: `src/lib/pdf/belegPdf.ts` (Anker-IDs, Tracker-Aufruf, Rückgabe `{blob, hotspots}`)
+- **edit**: `src/lib/pdf/fieldMap.ts` (Tab/Label-Map bleibt, Geometrie raus)
+- **edit**: `src/components/pdf-editor/LivePdfPreview.tsx` (Multi-Page-Overlay, Flicker-frei)
+- **edit**: `src/components/pdf-editor/PdfFieldOverlay.tsx` (pt→px-Scale, Box-Border-Style, Popover-Anker)
+- **edit**: `src/components/pdf-editor/PdfEditorLayout.tsx` (Inline-Editor verkabeln)
 
-Geänderte/neue Dateien (Backend):
-- `backend/src/server.ts` — Boot-Guard + Stale-Lauf-Recovery + Staging-Cleanup-Cron.
-- `backend/src/system/runner.ts` — `safeFs`-Wrapper, Allowlist-Validate, deterministisches `previous`, manueller-Rollback nur direkter Vorgänger, Healthcheck-Fail im Rollback hart.
-- `backend/src/system/zip.ts` — Top-Level-Allowlist erweitern.
-- `backend/src/system/migrations-diff.ts` (neu) — echter Diff.
-- `backend/src/system/repo.ts` — `markStaleLaeufeAlsFehler()`.
-- `backend/src/routes/system.ts` — `/validate` füllt `pendingMigrations`; Rollback prüft "nur direkter Vorgänger".
+Keine Backend-Änderungen, keine Datenmigration, keine neuen Dependencies (Radix Popover ist schon im Projekt, react-pdf/pdfmake bleiben).
 
-Frontend:
-- `src/components/einstellungen/SystemUpdateTab.tsx` — `OperationLockBanner`, Schließen-Sperre, Recovery-Hinweis nach `fehler`.
-- `src/components/einstellungen/UpdateProgressDialog.tsx` — SSE-Disconnect-Polling-Fallback.
-- `src/hooks/useLiveEvents.ts` — `system:update:phase` invalidiert auch `["system","update","lauf","aktuell"]`.
+## Reihenfolge der Umsetzung
+1. Hotspot-Tracker + Anker in `belegPdf.ts` (Rückgabe `{blob, hotspots}`).
+2. `LivePdfPreview` auf neue Rückgabe + Multi-Page-Overlay + Flicker-freier Rebuild.
+3. `PdfFieldOverlay` neuer Box-Border-Style + Popover-Anker.
+4. `HotspotInlineEditor` mit Mini-Editoren je Feldtyp.
+5. Fallback-Geometrie + Dev-Assert "Preview == Save".
+6. QA: Angebot mit 1 Seite, mit 30 Positionen (3 Seiten), Rechnung mit langer Adresse, Mobile-Bottom-Sheet.
 
-Keine DB-Migration erforderlich — `system_update_lauf` reicht aus, nur Status-Update bestehender Zeilen.
-
-## Garantien nach dieser Runde
-
-- Daten-Verzeichnis kann durch Code-Update **technisch** nicht angefasst werden (Boot-Check + Pfad-Guard + ZIP-Allowlist).
-- Vor jedem destruktiven Schritt liegt ein Sicherheits-Backup mit fester ID, die im Lauf gespeichert ist und im UI verlinkt wird.
-- Fehler vor Symlink-Swap → System ist 100 % unverändert.
-- Fehler nach Symlink-Swap → automatischer Rollback auf `previous`, defekte Version in `broken-*` archiviert.
-- Manueller Rollback ist nur auf `previous` möglich, passwortgeschützt, mit Lockout.
-- Backend-Crash mitten im Update → beim nächsten Start Lock entfernt, hängender Lauf als `fehler` markiert, UI bietet Restore an.
-
-Sag „weiter", dann setze ich Schritt 1–4 (Backend-Hardening + Validate-Diff) um, danach 5–7 (Rollback + UI).
+Sag „weiter", dann setze ich Schritt 1–3 um, danach 4–6.

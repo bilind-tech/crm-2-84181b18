@@ -13,7 +13,9 @@ const ResizablePanel = Panel;
 const PanelResizeHandle = Separator;
 import { LivePdfPreview } from "./LivePdfPreview";
 import { EditorPanel, type EditorTab } from "./EditorPanel";
+import { HotspotInlineEditor } from "./HotspotInlineEditor";
 import { useBelegEditor } from "@/hooks/useBelegEditor";
+import { metaForId } from "@/lib/pdf/fieldMap";
 import type { Angebot, Rechnung, Kunde, Firmendaten, Ansprechpartner, BelegOptionen } from "@/lib/api/types";
 
 type Props =
@@ -43,12 +45,22 @@ export function PdfEditorLayout(props: Props) {
   const titlePrefix = kind === "angebot" ? "Angebot" : "Rechnung";
   const draft = editor.draft;
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const handleHotspot = (h: any) => {
-    setActiveTab(h.tab);
-    setMobileView("editor");
-    editor.focusField(h.fieldId);
-  };
+  const renderEditor = (fieldId: string, close: () => void) => (
+    <HotspotInlineEditor
+      fieldId={fieldId}
+      draft={draft}
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      set={editor.set as any}
+      onOpenAdvanced={() => {
+        const meta = metaForId(fieldId);
+        setActiveTab(meta.tab as EditorTab);
+        setMobileView("editor");
+        editor.focusField(meta.fieldId);
+        close();
+      }}
+      onClose={close}
+    />
+  );
 
   const preview = (
     <LivePdfPreview
@@ -58,7 +70,7 @@ export function PdfEditorLayout(props: Props) {
       kunde={kunde}
       firma={firma}
       ansprechpartner={ansprechpartner}
-      onHotspotClick={handleHotspot}
+      renderEditor={renderEditor}
     />
   );
 
