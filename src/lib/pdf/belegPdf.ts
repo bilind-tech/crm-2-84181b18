@@ -321,11 +321,11 @@ export function defaultOutroAngebot(a: Angebot, opts: BuildOptions = {}) {
   ].filter(Boolean);
   return teile.join("\n\n");
 }
-function defaultIntroRechnung(_r: Rechnung, opts: BuildOptions) {
+export function defaultIntroRechnung(_r: Rechnung, opts: BuildOptions = {}) {
   if (opts.intro) return opts.intro;
   return `hiermit übersenden wir Ihnen die Rechnung für folgende Leistungen:`;
 }
-function defaultOutroRechnung(_r: Rechnung, opts: BuildOptions) {
+export function defaultOutroRechnung(_r: Rechnung, opts: BuildOptions = {}) {
   if (opts.outro) return opts.outro;
   const teile = [
     "Vielen Dank für Ihren Auftrag.",
