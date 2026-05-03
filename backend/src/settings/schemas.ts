@@ -158,6 +158,26 @@ export const StundenzettelSchema = z.object({
     ),
 });
 
+// GitHub als Update-Quelle (One-Click-Update aus dem Pi heraus).
+// PAT wird separat als verschlüsseltes Secret unter SENSITIVE_KEYS.githubToken gespeichert.
+export const GithubUpdateSchema = z.object({
+  repo: z
+    .string()
+    .trim()
+    .max(200)
+    .default("")
+    .refine((v) => v === "" || /^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/.test(v), {
+      message: "Format: besitzer/repo",
+    }),
+  branch: z.string().trim().min(1).max(100).default("main"),
+  autoCheck: z.coerce.boolean().default(true),
+});
+export type GithubUpdateSettings = z.infer<typeof GithubUpdateSchema>;
+
+export const GithubTokenSchema = z.object({
+  token: z.string().min(20).max(500),
+});
+
 // Bereich-Definition: name -> Schema, sensible-flag.
 export interface Area<T extends z.ZodTypeAny = z.ZodTypeAny> {
   key: string;
@@ -184,4 +204,5 @@ export const SENSITIVE_KEYS = {
   smtpPassword: "smtp.password",
   googleClientSecret: "googleDrive.clientSecret",
   googleRefreshToken: "googleDrive.refreshToken",
+  githubToken: "githubUpdate.token",
 } as const;

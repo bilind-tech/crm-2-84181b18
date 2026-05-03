@@ -33,6 +33,7 @@ import { Section } from "./_shared";
 import { LoadingPlaceholder } from "@/components/layout/LoadingPlaceholder";
 import { UpdateUploadDropzone } from "./UpdateUploadDropzone";
 import { RollbackConfirmDialog } from "./RollbackConfirmDialog";
+import { GitHubUpdateCard } from "./GitHubUpdateCard";
 import {
   useSystemInfo,
   useUpdateHistorie,
@@ -194,10 +195,21 @@ export function SystemUpdateTab() {
         </div>
       </Section>
 
-      {/* ─── Update einspielen ──────────────────────────────────────── */}
+      {/* ─── GitHub-One-Click-Update ────────────────────────────────── */}
       <Section
-        title="Update einspielen"
-        description="Lade das neue Update-Paket (.zip) hoch — Daten bleiben unberührt."
+        title="Aus GitHub aktualisieren"
+        description="Verbinde dein Repository — dann reicht ein Klick. Daten bleiben unberührt."
+      >
+        <GitHubUpdateCard
+          onLaufGestartet={(id) => setActiveLaufId(id)}
+          updateLaeuft={!!aktuellerLauf && aktuellerLauf.status === "laeuft"}
+        />
+      </Section>
+
+      {/* ─── Update einspielen (ZIP-Upload als Fallback) ─────────────── */}
+      <Section
+        title="Update aus Datei (manuell)"
+        description="Alternativ: lade ein .zip-Paket hoch — Daten bleiben unberührt."
       >
         {aktuellerLauf && aktuellerLauf.status === "laeuft" ? (
           <div className="flex items-start gap-3 rounded-xl border border-primary/30 bg-primary/5 p-4 text-sm">

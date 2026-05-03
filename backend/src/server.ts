@@ -21,6 +21,7 @@ import { benachrichtigungRoutes } from "./routes/benachrichtigung.js";
 import { auditRoutes } from "./routes/audit.js";
 import { eventsRoutes } from "./routes/events.js";
 import { systemRoutes } from "./routes/system.js";
+import { systemGithubRoutes } from "./routes/system-github.js";
 import { steuernRoutes } from "./routes/steuern.js";
 import { dokumenteRoutes } from "./routes/dokumente.js";
 import { protokolleRoutes } from "./routes/protokolle.js";
@@ -153,6 +154,7 @@ async function main(): Promise<void> {
   await app.register(auditRoutes);
   await app.register(eventsRoutes);
   await app.register(systemRoutes);
+  await app.register(systemGithubRoutes);
   await app.register(steuernRoutes);
   await app.register(dokumenteRoutes);
   await app.register(protokolleRoutes);
