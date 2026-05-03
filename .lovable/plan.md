@@ -1,41 +1,51 @@
-Ich habe die PDF-Stellen geprüft. Der wichtigste Fund: Der Browser-PDF-Generator nutzt aktuell noch die alte pdfmake-Callback-Variante `getBlob((blob) => ...)`. In der installierten pdfmake-Version `0.3.x` ist `getBlob()` aber async/promise-basiert. Dadurch kann der Promise in unserer App hängen bleiben — Ergebnis: `PDF wird erzeugt …` lädt endlos. Das betrifft Rechnung, Angebot, Auge-Icon, Detailkarte, E-Mail-Dialog und den Live-PDF-Editor, weil alle denselben Generator verwenden.
+Ich habe den aktuellen Fehler eingegrenzt: Die PDF-Datei wird inzwischen offenbar erzeugt, aber die Anzeige scheitert am PDF-Viewer. In der Konsole steht:
 
-Plan zur Behebung:
+```text
+Setting up fake worker failed: "Module name, 'pdf.worker.mjs' does not resolve to a valid URL."
+```
 
-1. PDF-Generator korrigieren
-   - In `src/lib/pdf/belegPdf.ts` die pdfmake-Initialisierung robust machen.
-   - VFS/Schriften korrekt über `addVirtualFileSystem(...)` bzw. kompatiblen Fallback registrieren.
-   - `renderPdf(...)` von Callback-API auf `await pdfMake.createPdf(doc).getBlob()` umstellen.
-   - Zusätzlich eine Timeout-/Fehlerbehandlung einbauen, damit nie wieder ein endloser Spinner ohne Fehlermeldung stehen bleibt.
+Das heißt: Der erzeugte PDF-Blob ist wahrscheinlich vorhanden, aber `react-pdf`/PDF.js kann seinen Worker nicht laden. Deshalb verschwindet der Spinner und es bleibt leer bzw. im Live-Editor erscheint „PDF kann nicht angezeigt werden“.
 
-2. PDF-Hook stabilisieren
-   - In `src/hooks/useBelegPdf.ts` sicherstellen, dass bei jeder neuen Rechnung/jedem neuen Angebot alter Fehler und alte URL sauber zurückgesetzt werden.
-   - Bei fehlenden Basisdaten nicht stumm auf `idle` hängen bleiben, sondern zuverlässig auf `loading`, `ready` oder `error` gehen.
-   - Optional einen kurzen Schutz-Timeout einbauen, sodass die UI statt Endlos-Laden eine verständliche Fehlermeldung zeigt.
+Plan zur Reparatur:
 
-3. PDF-Anzeige an allen Stellen absichern
-   - `PdfViewerDialog` so anpassen, dass die Anzeige auch funktioniert, wenn `react-pdf` die Seitenanzahl nicht sofort liefert.
-   - Bei `Document`-Fehlern einen sichtbaren Fehler statt leerer Fläche anzeigen.
-   - Das betrifft insbesondere:
-     - Detailseite Rechnung unten
-     - Auge-Icon in der Rechnungsübersicht
-     - Angebot-PDFs analog
-     - Live-PDF-Editor
+1. PDF.js-Worker korrekt dort setzen, wo `react-pdf` genutzt wird
+   - Die bisherige Datei `src/lib/pdf/pdfjsWorker.ts` setzt den Worker separat.
+   - Laut `react-pdf` v10 muss `pdfjs.GlobalWorkerOptions.workerSrc` im gleichen Modul gesetzt werden, in dem `<Document>`/`<Page>` gerendert werden, weil `react-pdf` sonst später wieder den Default `pdf.worker.mjs` setzen kann.
+   - Ich passe `PdfViewerDialog.tsx` und `LivePdfPreview.tsx` so an, dass sie direkt `pdfjs` importieren und den Worker mit `new URL("pdfjs-dist/build/pdf.worker.min.mjs", import.meta.url).toString()` konfigurieren.
 
-4. Live-Editor prüfen/anpassen
-   - `src/components/pdf-editor/LivePdfPreview.tsx` nutzt denselben PDF-Generator und profitiert vom Generator-Fix.
-   - Ich ergänze dort ebenfalls eine robuste Fehler-/Timeout-Behandlung, damit der Live-Editor nicht endlos lädt.
+2. Anzeige-Fehler sichtbar und diagnostizierbar machen
+   - In `PdfViewerDialog.tsx` und `LivePdfPreview.tsx` ergänze ich `onLoadError`, damit der genaue PDF.js-Fehler in der UI angezeigt wird statt nur „nichts“ oder einem generischen roten Text.
+   - Dadurch sieht man bei zukünftigen PDF-Problemen sofort, ob der PDF-Blob defekt ist oder nur der Viewer nicht laden kann.
 
-5. Technische Verifikation ohne Browser-Navigation
-   - Nach Umsetzung per Codeprüfung und automatischem Test/Runtime-Check sicherstellen, dass:
-     - `generateRechnungPdf(...)` tatsächlich einen PDF-Blob erzeugt.
-     - Der Blob `application/pdf` ist und nicht leer ist.
-     - Der Viewer-Status von `loading` nach `ready` wechselt.
-   - Keine Änderung am echten Datenverzeichnis oder am Pi-Update-/Backup-System.
+3. Detailseite wirklich mit Vorschau statt nur Status-Karte versehen
+   - Die Detailseite zeigt aktuell nur eine kompakte Karte „PDF bereit“ plus Button; sie rendert die PDF nicht inline.
+   - Ich erweitere `PdfPreviewCard`, sodass bei `status === "ready"` und vorhandener `pdfUrl` eine kleine erste-Seite-Vorschau direkt in der Detailseite angezeigt wird.
+   - Der Button „PDF ansehen“ öffnet weiterhin den großen Dialog.
 
-Erwartetes Ergebnis nach Freigabe:
-- Rechnung erstellen → PDF wird wirklich erzeugt.
-- Detailseite unten zeigt nicht dauerhaft Spinner, sondern `PDF bereit` oder eine klare Fehlermeldung.
-- Auge-Icon in der Rechnungsübersicht öffnet die Rechnung sichtbar.
-- Angebot-PDFs funktionieren analog.
-- Live-PDF-Editor lädt die Vorschau statt endlos zu hängen.
+4. Doppelte PDF-Erzeugung vermeiden
+   - Momentan erzeugt die Detailseite über `useRechnungPdf(r)` eine PDF und der `PdfViewButton` erzeugt beim Öffnen nochmal eine eigene PDF. Das kann zu leeren Zuständen und unnötiger Arbeit führen.
+   - Ich passe die Komponenten so an, dass die Detailseite ihre bereits erzeugte `pdf.url/status/error` an den Viewer-Button übergeben kann.
+   - Für Listen/Übersichten bleibt der Button weiterhin selbstständig, damit das Auge-Icon dort funktioniert.
+
+5. Live-Editor stabilisieren
+   - `LivePdfPreview.tsx` nutzt denselben reparierten Worker.
+   - Wenn PDF.js einmal noch nicht laden kann, bleibt die erzeugte Datei/Fehlermeldung nachvollziehbar, statt nur rot und unklar zu bleiben.
+
+6. Kurztest nach Umsetzung
+   - Rechnung erstellen/öffnen: Detailseite zeigt PDF-Vorschau.
+   - „PDF ansehen“: Dialog zeigt Seiten statt leerem Bereich.
+   - „PDF bearbeiten“: Live-Editor zeigt die PDF links.
+   - Auge-Icon in Rechnungsübersicht: Dialog zeigt PDF korrekt.
+
+Technische Dateien, die ich voraussichtlich ändere:
+
+```text
+src/components/pdf/PdfViewerDialog.tsx
+src/components/pdf/PdfPreviewCard.tsx
+src/components/pdf/PdfViewButton.tsx
+src/components/pdf-editor/LivePdfPreview.tsx
+src/routes/rechnungen.$id.tsx
+src/routes/angebote.$id.tsx
+```
+
+Optional kann `src/lib/pdf/pdfjsWorker.ts` danach entweder ungenutzt bleiben oder auf die neue Worker-Konfigurationsfunktion reduziert werden. Wichtig ist aber: Der Worker muss direkt in den Viewer-Modulen gesetzt werden.

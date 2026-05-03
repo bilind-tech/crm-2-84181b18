@@ -6,7 +6,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Document, Page } from "react-pdf";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
-import "@/lib/pdf/pdfjsWorker";
+import { configurePdfWorker } from "@/lib/pdf/pdfjsWorker";
+
+configurePdfWorker();
 import { Loader2 } from "lucide-react";
 import { generateAngebotPdf, generateRechnungPdf } from "@/lib/pdf/belegPdf";
 import type { Angebot, Rechnung, Kunde, Firmendaten, Ansprechpartner } from "@/lib/api/types";
@@ -38,6 +40,7 @@ export function LivePdfPreview(props: Props) {
   const [numPages, setNumPages] = useState(0);
   const [rendering, setRendering] = useState(false);
   const [buildError, setBuildError] = useState<string | null>(null);
+  const [viewerError, setViewerError] = useState<string | null>(null);
   const [openHotspotId, setOpenHotspotId] = useState<string | null>(null);
 
   // Container-Breite messen
@@ -75,6 +78,7 @@ export function LivePdfPreview(props: Props) {
           return newUrl;
         });
         setHotspots(result.hotspots);
+        setViewerError(null);
       } catch (e) {
         console.error(e);
         if (!cancelled) setBuildError(e instanceof Error ? e.message : "PDF konnte nicht erzeugt werden.");
@@ -144,10 +148,17 @@ export function LivePdfPreview(props: Props) {
         </div>
       )}
 
-      {pdfUrl && containerWidth > 0 && (
+      {pdfUrl && containerWidth > 0 && !viewerError && (
         <Document
           file={pdfUrl}
-          onLoadSuccess={({ numPages }) => setNumPages(numPages)}
+          onLoadSuccess={({ numPages }) => {
+            setNumPages(numPages);
+            setViewerError(null);
+          }}
+          onLoadError={(err) => {
+            console.error("[LivePdfPreview] Document load error", err);
+            setViewerError(err?.message || String(err));
+          }}
           loading={null}
           error={<div className="text-sm text-destructive">PDF kann nicht angezeigt werden.</div>}
           className="flex flex-col items-center gap-4"
@@ -176,6 +187,16 @@ export function LivePdfPreview(props: Props) {
             );
           })}
         </Document>
+      )}
+
+      {viewerError && pdfUrl && (
+        <div className="flex h-full min-h-[40vh] flex-col items-center justify-center gap-2 px-6 text-center text-sm">
+          <p className="font-medium text-destructive">PDF kann nicht angezeigt werden</p>
+          <p className="text-xs text-muted-foreground">{viewerError}</p>
+          <a href={pdfUrl} download className="mt-2 text-xs underline text-primary">
+            PDF trotzdem herunterladen
+          </a>
+        </div>
       )}
     </div>
   );

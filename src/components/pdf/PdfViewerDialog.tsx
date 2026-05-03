@@ -2,7 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import { Document, Page } from "react-pdf";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
-import "@/lib/pdf/pdfjsWorker";
+import { configurePdfWorker } from "@/lib/pdf/pdfjsWorker";
+
+// react-pdf v10: workerSrc MUSS im gleichen Modul wie <Document> gesetzt werden.
+configurePdfWorker();
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useNavigate } from "@tanstack/react-router";
 
@@ -39,6 +42,13 @@ export function PdfViewerDialog({
   const [containerWidth, setContainerWidth] = useState<number>(0);
   const [numPages, setNumPages] = useState<number>(0);
   const [currentPage, setCurrentPage] = useState<number>(1);
+  const [viewerError, setViewerError] = useState<string | null>(null);
+
+  // Reset Viewer-Fehler, wenn neue PDF reinkommt
+  useEffect(() => {
+    setViewerError(null);
+    setNumPages(0);
+  }, [pdfUrl]);
 
   // Container-Breite messen für responsive PDF-Skalierung
   useEffect(() => {
@@ -156,10 +166,14 @@ export function PdfViewerDialog({
             </div>
           )}
 
-          {!isLoading && !isError && pdfUrl && containerWidth > 0 && (
+          {!isLoading && !isError && pdfUrl && containerWidth > 0 && !viewerError && (
             <Document
               file={pdfUrl}
               onLoadSuccess={({ numPages }) => setNumPages(numPages)}
+              onLoadError={(err) => {
+                console.error("[PdfViewerDialog] Document load error", err);
+                setViewerError(err?.message || String(err));
+              }}
               loading={
                 <div className="flex min-h-[40vh] items-center justify-center text-sm text-muted-foreground">
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -182,10 +196,26 @@ export function PdfViewerDialog({
                     width={Math.min(containerWidth - 4, 900)}
                     renderAnnotationLayer={false}
                     renderTextLayer={false}
+                    onRenderError={(err) => {
+                      console.error("[PdfViewerDialog] Page render error", err);
+                    }}
                   />
                 </div>
               ))}
             </Document>
+          )}
+
+          {viewerError && (
+            <div className="flex h-full min-h-[40vh] flex-col items-center justify-center gap-2 px-6 text-center text-sm text-destructive">
+              <AlertCircle className="h-6 w-6" />
+              <div className="font-medium">PDF kann nicht angezeigt werden</div>
+              <div className="text-xs text-muted-foreground">{viewerError}</div>
+              {pdfUrl && (
+                <a href={pdfUrl} download={fileName} className="mt-2 text-xs underline text-primary">
+                  PDF trotzdem herunterladen
+                </a>
+              )}
+            </div>
           )}
         </div>
       </DialogContent>
