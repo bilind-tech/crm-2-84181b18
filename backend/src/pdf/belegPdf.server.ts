@@ -10,15 +10,34 @@ import { loadFirmaForPdf, loadLogoDataUrl } from "./firma.js";
 import type { ApiAngebot, ApiRechnung } from "../belege/mappers.js";
 import type { ApiKunde, ApiAnsprechpartner } from "../kunden/mappers.js";
 
+function safe(s: string): string {
+  return s.replace(/[^\p{L}\p{N}\- _]/gu, "").replace(/\s+/g, " ").trim();
+}
+function kundeName(k: ApiKunde): string {
+  return safe(k.firmenname || [k.vorname, k.nachname].filter(Boolean).join(" ") || k.nummer);
+}
+function mmYYYY(iso?: string | null): string {
+  const d = iso ? new Date(iso) : new Date();
+  if (isNaN(d.getTime())) return mmYYYY(undefined);
+  const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
+  return `${mm}-${d.getUTCFullYear()}`;
+}
+function nummerForFilename(n: string): string {
+  return n.replace(/\//g, "-");
+}
 function dateinameAngebot(a: ApiAngebot, k: ApiKunde): string {
-  const kn = (k.firmenname || [k.vorname, k.nachname].filter(Boolean).join(" ") || k.nummer)
-    .replace(/[^\p{L}\p{N}\- _]/gu, "").trim();
-  return `Angebot ${a.nummer} ${kn}.pdf`.replace(/\s+/g, " ");
+  const teile = [`Angebot ${nummerForFilename(a.nummer)}`, kundeName(k)];
+  const titel = safe(a.titel || "");
+  if (titel) teile.push(`– ${titel}`);
+  teile.push(`(${mmYYYY(a.erstelltAm)})`);
+  return `${teile.join(" ")}.pdf`.replace(/\s+/g, " ");
 }
 function dateinameRechnung(r: ApiRechnung, k: ApiKunde): string {
-  const kn = (k.firmenname || [k.vorname, k.nachname].filter(Boolean).join(" ") || k.nummer)
-    .replace(/[^\p{L}\p{N}\- _]/gu, "").trim();
-  return `Rechnung ${r.nummer} ${kn}.pdf`.replace(/\s+/g, " ");
+  const teile = [`Rechnung ${nummerForFilename(r.nummer)}`, kundeName(k)];
+  const titel = safe(r.titel || "");
+  if (titel) teile.push(`– ${titel}`);
+  teile.push(`(${mmYYYY(r.rechnungsdatum || r.erstelltAm)})`);
+  return `${teile.join(" ")}.pdf`.replace(/\s+/g, " ");
 }
 
 export interface RenderResult {
