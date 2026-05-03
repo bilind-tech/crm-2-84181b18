@@ -115,65 +115,67 @@ function footer(f: FirmaForPdf) {
   };
 }
 
-function ausfuehrungText(p: ApiPosition): string {
+function stundenText(p: ApiPosition): string {
+  if (p.modus === "pauschal") return "";
+  const menge = p.menge.toLocaleString("de-DE", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  return `${menge} ${p.einheit}`;
+}
+function abrechnungsartText(p: ApiPosition): string {
   if (p.ausfuehrung && p.ausfuehrung.trim()) return p.ausfuehrung;
   if (p.modus === "pauschal") return "Pauschal";
-  const menge = p.menge.toLocaleString("de-DE", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
-  return `${menge} ${p.einheit}\n(à ${eur(p.einzelpreisNetto)})`;
+  return `à ${eur(p.einzelpreisNetto)}`;
 }
 
 function leistungstabelle(positionen: ApiPosition[], totalsT: { netto: number; steuer: number; brutto: number }, steuersatz: number) {
   const headerRow = [
-    { text: "Ausführung", bold: true, fontSize: 10, color: COLOR_TEXT, margin: [0, 4, 0, 4] },
     { text: "Leistung", bold: true, fontSize: 10, color: COLOR_TEXT, margin: [0, 4, 0, 4] },
+    { text: "Stunden", bold: true, fontSize: 10, color: COLOR_TEXT, alignment: "center", margin: [0, 4, 0, 4] },
+    { text: "Abrechnungsart", bold: true, fontSize: 10, color: COLOR_TEXT, alignment: "center", margin: [0, 4, 0, 4] },
     { text: "Preis ohne MwSt.", bold: true, fontSize: 10, color: COLOR_TEXT, alignment: "right", margin: [0, 4, 0, 4] },
   ];
   const body: unknown[][] = [headerRow];
   positionen.forEach((p) => {
     body.push([
-      { text: ausfuehrungText(p), fontSize: 10 },
-      beschreibungBlock(p.beschreibung || ""),
+      { stack: [beschreibungBlock(p.beschreibung || "")] },
+      { text: stundenText(p), fontSize: 10, alignment: "center" },
+      { text: abrechnungsartText(p), fontSize: 10, alignment: "center" },
       { text: eur(summe(p)), fontSize: 10, alignment: "right" },
     ]);
   });
   body.push([
-    { text: "Zwischensumme (netto)", colSpan: 2, fontSize: 10, alignment: "right" },
+    { text: `Zzgl. gesetzlicher Mehrwertsteuer ${steuersatz}%`, colSpan: 3, fontSize: 10 },
     {},
-    { text: eur(totalsT.netto), fontSize: 10, alignment: "right" },
-  ]);
-  body.push([
-    { text: `Zzgl. gesetzliche Mehrwertsteuer ${steuersatz}%`, colSpan: 2, fontSize: 10, alignment: "right" },
     {},
     { text: eur(totalsT.steuer), fontSize: 10, alignment: "right" },
   ]);
   body.push([
-    { text: "Gesamtbetrag inkl. MwSt.", colSpan: 2, fontSize: 10, alignment: "right", bold: true },
+    { text: "Gesamtbetrag inkl. MwSt.", colSpan: 3, fontSize: 10, bold: true },
+    {},
     {},
     { text: eur(totalsT.brutto), fontSize: 10, alignment: "right", bold: true },
   ]);
-  const totalRows = body.length;
   return {
     table: {
       headerRows: 1,
       keepWithHeaderRows: 1,
       dontBreakRows: true,
-      widths: [110, "*", 90],
+      widths: ["*", 60, 90, 85],
       body,
     },
     layout: {
-      hLineWidth: (i: number) => (i === 0 || i === totalRows ? 0.7 : 0.4),
-      vLineWidth: () => 0,
-      hLineColor: () => COLOR_LINE,
-      vLineColor: () => COLOR_LINE,
-      paddingTop: () => 7,
-      paddingBottom: () => 7,
-      paddingLeft: () => 6,
-      paddingRight: () => 6,
+      hLineWidth: () => 0.6,
+      vLineWidth: () => 0.6,
+      hLineColor: () => COLOR_TEXT,
+      vLineColor: () => COLOR_TEXT,
+      paddingTop: () => 8,
+      paddingBottom: () => 8,
+      paddingLeft: () => 8,
+      paddingRight: () => 8,
     },
   };
 }
 
-function metaBox(meta: { label: string; wert: string }[], variant: "box" | "plain", note?: string) {
+function metaBox(meta: { label: string; wert: string }[], variant: "box" | "plain", headerNote?: string) {
   if (variant === "plain") {
     return {
       width: 210,
@@ -185,24 +187,24 @@ function metaBox(meta: { label: string; wert: string }[], variant: "box" | "plai
       })),
     };
   }
-  const dataRows = meta.map((m) => [
-    { text: m.label, fontSize: 10, border: [false, false, false, false], margin: [0, 1, 8, 1] },
-    { text: m.wert, fontSize: 10, alignment: "right", border: [false, false, false, false], margin: [0, 1, 0, 1] },
-  ]);
-  const noteRows = note
-    ? [[
-        {
-          text: note,
-          fontSize: 9,
-          colSpan: 2,
-          margin: [0, 6, 0, 0],
-          border: [false, true, false, false],
-        },
+  const body: unknown[][] = [];
+  let noteRowsCount = 0;
+  if (headerNote) {
+    for (const line of headerNote.split("\n")) {
+      body.push([
+        { text: line, fontSize: 10, bold: true, colSpan: 2, border: [false, false, false, false], margin: [0, 0, 0, 0] },
         {},
-      ]]
-    : [];
-  const body = [...dataRows, ...noteRows];
-  const totalRows = body.length;
+      ]);
+      noteRowsCount++;
+    }
+  }
+  meta.forEach((m) => {
+    body.push([
+      { text: m.label, fontSize: 10, border: [false, false, false, false], margin: [0, 2, 8, 2] },
+      { text: m.wert, fontSize: 10, alignment: "right", border: [false, false, false, false], margin: [0, 2, 0, 2] },
+    ]);
+  });
+  const dividerIndex = noteRowsCount;
   return {
     width: 245,
     table: {
@@ -210,12 +212,16 @@ function metaBox(meta: { label: string; wert: string }[], variant: "box" | "plai
       body,
     },
     layout: {
-      hLineWidth: (i: number) => (i === 0 || i === totalRows ? 0.7 : 0),
+      hLineWidth: (i: number, node: { table: { body: unknown[][] } }) => {
+        if (i === 0 || i === node.table.body.length) return 0.7;
+        if (i === dividerIndex && noteRowsCount > 0) return 0.5;
+        return 0;
+      },
       vLineWidth: (i: number, node: { table: { widths: unknown[] } }) => (i === 0 || i === node.table.widths.length ? 0.7 : 0),
       hLineColor: () => COLOR_TEXT,
       vLineColor: () => COLOR_TEXT,
-      paddingTop: () => 5,
-      paddingBottom: () => 5,
+      paddingTop: () => 4,
+      paddingBottom: () => 4,
       paddingLeft: () => 8,
       paddingRight: () => 8,
     },
