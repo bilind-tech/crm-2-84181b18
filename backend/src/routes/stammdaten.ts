@@ -221,7 +221,7 @@ export async function stammdatenRoutes(app: FastifyInstance): Promise<void> {
         reply.status(404);
         return { error: "kunde-not-found" };
       }
-      const o = createObjekt(body as Parameters<typeof createObjekt>[0]);
+      const o = createObjekt(parsed.data as unknown as Parameters<typeof createObjekt>[0]);
       audit({ userId: req.user?.id, action: "objekt.create", detail: { id: o.id, nummer: o.nummer }, ip: req.ip });
       return o;
     });
