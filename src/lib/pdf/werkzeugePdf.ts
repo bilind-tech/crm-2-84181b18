@@ -387,9 +387,21 @@ export async function generateSchluesseluebergabePdf(
 async function renderToBlob(doc: any): Promise<Blob> {
   const pm = await getPdfMake();
   const pdfDoc = pm.createPdf(doc);
-  return await new Promise<Blob>((resolve) => {
-    pdfDoc.getBlob((b: Blob) => resolve(b));
+  const result: Blob | unknown = await new Promise<Blob>((resolve, reject) => {
+    try {
+      const ret = pdfDoc.getBlob((b: Blob) => resolve(b));
+      if (ret && typeof (ret as Promise<Blob>).then === "function") {
+        (ret as Promise<Blob>).then(resolve, reject);
+      }
+    } catch (err) {
+      reject(err);
+    }
   });
+  const blob = result as Blob;
+  if (!(blob instanceof Blob) || blob.size === 0) {
+    throw new Error("PDF konnte nicht erzeugt werden (leerer Blob).");
+  }
+  return blob;
 }
 
 function formatDatum(iso: string): string {
