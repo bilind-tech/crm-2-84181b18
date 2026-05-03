@@ -332,10 +332,11 @@ export function summenRechnung(positionen: Position[], rabattGesamt: number) {
 }
 
 function rechnungStatusAuto(r: Rechnung): RechnungStatus {
-  if (r.status === "storniert" || r.status === "entwurf") return r.status;
+  if (r.status === "storniert") return r.status;
   const { brutto } = summenRechnung(r.positionen, r.rabattGesamt);
   const bezahlt = r.zahlungen.reduce((s, z) => s + z.betrag, 0);
-  if (bezahlt >= brutto - 0.005) return "bezahlt";
+  if (bezahlt >= brutto - 0.005 && bezahlt > 0) return "bezahlt";
+  if (r.status === "entwurf") return r.status;
   if (bezahlt > 0) return "teilbezahlt";
   if (new Date(r.faelligkeitsdatum) < new Date()) return "ueberfaellig";
   return r.status;
