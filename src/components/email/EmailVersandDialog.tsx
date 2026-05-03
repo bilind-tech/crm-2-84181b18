@@ -305,7 +305,19 @@ export function EmailVersandDialog({
         },
         onError: (e: unknown) => {
           setPhase("idle");
-          toast.error(`Versand fehlgeschlagen: ${(e as Error)?.message ?? ""}`);
+          // Backend (Pi) liefert HTTP 412 + { error: "smtp-not-configured", message }
+          // wenn SMTP nicht konfiguriert ist. Zeige die exakte Server-Message.
+          const err = e as { message?: string; status?: number; body?: { error?: string; message?: string } };
+          const isSmtpFehlt = err?.body?.error === "smtp-not-configured" || err?.status === 412;
+          if (isSmtpFehlt) {
+            toast.error("SMTP nicht konfiguriert", {
+              description:
+                err?.body?.message ??
+                "Bitte unter Einstellungen → E-Mail Server, Benutzer und Passwort hinterlegen.",
+            });
+          } else {
+            toast.error(`Versand fehlgeschlagen: ${err?.body?.message ?? err?.message ?? ""}`);
+          }
         },
       },
     );
