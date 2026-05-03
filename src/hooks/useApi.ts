@@ -18,6 +18,8 @@ import type {
   EmailVersand,
   EmailVorlage,
   Firmendaten,
+  GithubInstallResult,
+  GithubUpdateStatus,
   GoogleDriveEinstellungen,
   InstallierteVersion,
   Kunde,
