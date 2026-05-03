@@ -238,6 +238,11 @@ export function EmailVersandDialog({
       toast.error("Bitte mindestens einen Empfänger angeben.");
       return;
     }
+    // Zweistufige Bestätigung für Mahnungen
+    if (mahnStufe && !mahnConfirm) {
+      setMahnConfirm(true);
+      return;
+    }
     const belegTyp =
       kontext === "rechnung" || kontext === "mahnung"
         ? "rechnung"
