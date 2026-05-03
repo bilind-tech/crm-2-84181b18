@@ -39,10 +39,13 @@ export function loadDriveSettings(): DriveSettings {
       rechnungen: "Rechnungen/{YYYY}/{MM}",
       angebote: "Angebote/{YYYY}/{MM}",
       dokumente: "Dokumente/{YYYY}/{MM}",
+      protokollUebergabe: "Protokolle/Übergabe-Abnahme/{YYYY}/{MM}",
+      protokollSchluessel: "Protokolle/Schlüsselübergabe/{YYYY}/{MM}",
     },
     dateinameSchema: {
       rechnung: "{nummer} {kunde} {leistung} {MM}-{YYYY}",
       angebot: "{nummer} {kunde} {leistung} {MM}-{YYYY}",
+      protokoll: "{nummer} {kunde} {leistung} {DD}-{MM}-{YYYY}",
     },
     autoUpload: true,
   }) as GoogleDriveSettings;
