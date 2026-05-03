@@ -80,17 +80,23 @@ export const GoogleDriveSchema = z.object({
     rechnungen: z.string().trim().min(1).max(200).default("Rechnungen/{YYYY}/{MM}"),
     angebote: z.string().trim().min(1).max(200).default("Angebote/{YYYY}/{MM}"),
     dokumente: z.string().trim().min(1).max(200).default("Dokumente/{YYYY}/{MM}"),
+    protokollUebergabe: z.string().trim().min(1).max(200).default("Protokolle/Übergabe-Abnahme/{YYYY}/{MM}"),
+    protokollSchluessel: z.string().trim().min(1).max(200).default("Protokolle/Schlüsselübergabe/{YYYY}/{MM}"),
   }).default({
     rechnungen: "Rechnungen/{YYYY}/{MM}",
     angebote: "Angebote/{YYYY}/{MM}",
     dokumente: "Dokumente/{YYYY}/{MM}",
+    protokollUebergabe: "Protokolle/Übergabe-Abnahme/{YYYY}/{MM}",
+    protokollSchluessel: "Protokolle/Schlüsselübergabe/{YYYY}/{MM}",
   }),
   dateinameSchema: z.object({
     rechnung: z.string().trim().min(1).max(200).default("{nummer} {kunde} {leistung} {MM}-{YYYY}"),
     angebot: z.string().trim().min(1).max(200).default("{nummer} {kunde} {leistung} {MM}-{YYYY}"),
+    protokoll: z.string().trim().min(1).max(200).default("{nummer} {kunde} {leistung} {DD}-{MM}-{YYYY}"),
   }).default({
     rechnung: "{nummer} {kunde} {leistung} {MM}-{YYYY}",
     angebot: "{nummer} {kunde} {leistung} {MM}-{YYYY}",
+    protokoll: "{nummer} {kunde} {leistung} {DD}-{MM}-{YYYY}",
   }),
   autoUpload: z.coerce.boolean().default(true),
 });
