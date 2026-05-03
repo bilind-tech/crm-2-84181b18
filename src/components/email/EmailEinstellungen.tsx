@@ -754,19 +754,7 @@ export function SmtpTab() {
               )}
               Verbindung prüfen
             </Button>
-            <Button
-              variant="ghost"
-              onClick={() =>
-                test.mutate(undefined, {
-                  onSuccess: (res) =>
-                    res.erfolg ? toast.success(res.nachricht) : toast.error(res.nachricht),
-                })
-              }
-              disabled={test.isPending || !smtp.passwortGesetzt}
-            >
-              {test.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : null}
-              Schnelltest
-            </Button>
+            {/* Schnelltest entfernt — „Verbindung prüfen" (verify) ist die robuste Variante. */}
           </div>
           <Button onClick={handleSpeichern} disabled={update.isPending}>
             <Check className="mr-1.5 h-4 w-4" /> Speichern
