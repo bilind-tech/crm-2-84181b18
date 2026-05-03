@@ -11,24 +11,38 @@ import type { Angebot, Rechnung } from "@/lib/api/types";
 
 type BelegKind = "angebot" | "rechnung";
 
+const VOLATILE_KEYS = new Set(["aktualisiertAm", "updatedAt", "erstelltAm", "createdAt"]);
+
+function stableStringify<T>(obj: T): string {
+  return JSON.stringify(obj, (key, value) => (VOLATILE_KEYS.has(key) ? undefined : value));
+}
+
 export function useBelegEditor<T extends Angebot | Rechnung>(
   kind: BelegKind,
   beleg: T,
 ) {
   const [draft, setDraft] = useState<T>(beleg);
-  const lastSavedRef = useRef<string>(JSON.stringify(beleg));
+  const lastSavedRef = useRef<string>(stableStringify(beleg));
+  const draftRef = useRef<T>(beleg);
+  draftRef.current = draft;
 
-  // Wenn von außen ein neuer Beleg reinkommt (z.B. nach Save), Draft neu laden,
-  // falls noch nicht dirty.
+  // Server-Echos nur dann in den Draft spiegeln, wenn der lokale Draft nicht
+  // dirty ist UND sich semantisch (ohne Timestamps) etwas geändert hat.
   useEffect(() => {
-    const incoming = JSON.stringify(beleg);
+    const incoming = stableStringify(beleg);
     if (incoming === lastSavedRef.current) return;
+    const currentDraft = stableStringify(draftRef.current);
+    if (incoming === currentDraft) {
+      lastSavedRef.current = incoming;
+      return;
+    }
+    if (currentDraft !== lastSavedRef.current) return; // Draft dirty → User-Eingaben behalten
     setDraft(beleg);
     lastSavedRef.current = incoming;
   }, [beleg]);
 
   const isDirty = useMemo(
-    () => JSON.stringify(draft) !== lastSavedRef.current,
+    () => stableStringify(draft) !== lastSavedRef.current,
     [draft],
   );
 
@@ -59,30 +73,28 @@ export function useBelegEditor<T extends Angebot | Rechnung>(
     [],
   );
 
-  const save = useCallback(async () => {
+  const save = useCallback(async (opts?: { silent?: boolean }) => {
     if (!isDirty) return;
     try {
-      // Nur die Felder schicken, die das Backend kennt — wir patchen den
-      // gesamten Draft und überlassen dem Backend das Diffing.
       const payload = { ...draft } as Partial<T>;
       if (kind === "angebot") {
         await updateAngebot.mutateAsync(payload as Partial<Angebot>);
       } else {
         await updateRechnung.mutateAsync(payload as Partial<Rechnung>);
       }
-      lastSavedRef.current = JSON.stringify(draft);
-      toast.success("Gespeichert", { duration: 1500 });
+      lastSavedRef.current = stableStringify(draft);
+      if (!opts?.silent) toast.success("Gespeichert", { duration: 1500 });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Speichern fehlgeschlagen");
     }
   }, [draft, isDirty, kind, updateAngebot, updateRechnung]);
 
-  // Autosave nach 1.5s ohne Änderung
+  // Autosave nach 3s ohne Änderung — silent (kein Toast).
   useEffect(() => {
     if (!isDirty) return;
     const t = setTimeout(() => {
-      void save();
-    }, 1500);
+      void save({ silent: true });
+    }, 3000);
     return () => clearTimeout(t);
   }, [draft, isDirty, save]);
 
