@@ -5,7 +5,6 @@ import {
   AREAS,
   SENSITIVE_KEYS,
   SmtpPasswordSchema,
-  GoogleDriveSecretSchema,
 } from "../settings/schemas.js";
 import {
   deleteSetting,
