@@ -219,6 +219,13 @@ async function main(): Promise<void> {
   // Stale Lock-File aus abgebrochenem Update aufräumen
   const staleLock = reapStaleLock();
   if (staleLock) app.log.warn("Stale System-Update Lock aufgeräumt");
+  // Hängende Update-Läufe (status='laeuft') als Fehler markieren — Backend
+  // ist neu gestartet, also kann kein Update mehr aktiv sein.
+  const reapedLaeufe = markStaleLaeufeAlsFehler();
+  if (reapedLaeufe > 0) app.log.warn({ reapedLaeufe }, "Hängende Update-Läufe als 'fehler' markiert");
+  // Staging-Reste älter 1 h aufräumen
+  const stagingRm = cleanupStaleStaging();
+  if (stagingRm > 0) app.log.info({ stagingRm }, "Update-Staging Reste entfernt");
 
   // Backup-Scheduler starten (täglicher Snapshot)
   startScheduler();
