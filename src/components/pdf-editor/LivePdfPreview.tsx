@@ -147,10 +147,17 @@ export function LivePdfPreview(props: Props) {
         </div>
       )}
 
-      {pdfUrl && containerWidth > 0 && (
+      {pdfUrl && containerWidth > 0 && !viewerError && (
         <Document
           file={pdfUrl}
-          onLoadSuccess={({ numPages }) => setNumPages(numPages)}
+          onLoadSuccess={({ numPages }) => {
+            setNumPages(numPages);
+            setViewerError(null);
+          }}
+          onLoadError={(err) => {
+            console.error("[LivePdfPreview] Document load error", err);
+            setViewerError(err?.message || String(err));
+          }}
           loading={null}
           error={<div className="text-sm text-destructive">PDF kann nicht angezeigt werden.</div>}
           className="flex flex-col items-center gap-4"
@@ -179,6 +186,16 @@ export function LivePdfPreview(props: Props) {
             );
           })}
         </Document>
+      )}
+
+      {viewerError && pdfUrl && (
+        <div className="flex h-full min-h-[40vh] flex-col items-center justify-center gap-2 px-6 text-center text-sm">
+          <p className="font-medium text-destructive">PDF kann nicht angezeigt werden</p>
+          <p className="text-xs text-muted-foreground">{viewerError}</p>
+          <a href={pdfUrl} download className="mt-2 text-xs underline text-primary">
+            PDF trotzdem herunterladen
+          </a>
+        </div>
       )}
     </div>
   );
