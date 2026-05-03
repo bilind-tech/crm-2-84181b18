@@ -28,6 +28,8 @@ import type {
   DauerauftragFrequenz,
   DauerauftragSonderposition,
   Dokument,
+  Protokoll,
+  ProtokollKind,
   UploadSession,
   EmailSignatur,
   EmailVersand,
