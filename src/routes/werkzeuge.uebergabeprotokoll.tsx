@@ -2,6 +2,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, FileDown, Loader2, Mail } from "lucide-react";
+import { PrintButton } from "@/components/pdf/PrintButton";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -64,6 +65,23 @@ function Page() {
 
   const empfaengerEmail = useMemo(() => kunde?.email ?? "", [kunde]);
 
+  const buildBlob = async (): Promise<Blob> => {
+    if (!kunde) throw new Error("Bitte zuerst einen Kunden auswählen.");
+    return generateUebergabeprotokollPdf({
+      art,
+      datum,
+      uhrzeit,
+      vertreterAuftraggeber: vertreterAg,
+      vertreterAuftragnehmer: vertreterAn,
+      leistungsumfang,
+      bemerkungen,
+      ohneVorbehalt,
+      kunde,
+      objekt,
+      firma: firmaQ.data,
+    });
+  };
+
   const handleErstellen = async (downloadOnly: boolean) => {
     if (!kunde) {
       toast.error("Bitte zuerst einen Kunden auswählen.");
@@ -71,19 +89,7 @@ function Page() {
     }
     setBusy(true);
     try {
-      const blob = await generateUebergabeprotokollPdf({
-        art,
-        datum,
-        uhrzeit,
-        vertreterAuftraggeber: vertreterAg,
-        vertreterAuftragnehmer: vertreterAn,
-        leistungsumfang,
-        bemerkungen,
-        ohneVorbehalt,
-        kunde,
-        objekt,
-        firma: firmaQ.data,
-      });
+      const blob = await buildBlob();
       const fname = `${
         art === "uebergabe"
           ? "Uebergabeprotokoll"
