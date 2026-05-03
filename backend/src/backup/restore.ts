@@ -28,7 +28,7 @@ import {
 import path from "node:path";
 import crypto from "node:crypto";
 import * as tar from "tar";
-import { config } from "../config.js";
+import { config, DB_FILENAME } from "../config.js";
 import {
   closeDatabase,
   getSchemaVersion,
@@ -46,6 +46,7 @@ import {
   setRestorePhase,
   startRestoreProgress,
 } from "./progress.js";
+import { assertInsideDataDir } from "../system/data-guard.js";
 
 const RESTORE_TMP_PREFIX = "restore-";
 
