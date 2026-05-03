@@ -199,7 +199,20 @@ export function SystemUpdateTab() {
         title="Update einspielen"
         description="Lade das neue Update-Paket (.zip) hoch — Daten bleiben unberührt."
       >
-        {!pendingPackage ? (
+        {aktuellerLauf && aktuellerLauf.status === "laeuft" ? (
+          <div className="flex items-start gap-3 rounded-xl border border-primary/30 bg-primary/5 p-4 text-sm">
+            <Loader2 className="mt-0.5 h-4 w-4 animate-spin text-primary" />
+            <div className="min-w-0 flex-1">
+              <p className="font-medium">Es läuft bereits ein Update.</p>
+              <p className="text-xs text-muted-foreground">
+                Bitte warten, bis der Vorgang abgeschlossen ist. Upload und Rollback sind so lange gesperrt.
+              </p>
+            </div>
+            <Button size="sm" variant="outline" onClick={() => setActiveLaufId(aktuellerLauf.id)}>
+              Fortschritt
+            </Button>
+          </div>
+        ) : !pendingPackage ? (
           <UpdateUploadDropzone
             onFile={handleFile}
             disabled={validate.isPending || install.isPending}
