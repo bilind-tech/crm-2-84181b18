@@ -307,6 +307,36 @@ export async function belegeRoutes(app: FastifyInstance): Promise<void> {
       }
       audit({ userId: req.user?.id, action: "rechnung.inkasso", detail: { id: r.id }, ip: req.ip });
       return r;
+    // ============================================================
+    // BELEGNUMMERN — Reservierung & Import-Scan
+    // ============================================================
+    const reserviereSchema = z.object({
+      art: z.enum(["angebot", "rechnung"]),
+      nummer: z.string().min(3).max(40),
+      kundeId: z.string().optional(),
+      grund: z.string().max(200).optional(),
+    });
+    scoped.post("/belege/nummer/reservieren", async (req, reply) => {
+      const parsed = reserviereSchema.safeParse(req.body ?? {});
+      if (!parsed.success) {
+        reply.status(422);
+        return { error: "invalid-input" };
+      }
+      const { reserviereNummer } = await import("../belege/belegnummer.js");
+      const r = reserviereNummer(parsed.data);
+      if (!r.ok) {
+        reply.status(r.grund === "kollision" ? 409 : 422);
+        return { error: r.grund };
+      }
+      audit({ userId: req.user?.id, action: "belegnummer.reservieren", detail: parsed.data, ip: req.ip });
+      return { ok: true };
+    });
+
+    scoped.post("/belege/nummer/import-scan", async (req) => {
+      const { importScanZaehler } = await import("../belege/belegnummer.js");
+      const result = importScanZaehler();
+      audit({ userId: req.user?.id, action: "belegnummer.import-scan", detail: result, ip: req.ip });
+      return result;
     });
   });
 }
