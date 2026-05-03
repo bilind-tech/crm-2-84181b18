@@ -160,7 +160,9 @@ export async function backupRoutes(app: FastifyInstance): Promise<void> {
       return reply.send(createReadStream(full));
     });
 
-    scoped.post("/backup/upload", async (req, reply) => {
+    scoped.post("/backup/upload", {
+      config: { rateLimit: { max: 5, timeWindow: "1 minute" } },
+    }, async (req, reply) => {
       const data = await req.file({ limits: { fileSize: UPLOAD_LIMIT_BYTES } });
       if (!data) {
         reply.status(400);
@@ -259,6 +261,7 @@ export async function backupRoutes(app: FastifyInstance): Promise<void> {
 
     scoped.post<{ Params: { id: string }; Body: { passwort?: string } }>(
       "/backup/:id/restore",
+      { config: { rateLimit: { max: 5, timeWindow: "1 minute" } } },
       async (req, reply) => {
         const params = z.object({ id: z.string().min(1) }).safeParse(req.params);
         if (!params.success) {
@@ -296,6 +299,7 @@ export async function backupRoutes(app: FastifyInstance): Promise<void> {
 
     scoped.post<{ Params: { uploadId: string }; Body: { passwort?: string } }>(
       "/backup/upload/:uploadId/restore",
+      { config: { rateLimit: { max: 5, timeWindow: "1 minute" } } },
       async (req, reply) => {
         const params = z.object({ uploadId: z.string().min(1) }).safeParse(req.params);
         if (!params.success) {
