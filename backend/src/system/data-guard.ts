@@ -48,6 +48,26 @@ export function assertNotInDataDir(absolutePath: string, opCtx?: string): void {
   }
 }
 
+/**
+ * Inverse Guard: Pfad MUSS innerhalb dataDir liegen. Verhindert, dass der
+ * Restore-Flow versehentlich außerhalb des Daten-Verzeichnisses schreibt
+ * (z. B. nach Pfad-Manipulation aus einem präparierten Backup-Archiv).
+ */
+export function assertInsideDataDir(absolutePath: string, opCtx?: string): void {
+  const target = normalizeAbs(absolutePath);
+  const data = normalizeAbs(config.dataDir);
+  if (!isSubpath(data, target)) {
+    const detail = opCtx ? `${opCtx} → ${target}` : target;
+    audit({
+      action: "data-guard.outside-data",
+      detail: { dataDir: data, attempted: target, op: opCtx ?? null },
+    });
+    throw new Error(
+      `DATEN-SCHUTZ-VERLETZUNG: Restore wollte außerhalb des Daten-Verzeichnisses schreiben (${detail}).`,
+    );
+  }
+}
+
 /** Beim Boot einmal aufrufen — verhindert Fehlkonfiguration (Code-Ordner = Daten-Ordner). */
 export function assertCodeAndDataSeparated(): void {
   const data = normalizeAbs(config.dataDir);
