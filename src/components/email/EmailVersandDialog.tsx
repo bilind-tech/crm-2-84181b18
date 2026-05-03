@@ -665,7 +665,7 @@ export function EmailVersandDialog({
             onClick={handleSend}
             disabled={
               !istValide ||
-              !smtpKonfiguriert ||
+              (!smtpKonfiguriert && !demoModus) ||
               send.isPending ||
               phase !== "idle" ||
               (pdfAnhangAktiv && pdfStatus === "loading")
