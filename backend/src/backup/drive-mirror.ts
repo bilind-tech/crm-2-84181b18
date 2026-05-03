@@ -8,7 +8,7 @@
 //
 // Drive-Fehler markieren das lokale Backup NIEMALS als failed.
 // =============================================================================
-import { createReadStream, createWriteStream, existsSync, mkdirSync, rmSync } from "node:fs";
+import { createReadStream, existsSync, mkdirSync, rmSync } from "node:fs";
 import path from "node:path";
 import * as tar from "tar";
 import { getDatabase } from "../db/index.js";
