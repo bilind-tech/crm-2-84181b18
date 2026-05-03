@@ -105,8 +105,8 @@ async function processDokument(row: DriveUpload): Promise<void> {
   const out = await (hooks.uploadFn ?? uploadFile)({
     parentFolderId: folderId,
     name: row.dateiName || dok.dateiname || "Dokument",
-    data: file.buffer,
-    mimeType: file.mimeType ?? "application/octet-stream",
+    data: buf,
+    mimeType: dok.mimeType ?? raw.mime_type ?? "application/octet-stream",
   });
   markErfolg(row.id, out.id, out.webViewLink);
   setDriveStatus(row.belegId, { status: "uploaded", fileId: out.id, url: out.webViewLink ?? null, fehlerText: null });
