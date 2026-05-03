@@ -109,7 +109,7 @@ export function KundenObjektPicker({
             <SelectContent>
               {objekte.map((o) => (
                 <SelectItem key={o.id} value={o.id}>
-                  {o.bezeichnung}
+                  {o.name}
                 </SelectItem>
               ))}
             </SelectContent>
