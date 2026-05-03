@@ -4,6 +4,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useKunde, useObjekt } from "@/hooks/useApi";
 import { useDokumentBlobUrl } from "@/hooks/useDokumentBlobUrl";
+import { PrintButton } from "@/components/pdf/PrintButton";
 import type { Dokument } from "@/lib/api/types";
 import { DriveSyncRow } from "./DriveSyncBadge";
 
@@ -56,6 +57,9 @@ export function DokumentViewer({ dokument, open, onOpenChange, onEdit }: Props) 
             <Download className="h-4 w-4 sm:mr-1.5" />
             <span className="hidden sm:inline">Download</span>
           </Button>
+          {(isImage || isPdf) && (
+            <PrintButton url={dateiUrl || null} variant="outline" size="sm" className="h-9 px-2 sm:px-3" />
+          )}
           <Button
             variant="outline"
             size="sm"
