@@ -15,7 +15,7 @@ import path from "node:path";
 import crypto from "node:crypto";
 import * as tar from "tar";
 import { getDatabase, getSchemaVersion } from "../db/index.js";
-import { config } from "../config.js";
+import { config, DB_FILENAME } from "../config.js";
 import { audit } from "../auth/audit.js";
 import { buildManifest } from "./manifest.js";
 import {
