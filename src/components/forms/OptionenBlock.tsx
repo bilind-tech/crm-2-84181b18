@@ -2,10 +2,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import type { WiederkehrendDetails } from "@/lib/api/types";
-import {
-  DauerauftragKonfig,
-  defaultWiederkehrendDetails,
-} from "./DauerauftragKonfig";
+import { DauerauftragKonfig, defaultWiederkehrendDetails } from "./DauerauftragKonfig";
 
 export interface OptionenState {
   materialBereitgestellt: boolean;
@@ -35,11 +32,14 @@ interface Props {
 }
 
 export function OptionenBlock({ value, onChange }: Props) {
-  const set = <K extends keyof OptionenState>(k: K, v: OptionenState[K]) => onChange({ ...value, [k]: v });
+  const set = <K extends keyof OptionenState>(k: K, v: OptionenState[K]) =>
+    onChange({ ...value, [k]: v });
 
   return (
     <div className="space-y-4 rounded-2xl border border-border bg-card/50 p-4">
-      <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Optionen</p>
+      <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+        Optionen
+      </p>
 
       <Row
         checked={value.materialBereitgestellt}
@@ -110,10 +110,7 @@ function Row({
     <div className="flex items-start gap-3">
       <Checkbox checked={checked} onCheckedChange={(v) => onChange(!!v)} className="mt-0.5" />
       <div className="min-w-0">
-        <Label
-          className="cursor-pointer text-sm font-medium"
-          onClick={() => onChange(!checked)}
-        >
+        <Label className="cursor-pointer text-sm font-medium" onClick={() => onChange(!checked)}>
           {label}
         </Label>
         {hint && <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p>}

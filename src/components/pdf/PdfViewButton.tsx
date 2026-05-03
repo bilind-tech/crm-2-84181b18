@@ -37,10 +37,7 @@ export function PdfViewButton(props: Props) {
           e.preventDefault();
           setOpen(true);
         }}
-        className={cn(
-          variant === "icon" ? "h-8 w-8" : "h-8 px-2",
-          props.className,
-        )}
+        className={cn(variant === "icon" ? "h-8 w-8" : "h-8 px-2", props.className)}
         title={`${titlePrefix} ${props.beleg.nummer} ansehen`}
         aria-label={`${titlePrefix} ${props.beleg.nummer} ansehen`}
       >

@@ -1,11 +1,26 @@
 import { createFileRoute, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useState, useMemo } from "react";
-import { Search, Mail, Trash2, ChevronRight, SlidersHorizontal, Check, ThumbsUp, ThumbsDown } from "lucide-react";
+import {
+  Search,
+  Mail,
+  Trash2,
+  ChevronRight,
+  SlidersHorizontal,
+  Check,
+  ThumbsUp,
+  ThumbsDown,
+} from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { PdfViewButton } from "@/components/pdf/PdfViewButton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useAngebote, useDeleteAngebot, useKunde, useUpdateAngebot, useRechnungen } from "@/hooks/useApi";
+import {
+  useAngebote,
+  useDeleteAngebot,
+  useKunde,
+  useUpdateAngebot,
+  useRechnungen,
+} from "@/hooks/useApi";
 import { toast } from "sonner";
 import { useAngebotPdf } from "@/hooks/useBelegPdf";
 import { EmailVersandDialog } from "@/components/email/EmailVersandDialog";
@@ -103,7 +118,7 @@ function Page() {
         .filter((a) => a.status === "entwurf" || a.status === "versendet")
         .reduce((acc, a) => acc + summe(a), 0),
     }),
-    [alle]
+    [alle],
   );
 
   const filtered = useMemo(() => {
@@ -113,7 +128,7 @@ function Page() {
     if (q.trim()) {
       const t = q.toLowerCase();
       list = list.filter(
-        (a) => a.nummer.toLowerCase().includes(t) || a.titel.toLowerCase().includes(t)
+        (a) => a.nummer.toLowerCase().includes(t) || a.titel.toLowerCase().includes(t),
       );
     }
     return [...list].sort((a, b) => b.erstelltAm.localeCompare(a.erstelltAm));
@@ -124,9 +139,7 @@ function Page() {
       <PageHeader
         title="Angebote"
         subtitle="Angebote erstellen, versenden und nachverfolgen."
-        actions={
-          <PrimaryAction onClick={() => setOpen(true)} label="Neues Angebot" />
-        }
+        actions={<PrimaryAction onClick={() => setOpen(true)} label="Neues Angebot" />}
       />
 
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
@@ -168,14 +181,20 @@ function Page() {
             }
             trailing={formatEUR(summe(a))}
             badge={statusBadge(a.status)}
-            footer={<FlowBar steps={angebotFlow(a, angebotMitRechnung.has(a.id)).steps} size="sm" />}
+            footer={
+              <FlowBar steps={angebotFlow(a, angebotMitRechnung.has(a.id)).steps} size="sm" />
+            }
             actions={
               <>
                 <AngebotAnnahmeButtons angebot={a} />
                 <PdfViewButton kind="angebot" beleg={a} />
                 <button
                   type="button"
-                  onClick={(e) => { e.stopPropagation(); e.preventDefault(); setEmailFuer(a); }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    setEmailFuer(a);
+                  }}
                   className="rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-primary"
                   title="Per E-Mail versenden"
                 >
@@ -211,86 +230,90 @@ function Page() {
       {/* Desktop: Tabelle */}
       <div className="hidden overflow-hidden rounded-2xl border border-border bg-card shadow-sm md:block">
         <div className="overflow-x-auto">
-        <table className="w-full min-w-[1000px] text-sm">
-          <thead>
-            <tr className="border-b border-border bg-muted/30 text-left text-xs uppercase tracking-wider text-muted-foreground">
-              <th className="px-4 py-3 font-medium">Nummer</th>
-              <th className="px-4 py-3 font-medium">Titel</th>
-              <th className="px-4 py-3 font-medium">Kunde</th>
-              <th className="px-4 py-3 font-medium">Gültig bis</th>
-              <th className="px-4 py-3 text-right font-medium">Summe</th>
-              <th className="px-4 py-3 font-medium">Status</th>
-              <th className="px-4 py-3 font-medium">Fortschritt</th>
-              <th className="whitespace-nowrap px-4 py-3 text-right font-medium">Aktionen</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((a) => (
-              <tr
-                key={a.id}
-                role="link"
-                tabIndex={0}
-                onClick={() => navigate({ to: "/angebote/$id", params: { id: a.id } })}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    navigate({ to: "/angebote/$id", params: { id: a.id } });
-                  }
-                }}
-                className="cursor-pointer border-b border-border last:border-0 transition-colors hover:bg-muted/40 focus:bg-muted/40 focus:outline-none"
-              >
-                <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{a.nummer}</td>
-                <td className="px-4 py-3 font-medium">{a.titel}</td>
-                <td className="px-4 py-3 text-muted-foreground">—</td>
-                <td className="px-4 py-3 text-muted-foreground">{formatDate(a.gueltigBis)}</td>
-                <td className="px-4 py-3 text-right font-semibold">{formatEUR(summe(a))}</td>
-                <td className="px-4 py-3">{statusBadge(a.status)}</td>
-                <td className="px-4 py-3">
-                  <FlowBar steps={angebotFlow(a, angebotMitRechnung.has(a.id)).steps} size="sm" />
-                </td>
-                <td className="whitespace-nowrap px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                  <div className="flex items-center justify-end gap-1.5 whitespace-nowrap text-muted-foreground">
-                    <AngebotAnnahmeButtons angebot={a} size="sm" />
-                    <PdfViewButton kind="angebot" beleg={a} />
-                    <button
-                      type="button"
-                      onClick={(e) => { e.stopPropagation(); e.preventDefault(); setEmailFuer(a); }}
-                      className="rounded-md p-1.5 hover:bg-muted hover:text-primary"
-                      title="Per E-Mail versenden"
-                    >
-                      <Mail className="h-4 w-4" />
-                    </button>
-                    <button
-                      onClick={() =>
-                        confirm(
-                          {
-                            title: "Angebot löschen?",
-                            description: `Angebot ${a.nummer} dauerhaft entfernen.`,
-                            variant: "destructive",
-                            confirmLabel: "Löschen",
-                          },
-                          () => del.mutate(a.id),
-                        )
-                      }
-                      className="rounded-md p-1.5 text-destructive hover:bg-destructive/10"
-                      title="Löschen"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                    <ChevronRight className="h-4 w-4" />
-                  </div>
-                </td>
+          <table className="w-full min-w-[1000px] text-sm">
+            <thead>
+              <tr className="border-b border-border bg-muted/30 text-left text-xs uppercase tracking-wider text-muted-foreground">
+                <th className="px-4 py-3 font-medium">Nummer</th>
+                <th className="px-4 py-3 font-medium">Titel</th>
+                <th className="px-4 py-3 font-medium">Kunde</th>
+                <th className="px-4 py-3 font-medium">Gültig bis</th>
+                <th className="px-4 py-3 text-right font-medium">Summe</th>
+                <th className="px-4 py-3 font-medium">Status</th>
+                <th className="px-4 py-3 font-medium">Fortschritt</th>
+                <th className="whitespace-nowrap px-4 py-3 text-right font-medium">Aktionen</th>
               </tr>
-            ))}
-            {filtered.length === 0 && (
-              <tr>
-                <td colSpan={8} className="px-4 py-12 text-center text-sm text-muted-foreground">
-                  Keine Angebote gefunden.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {filtered.map((a) => (
+                <tr
+                  key={a.id}
+                  role="link"
+                  tabIndex={0}
+                  onClick={() => navigate({ to: "/angebote/$id", params: { id: a.id } })}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      navigate({ to: "/angebote/$id", params: { id: a.id } });
+                    }
+                  }}
+                  className="cursor-pointer border-b border-border last:border-0 transition-colors hover:bg-muted/40 focus:bg-muted/40 focus:outline-none"
+                >
+                  <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{a.nummer}</td>
+                  <td className="px-4 py-3 font-medium">{a.titel}</td>
+                  <td className="px-4 py-3 text-muted-foreground">—</td>
+                  <td className="px-4 py-3 text-muted-foreground">{formatDate(a.gueltigBis)}</td>
+                  <td className="px-4 py-3 text-right font-semibold">{formatEUR(summe(a))}</td>
+                  <td className="px-4 py-3">{statusBadge(a.status)}</td>
+                  <td className="px-4 py-3">
+                    <FlowBar steps={angebotFlow(a, angebotMitRechnung.has(a.id)).steps} size="sm" />
+                  </td>
+                  <td className="whitespace-nowrap px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex items-center justify-end gap-1.5 whitespace-nowrap text-muted-foreground">
+                      <AngebotAnnahmeButtons angebot={a} size="sm" />
+                      <PdfViewButton kind="angebot" beleg={a} />
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          e.preventDefault();
+                          setEmailFuer(a);
+                        }}
+                        className="rounded-md p-1.5 hover:bg-muted hover:text-primary"
+                        title="Per E-Mail versenden"
+                      >
+                        <Mail className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() =>
+                          confirm(
+                            {
+                              title: "Angebot löschen?",
+                              description: `Angebot ${a.nummer} dauerhaft entfernen.`,
+                              variant: "destructive",
+                              confirmLabel: "Löschen",
+                            },
+                            () => del.mutate(a.id),
+                          )
+                        }
+                        className="rounded-md p-1.5 text-destructive hover:bg-destructive/10"
+                        title="Löschen"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                      <ChevronRight className="h-4 w-4" />
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {filtered.length === 0 && (
+                <tr>
+                  <td colSpan={8} className="px-4 py-12 text-center text-sm text-muted-foreground">
+                    Keine Angebote gefunden.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
 
@@ -303,12 +326,7 @@ function Page() {
         <AngebotForm onClose={() => setOpen(false)} />
       </SlideOver>
 
-      {emailFuer && (
-        <AngebotEmailLauncher
-          angebot={emailFuer}
-          onClose={() => setEmailFuer(null)}
-        />
-      )}
+      {emailFuer && <AngebotEmailLauncher angebot={emailFuer} onClose={() => setEmailFuer(null)} />}
 
       {confirmDialog}
     </div>
@@ -321,7 +339,9 @@ function AngebotEmailLauncher({ angebot, onClose }: { angebot: Angebot; onClose:
   return (
     <EmailVersandDialog
       open
-      onOpenChange={(o) => { if (!o) onClose(); }}
+      onOpenChange={(o) => {
+        if (!o) onClose();
+      }}
       kontext="angebot"
       kunde={kunde}
       angebot={angebot}
@@ -351,9 +371,7 @@ function AngebotAnnahmeButtons({ angebot, size = "md" }: { angebot: Angebot; siz
     );
   };
   const sm = size === "sm";
-  const base = sm
-    ? "h-8 px-2.5 text-xs gap-1"
-    : "h-9 px-3 text-sm gap-1.5";
+  const base = sm ? "h-8 px-2.5 text-xs gap-1" : "h-9 px-3 text-sm gap-1.5";
   return (
     <>
       <button
@@ -471,7 +489,18 @@ function ZeitraumPills({
   );
 }
 
-function DesktopFilterBar({ filter, setFilter, q, setQ, tabs, placeholder, extra, zeitraum, setZeitraum, verfuegbareDaten }: FilterBarProps) {
+function DesktopFilterBar({
+  filter,
+  setFilter,
+  q,
+  setQ,
+  tabs,
+  placeholder,
+  extra,
+  zeitraum,
+  setZeitraum,
+  verfuegbareDaten,
+}: FilterBarProps) {
   const aktiv = tabs.find((t) => t.value === filter);
   const statusAktiv = filter !== "alle";
   return (
@@ -518,7 +547,17 @@ function DesktopFilterBar({ filter, setFilter, q, setQ, tabs, placeholder, extra
   );
 }
 
-function MobileFilterBar({ filter, setFilter, q, setQ, tabs, placeholder, zeitraum, setZeitraum, verfuegbareDaten }: FilterBarProps) {
+function MobileFilterBar({
+  filter,
+  setFilter,
+  q,
+  setQ,
+  tabs,
+  placeholder,
+  zeitraum,
+  setZeitraum,
+  verfuegbareDaten,
+}: FilterBarProps) {
   const [sheetOpen, setSheetOpen] = useState(false);
   const aktiv = tabs.find((t) => t.value === filter);
   const jahre = useMemo(() => jahreAusDaten(verfuegbareDaten ?? []), [verfuegbareDaten]);
@@ -551,10 +590,7 @@ function MobileFilterBar({ filter, setFilter, q, setQ, tabs, placeholder, zeitra
       </div>
 
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetContent
-          side="bottom"
-          className="rounded-t-2xl border-t bg-background p-0"
-        >
+        <SheetContent side="bottom" className="rounded-t-2xl border-t bg-background p-0">
           <div className="mx-auto mt-2 mb-1 h-1.5 w-10 rounded-full bg-muted-foreground/30" />
           <SheetHeader className="px-5 pb-2 pt-3 text-left">
             <SheetTitle className="text-base">Filter</SheetTitle>
@@ -578,7 +614,9 @@ function MobileFilterBar({ filter, setFilter, q, setQ, tabs, placeholder, zeitra
                 >
                   <span
                     className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${
-                      istAktiv ? "border-primary bg-primary text-primary-foreground" : "border-border"
+                      istAktiv
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border"
                     }`}
                   >
                     {istAktiv && <Check className="h-3.5 w-3.5" />}

@@ -40,7 +40,9 @@ export function PdfViewerDialog({
       <DialogContent className="flex h-[100dvh] max-h-[100dvh] w-screen max-w-none flex-col gap-0 overflow-hidden rounded-none border-0 bg-background p-0 sm:h-[90vh] sm:max-h-[90vh] sm:w-[95vw] sm:max-w-5xl sm:rounded-lg sm:border">
         <DialogHeader className="flex-row items-center justify-between gap-2 space-y-0 border-b border-border px-3 py-2 sm:gap-3 sm:px-6 sm:py-3">
           <div className="min-w-0 flex-1">
-            <DialogTitle className="truncate pr-8 text-sm font-semibold sm:pr-0 sm:text-base">{title}</DialogTitle>
+            <DialogTitle className="truncate pr-8 text-sm font-semibold sm:pr-0 sm:text-base">
+              {title}
+            </DialogTitle>
             <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground sm:mt-1">
               <DriveStatusBadge drive={drive} />
             </div>
@@ -53,9 +55,15 @@ export function PdfViewerDialog({
                   onOpenChange(false);
                   setTimeout(() => {
                     if (editTarget.kind === "rechnung") {
-                      void navigate({ to: "/rechnungen/$id/bearbeiten", params: { id: editTarget.id } });
+                      void navigate({
+                        to: "/rechnungen/$id/bearbeiten",
+                        params: { id: editTarget.id },
+                      });
                     } else {
-                      void navigate({ to: "/angebote/$id/bearbeiten", params: { id: editTarget.id } });
+                      void navigate({
+                        to: "/angebote/$id/bearbeiten",
+                        params: { id: editTarget.id },
+                      });
                     }
                   }, 50);
                 }}

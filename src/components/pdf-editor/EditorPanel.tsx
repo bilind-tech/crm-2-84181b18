@@ -31,12 +31,24 @@ export function EditorPanel({
   setOption,
 }: Props) {
   return (
-    <Tabs value={activeTab} onValueChange={(v) => onTabChange(v as EditorTab)} className="flex h-full flex-col">
+    <Tabs
+      value={activeTab}
+      onValueChange={(v) => onTabChange(v as EditorTab)}
+      className="flex h-full flex-col"
+    >
       <TabsList className="no-scrollbar mx-3 mt-3 flex h-10 justify-start gap-1 overflow-x-auto rounded-full bg-muted p-1">
-        <TabsTrigger value="stammdaten" className="shrink-0 rounded-full px-3">Stammdaten</TabsTrigger>
-        <TabsTrigger value="positionen" className="shrink-0 rounded-full px-3">Positionen</TabsTrigger>
-        <TabsTrigger value="texte" className="shrink-0 rounded-full px-3">Texte</TabsTrigger>
-        <TabsTrigger value="logo" className="shrink-0 rounded-full px-3">Logo & Firma</TabsTrigger>
+        <TabsTrigger value="stammdaten" className="shrink-0 rounded-full px-3">
+          Stammdaten
+        </TabsTrigger>
+        <TabsTrigger value="positionen" className="shrink-0 rounded-full px-3">
+          Positionen
+        </TabsTrigger>
+        <TabsTrigger value="texte" className="shrink-0 rounded-full px-3">
+          Texte
+        </TabsTrigger>
+        <TabsTrigger value="logo" className="shrink-0 rounded-full px-3">
+          Logo & Firma
+        </TabsTrigger>
       </TabsList>
 
       <div className="flex-1 overflow-y-auto px-4 py-4">

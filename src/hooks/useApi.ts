@@ -29,7 +29,6 @@ import type {
   Positionsvorlage,
   Rechnung,
   SicherheitsEinstellungen,
-  
   SmtpEinstellungen,
   SuchTreffer,
   SystemInfo,
@@ -69,7 +68,7 @@ export const qk = {
     backupHistorie: ["einstellungen", "backup", "historie"] as const,
     googleDrive: ["einstellungen", "googleDrive"] as const,
     sitzungen: ["einstellungen", "sitzungen"] as const,
-    
+
     positionsvorlagen: ["einstellungen", "positionsvorlagen"] as const,
     textvorlagen: ["einstellungen", "textvorlagen"] as const,
     systemInfo: ["system", "info"] as const,
@@ -86,7 +85,12 @@ export const qk = {
 };
 
 // ---------- Kunden ----------
-export const useKunden = (params?: { q?: string; status?: string; tag?: string; archiviert?: boolean }) =>
+export const useKunden = (params?: {
+  q?: string;
+  status?: string;
+  tag?: string;
+  archiviert?: boolean;
+}) =>
   useQuery({
     queryKey: [...qk.kunden, params],
     queryFn: () => {
@@ -103,14 +107,17 @@ export const useKunden = (params?: { q?: string; status?: string; tag?: string; 
 export const useKunde = (id: string) =>
   useQuery({
     queryKey: qk.kunde(id),
-    queryFn: () => api.get<Kunde & {
-      ansprechpartner: Ansprechpartner[];
-      objekte: Objekt[];
-      angebote: Angebot[];
-      rechnungen: Rechnung[];
-      dokumente: Dokument[];
-      notizen: Notiz[];
-    }>(`/kunden/${id}`),
+    queryFn: () =>
+      api.get<
+        Kunde & {
+          ansprechpartner: Ansprechpartner[];
+          objekte: Objekt[];
+          angebote: Angebot[];
+          rechnungen: Rechnung[];
+          dokumente: Dokument[];
+          notizen: Notiz[];
+        }
+      >(`/kunden/${id}`),
     enabled: !!id,
   });
 
@@ -222,7 +229,11 @@ export const useObjekte = (kundeId?: string) =>
   });
 
 export const useObjekt = (id: string) =>
-  useQuery({ queryKey: qk.objekt(id), queryFn: () => api.get<Objekt>(`/objekte/${id}`), enabled: !!id });
+  useQuery({
+    queryKey: qk.objekt(id),
+    queryFn: () => api.get<Objekt>(`/objekte/${id}`),
+    enabled: !!id,
+  });
 
 export const useCreateObjekt = () => {
   const qc = useQueryClient();
@@ -267,7 +278,11 @@ export const useAngebote = (params?: { kundeId?: string; status?: string }) =>
   });
 
 export const useAngebot = (id: string) =>
-  useQuery({ queryKey: qk.angebot(id), queryFn: () => api.get<Angebot>(`/angebote/${id}`), enabled: !!id });
+  useQuery({
+    queryKey: qk.angebot(id),
+    queryFn: () => api.get<Angebot>(`/angebote/${id}`),
+    enabled: !!id,
+  });
 
 export const useCreateAngebot = () => {
   const qc = useQueryClient();
@@ -344,7 +359,11 @@ export const useRechnungen = (params?: { kundeId?: string; status?: string }) =>
   });
 
 export const useRechnung = (id: string) =>
-  useQuery({ queryKey: qk.rechnung(id), queryFn: () => api.get<Rechnung>(`/rechnungen/${id}`), enabled: !!id });
+  useQuery({
+    queryKey: qk.rechnung(id),
+    queryFn: () => api.get<Rechnung>(`/rechnungen/${id}`),
+    enabled: !!id,
+  });
 
 /**
  * Invalidiert alle Caches, die sich verändern, wenn eine Rechnung oder
@@ -440,7 +459,8 @@ function patchRechnungInCache(
 export const useAddZahlung = (rechnungId: string) => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: Partial<Zahlung>) => api.post<Zahlung>(`/rechnungen/${rechnungId}/zahlungen`, data),
+    mutationFn: (data: Partial<Zahlung>) =>
+      api.post<Zahlung>(`/rechnungen/${rechnungId}/zahlungen`, data),
     onMutate: async (data) => {
       await qc.cancelQueries({ queryKey: ["rechnungen"] });
       await qc.cancelQueries({ queryKey: qk.rechnung(rechnungId) });
@@ -558,8 +578,7 @@ export const useUploadDateienToSession = (token: string) => {
 
 export const useBeendeUploadSession = () =>
   useMutation({
-    mutationFn: (token: string) =>
-      api.post<void>(`/upload-sessions/${token}/beenden`, {}),
+    mutationFn: (token: string) => api.post<void>(`/upload-sessions/${token}/beenden`, {}),
   });
 
 // ---------- Notizen ----------
@@ -600,7 +619,10 @@ export const useUmsatz = (zeitraum?: { jahr: string; monat: string }) =>
     queryFn: () => api.get<UmsatzPunkt[]>(`/dashboard/umsatz${zeitraumQuery(zeitraum)}`),
   });
 export const useWarnungen = () =>
-  useQuery({ queryKey: qk.dashboard.warnungen, queryFn: () => api.get<Warnung[]>("/dashboard/warnungen") });
+  useQuery({
+    queryKey: qk.dashboard.warnungen,
+    queryFn: () => api.get<Warnung[]>("/dashboard/warnungen"),
+  });
 
 // ---------- Suche ----------
 export const useSearch = (q: string) =>
@@ -638,7 +660,9 @@ export const useBenachrichtigungen = () =>
       const raw = await api.get<unknown>("/benachrichtigungen");
       const items = unwrapList<BackendBenachrichtigung | Benachrichtigung>(raw);
       return items.map((it) =>
-        "prioritaet" in it ? adaptBenachrichtigung(it as BackendBenachrichtigung) : (it as Benachrichtigung),
+        "prioritaet" in it
+          ? adaptBenachrichtigung(it as BackendBenachrichtigung)
+          : (it as Benachrichtigung),
       );
     },
     refetchInterval: 60_000,
@@ -661,17 +685,24 @@ export const useMarkAlleBenachrichtigungenGelesen = () => {
 
 // ---------- Einstellungen ----------
 export const useFirmendaten = () =>
-  useQuery({ queryKey: qk.einstellungen.firma, queryFn: () => api.get<Firmendaten>("/einstellungen/firma") });
+  useQuery({
+    queryKey: qk.einstellungen.firma,
+    queryFn: () => api.get<Firmendaten>("/einstellungen/firma"),
+  });
 export const useUpdateFirmendaten = () => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: Partial<Firmendaten>) => api.patch<Firmendaten>("/einstellungen/firma", data),
+    mutationFn: (data: Partial<Firmendaten>) =>
+      api.patch<Firmendaten>("/einstellungen/firma", data),
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.einstellungen.firma }),
   });
 };
 
 export const useSmtp = () =>
-  useQuery({ queryKey: qk.einstellungen.smtp, queryFn: () => api.get<SmtpEinstellungen>("/einstellungen/smtp") });
+  useQuery({
+    queryKey: qk.einstellungen.smtp,
+    queryFn: () => api.get<SmtpEinstellungen>("/einstellungen/smtp"),
+  });
 export const useUpdateSmtp = () => {
   const qc = useQueryClient();
   return useMutation({
@@ -681,33 +712,56 @@ export const useUpdateSmtp = () => {
   });
 };
 export const useTestSmtp = () =>
-  useMutation({ mutationFn: () => api.post<{ erfolg: boolean; nachricht: string; demo?: boolean }>("/einstellungen/smtp/test") });
+  useMutation({
+    mutationFn: () =>
+      api.post<{ erfolg: boolean; nachricht: string; demo?: boolean }>("/einstellungen/smtp/test"),
+  });
 
 /** SMTP-Verbindungstest (verify, kein Versand) — synchron, klare Fehler-Klartexte. */
 export const useVerifySmtp = () =>
   useMutation({
-    mutationFn: () => api.post<{ ok: boolean; latencyMs?: number; error?: string; errorCode?: string; demo?: boolean }>("/email/verify"),
+    mutationFn: () =>
+      api.post<{
+        ok: boolean;
+        latencyMs?: number;
+        error?: string;
+        errorCode?: string;
+        demo?: boolean;
+      }>("/email/verify"),
   });
 
 /** Echte Test-Mail an eine eingegebene Adresse senden (genau eine Mail, per User-Klick). */
 export const useSendTestMail = () =>
   useMutation({
     mutationFn: (an: string) =>
-      api.post<{ ok: boolean; messageId?: string; error?: string; errorCode?: string; demo?: boolean }>("/email/test", { an }),
+      api.post<{
+        ok: boolean;
+        messageId?: string;
+        error?: string;
+        errorCode?: string;
+        demo?: boolean;
+      }>("/email/test", { an }),
   });
 
 export const useNummernkreise = () =>
-  useQuery({ queryKey: qk.einstellungen.nummernkreise, queryFn: () => api.get<Nummernkreise>("/einstellungen/nummernkreise") });
+  useQuery({
+    queryKey: qk.einstellungen.nummernkreise,
+    queryFn: () => api.get<Nummernkreise>("/einstellungen/nummernkreise"),
+  });
 export const useUpdateNummernkreise = () => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: Partial<Nummernkreise>) => api.patch<Nummernkreise>("/einstellungen/nummernkreise", data),
+    mutationFn: (data: Partial<Nummernkreise>) =>
+      api.patch<Nummernkreise>("/einstellungen/nummernkreise", data),
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.einstellungen.nummernkreise }),
   });
 };
 
 export const useSicherheit = () =>
-  useQuery({ queryKey: qk.einstellungen.sicherheit, queryFn: () => api.get<SicherheitsEinstellungen>("/einstellungen/sicherheit") });
+  useQuery({
+    queryKey: qk.einstellungen.sicherheit,
+    queryFn: () => api.get<SicherheitsEinstellungen>("/einstellungen/sicherheit"),
+  });
 export const useUpdateSicherheit = () => {
   const qc = useQueryClient();
   return useMutation({
@@ -718,7 +772,10 @@ export const useUpdateSicherheit = () => {
 };
 
 export const useErscheinung = () =>
-  useQuery({ queryKey: qk.einstellungen.erscheinung, queryFn: () => api.get<AppearanceEinstellungen>("/einstellungen/erscheinung") });
+  useQuery({
+    queryKey: qk.einstellungen.erscheinung,
+    queryFn: () => api.get<AppearanceEinstellungen>("/einstellungen/erscheinung"),
+  });
 export const useUpdateErscheinung = () => {
   const qc = useQueryClient();
   return useMutation({
@@ -729,7 +786,10 @@ export const useUpdateErscheinung = () => {
 };
 
 export const useBackup = () =>
-  useQuery({ queryKey: qk.einstellungen.backup, queryFn: () => api.get<BackupEinstellungen>("/einstellungen/backup") });
+  useQuery({
+    queryKey: qk.einstellungen.backup,
+    queryFn: () => api.get<BackupEinstellungen>("/einstellungen/backup"),
+  });
 export const useUpdateBackup = () => {
   const qc = useQueryClient();
   return useMutation({
@@ -809,11 +869,15 @@ export const useDeleteBackup = () => {
 };
 
 export const usePositionsvorlagen = () =>
-  useQuery({ queryKey: qk.einstellungen.positionsvorlagen, queryFn: () => api.get<Positionsvorlage[]>("/einstellungen/positionsvorlagen") });
+  useQuery({
+    queryKey: qk.einstellungen.positionsvorlagen,
+    queryFn: () => api.get<Positionsvorlage[]>("/einstellungen/positionsvorlagen"),
+  });
 export const useCreatePositionsvorlage = () => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: Partial<Positionsvorlage>) => api.post<Positionsvorlage>("/einstellungen/positionsvorlagen", data),
+    mutationFn: (data: Partial<Positionsvorlage>) =>
+      api.post<Positionsvorlage>("/einstellungen/positionsvorlagen", data),
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.einstellungen.positionsvorlagen }),
   });
 };
@@ -834,11 +898,15 @@ export const useDeletePositionsvorlage = () => {
 };
 
 export const useTextvorlagen = () =>
-  useQuery({ queryKey: qk.einstellungen.textvorlagen, queryFn: () => api.get<Textvorlage[]>("/einstellungen/textvorlagen") });
+  useQuery({
+    queryKey: qk.einstellungen.textvorlagen,
+    queryFn: () => api.get<Textvorlage[]>("/einstellungen/textvorlagen"),
+  });
 export const useCreateTextvorlage = () => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: Partial<Textvorlage>) => api.post<Textvorlage>("/einstellungen/textvorlagen", data),
+    mutationFn: (data: Partial<Textvorlage>) =>
+      api.post<Textvorlage>("/einstellungen/textvorlagen", data),
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.einstellungen.textvorlagen }),
   });
 };
@@ -902,7 +970,8 @@ export const useEmailSignaturen = () =>
 export const useCreateEmailSignatur = () => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: Partial<EmailSignatur>) => api.post<EmailSignatur>("/email/signaturen", data),
+    mutationFn: (data: Partial<EmailSignatur>) =>
+      api.post<EmailSignatur>("/email/signaturen", data),
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.email.signaturen }),
   });
 };
@@ -987,8 +1056,7 @@ export const useMahnLaeufe = () =>
 export const useMahnLauf = (id: string | null | undefined) =>
   useQuery({
     queryKey: ["mahnung", "laeufe", id] as const,
-    queryFn: () =>
-      api.get<import("@/lib/api/types").MahnLaufDetail>(`/mahnung/laeufe/${id}`),
+    queryFn: () => api.get<import("@/lib/api/types").MahnLaufDetail>(`/mahnung/laeufe/${id}`),
     enabled: !!id,
   });
 
@@ -1073,8 +1141,7 @@ export const useUpdateGoogleDrive = () => {
 /** Liefert die Google-OAuth-Authorize-URL. Frontend öffnet sie in neuem Tab. */
 export const useConnectGoogleDrive = () =>
   useMutation({
-    mutationFn: () =>
-      api.post<{ authorizeUrl: string }>("/einstellungen/google-drive/connect"),
+    mutationFn: () => api.post<{ authorizeUrl: string }>("/einstellungen/google-drive/connect"),
   });
 
 export const useDisconnectGoogleDrive = () => {
@@ -1187,7 +1254,15 @@ export const useBackupInArbeit = () =>
 export type RestoreStatus = {
   restore: {
     id: string;
-    phase: "queued" | "safety-backup" | "extract" | "swap" | "verify" | "done" | "rollback" | "error";
+    phase:
+      | "queued"
+      | "safety-backup"
+      | "extract"
+      | "swap"
+      | "verify"
+      | "done"
+      | "rollback"
+      | "error";
     percent: number;
     message?: string;
     startedAt: string;
@@ -1211,17 +1286,16 @@ export const useRestoreStatus = (enabled = true) =>
     enabled,
   });
 
-
 // (Sitzungs-Hooks entfernt — Single-User-Modus, keine Session-Verwaltung mehr.)
-
 
 // ---------- System & Updates ----------
 
 /** Backend liefert installedAt evtl. als SQLite-Format "YYYY-MM-DD HH:MM:SS". */
 function adaptSystemInfo(s: SystemInfo): SystemInfo {
-  const iso = s.installedAt && !s.installedAt.includes("T")
-    ? s.installedAt.replace(" ", "T") + "Z"
-    : s.installedAt;
+  const iso =
+    s.installedAt && !s.installedAt.includes("T")
+      ? s.installedAt.replace(" ", "T") + "Z"
+      : s.installedAt;
   return { ...s, installedAt: iso };
 }
 
@@ -1269,8 +1343,7 @@ export const useValidateUpdate = () =>
 export const useInstallUpdate = () => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (uploadId: string) =>
-      api.post<UpdateLauf>(`/system/update/install/${uploadId}`),
+    mutationFn: (uploadId: string) => api.post<UpdateLauf>(`/system/update/install/${uploadId}`),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: qk.einstellungen.systemInfo });
       qc.invalidateQueries({ queryKey: qk.einstellungen.updateHistorie });
@@ -1315,10 +1388,7 @@ export const useRollbackUpdate = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ version, passwort }: { version: string; passwort: string }) =>
-      api.post<UpdateLauf>(
-        `/system/update/rollback/${encodeURIComponent(version)}`,
-        { passwort },
-      ),
+      api.post<UpdateLauf>(`/system/update/rollback/${encodeURIComponent(version)}`, { passwort }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: qk.einstellungen.systemInfo });
       qc.invalidateQueries({ queryKey: qk.einstellungen.updateHistorie });
@@ -1379,8 +1449,7 @@ export const useCreateProtokoll = () => {
 export const useUpdateProtokoll = (id: string) => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: Partial<Protokoll>) =>
-      api.patch<Protokoll>(`/protokolle/${id}`, data),
+    mutationFn: (data: Partial<Protokoll>) => api.patch<Protokoll>(`/protokolle/${id}`, data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: qkProtokoll(id) });
       qc.invalidateQueries({ queryKey: ["protokolle"] });
@@ -1399,7 +1468,12 @@ export const useDeleteProtokoll = () => {
 export const useAbschliessenProtokoll = (id: string) => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: { dateiname: string; mimeType: string; groesseBytes: number; url: string }) => {
+    mutationFn: (data: {
+      dateiname: string;
+      mimeType: string;
+      groesseBytes: number;
+      url: string;
+    }) => {
       // `url` ist eine DataURL (z. B. "data:application/pdf;base64,XXXX").
       // Mock-Backend nutzt `url` direkt, Pi-Backend erwartet `pdfBase64`.
       const base64 = data.url.includes(",") ? data.url.split(",")[1] : data.url;

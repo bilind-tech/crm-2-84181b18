@@ -46,9 +46,7 @@ export function DauerauftragVerwaltungCard({ rechnungId, details }: Props) {
       <div className="flex items-center gap-1.5 text-sm text-foreground">
         <Repeat className="h-3.5 w-3.5 text-primary" />
         Dauerauftrag
-        {details && (
-          <span className="text-muted-foreground">· {formatWiederkehrend(details)}</span>
-        )}
+        {details && <span className="text-muted-foreground">· {formatWiederkehrend(details)}</span>}
       </div>
     );
   }
@@ -61,7 +59,9 @@ function VerwaltungInner({
   alleRechnungen,
 }: {
   dauerauftragId: string;
-  alleRechnungen: ReturnType<typeof useRechnungen>["data"] extends infer T ? Exclude<T, undefined> : never;
+  alleRechnungen: ReturnType<typeof useRechnungen>["data"] extends infer T
+    ? Exclude<T, undefined>
+    : never;
 }) {
   const { data: da } = useDauerauftrag(dauerauftragId);
   const pausiere = usePausiereDauerauftrag(dauerauftragId);
@@ -101,17 +101,17 @@ function VerwaltungInner({
 
       <div className="mb-3 grid gap-2 text-sm sm:grid-cols-2">
         <div className="rounded-lg border border-border bg-background p-2.5">
-          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Nächster Lauf</p>
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
+            Nächster Lauf
+          </p>
           <p className="mt-0.5 font-medium">
-            {istBeendet
-              ? "—"
-              : naechste
-              ? formatDate(naechste.toISOString().slice(0, 10))
-              : "—"}
+            {istBeendet ? "—" : naechste ? formatDate(naechste.toISOString().slice(0, 10)) : "—"}
           </p>
         </div>
         <div className="rounded-lg border border-border bg-background p-2.5">
-          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Bisherige Läufe</p>
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
+            Bisherige Läufe
+          </p>
           <p className="mt-0.5 font-medium">{da.laeufe.length}</p>
         </div>
       </div>
@@ -238,7 +238,8 @@ function VerwaltungInner({
 
       <p className="text-[11px] leading-relaxed text-muted-foreground">
         <CheckCircle2 className="mr-1 inline h-3 w-3" />
-        Jeder Monat ist eine eigene Rechnung — bezahlt-Markierung erfolgt pro Monat in der jeweiligen Rechnung.
+        Jeder Monat ist eine eigene Rechnung — bezahlt-Markierung erfolgt pro Monat in der
+        jeweiligen Rechnung.
       </p>
 
       {dialog}

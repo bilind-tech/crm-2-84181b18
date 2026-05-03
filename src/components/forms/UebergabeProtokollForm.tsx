@@ -78,7 +78,9 @@ export function UebergabeProtokollForm({ onClose, defaultKundeId, defaultObjektI
               setObjektId("");
             }}
           >
-            <SelectTrigger><SelectValue placeholder="Kunde wählen…" /></SelectTrigger>
+            <SelectTrigger>
+              <SelectValue placeholder="Kunde wählen…" />
+            </SelectTrigger>
             <SelectContent>
               {kunden.map((k) => (
                 <SelectItem key={k.id} value={k.id}>
@@ -94,11 +96,15 @@ export function UebergabeProtokollForm({ onClose, defaultKundeId, defaultObjektI
             onValueChange={(v) => setObjektId(v === "__none__" ? "" : v)}
             disabled={!kundeId}
           >
-            <SelectTrigger><SelectValue placeholder={kundeId ? "— kein Objekt —" : "Erst Kunde wählen"} /></SelectTrigger>
+            <SelectTrigger>
+              <SelectValue placeholder={kundeId ? "— kein Objekt —" : "Erst Kunde wählen"} />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="__none__">— kein Objekt —</SelectItem>
               {objekteVonKunde.map((o) => (
-                <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>
+                <SelectItem key={o.id} value={o.id}>
+                  {o.name}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -111,7 +117,9 @@ export function UebergabeProtokollForm({ onClose, defaultKundeId, defaultObjektI
         </Field>
         <Field label="Art">
           <Select value={art} onValueChange={(v) => setArt(v as UebergabeArt)}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="uebergabe">Übergabe</SelectItem>
               <SelectItem value="abnahme">Abnahme</SelectItem>
@@ -138,15 +146,13 @@ export function UebergabeProtokollForm({ onClose, defaultKundeId, defaultObjektI
       </Field>
 
       <Field label="Bemerkungen (optional)">
-        <Textarea
-          value={bemerkungen}
-          onChange={(e) => setBemerkungen(e.target.value)}
-          rows={2}
-        />
+        <Textarea value={bemerkungen} onChange={(e) => setBemerkungen(e.target.value)} rows={2} />
       </Field>
 
       <div className="sticky bottom-0 -mx-4 -mb-6 mt-2 flex flex-col-reverse items-stretch gap-2 border-t border-border bg-background px-4 py-3 sm:-mx-8 sm:px-8 sm:flex-row sm:items-center sm:justify-end">
-        <Button variant="outline" onClick={onClose}>Abbrechen</Button>
+        <Button variant="outline" onClick={onClose}>
+          Abbrechen
+        </Button>
         <PrimaryAction
           icon={Check}
           label={create.isPending ? "Speichere…" : "Protokoll anlegen"}

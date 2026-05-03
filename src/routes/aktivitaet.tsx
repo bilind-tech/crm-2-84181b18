@@ -8,7 +8,10 @@ function Page() {
   return (
     <div className="space-y-4">
       <h1 className="text-2xl font-semibold">Aktivitätsverlauf</h1>
-      <Card><CardHeader><CardTitle>Verlauf</CardTitle></CardHeader>
+      <Card>
+        <CardHeader>
+          <CardTitle>Verlauf</CardTitle>
+        </CardHeader>
         <CardContent>
           <ul className="divide-y">
             {data.map((a) => (

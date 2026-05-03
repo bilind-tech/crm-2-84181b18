@@ -6,7 +6,9 @@ import { useUpdateProtokoll } from "@/hooks/useApi";
 import type { Protokoll } from "@/lib/api/types";
 
 const VOLATILE = new Set(["aktualisiertAm", "erstelltAm"]);
-function stable<T>(o: T) { return JSON.stringify(o, (k, v) => (VOLATILE.has(k) ? undefined : v)); }
+function stable<T>(o: T) {
+  return JSON.stringify(o, (k, v) => (VOLATILE.has(k) ? undefined : v));
+}
 
 export function useProtokollEditor<T extends Protokoll>(initial: T) {
   const [draft, setDraft] = useState<T>(initial);
@@ -18,7 +20,10 @@ export function useProtokollEditor<T extends Protokoll>(initial: T) {
     const incoming = stable(initial);
     if (incoming === lastSavedRef.current) return;
     const cur = stable(draftRef.current);
-    if (incoming === cur) { lastSavedRef.current = incoming; return; }
+    if (incoming === cur) {
+      lastSavedRef.current = incoming;
+      return;
+    }
     if (cur !== lastSavedRef.current) return; // dirty → behalten
     setDraft(initial);
     lastSavedRef.current = incoming;
@@ -32,26 +37,31 @@ export function useProtokollEditor<T extends Protokoll>(initial: T) {
     setDraft((p) => ({ ...p, [key]: value }));
   }, []);
 
-  const save = useCallback(async (silent = true) => {
-    if (stable(draftRef.current) === lastSavedRef.current) return;
-    setSaving(true);
-    try {
-      const cur = draftRef.current;
-      const saved = await update.mutateAsync(cur as Partial<Protokoll>);
-      lastSavedRef.current = stable(saved as T);
-      if (!silent) toast.success("Gespeichert");
-    } catch (e) {
-      console.error(e);
-      toast.error("Konnte nicht speichern");
-    } finally {
-      setSaving(false);
-    }
-  }, [update]);
+  const save = useCallback(
+    async (silent = true) => {
+      if (stable(draftRef.current) === lastSavedRef.current) return;
+      setSaving(true);
+      try {
+        const cur = draftRef.current;
+        const saved = await update.mutateAsync(cur as Partial<Protokoll>);
+        lastSavedRef.current = stable(saved as T);
+        if (!silent) toast.success("Gespeichert");
+      } catch (e) {
+        console.error(e);
+        toast.error("Konnte nicht speichern");
+      } finally {
+        setSaving(false);
+      }
+    },
+    [update],
+  );
 
   // Autosave debounced
   useEffect(() => {
     if (!isDirty) return;
-    const t = setTimeout(() => { void save(true); }, 1500);
+    const t = setTimeout(() => {
+      void save(true);
+    }, 1500);
     return () => clearTimeout(t);
   }, [draft, isDirty, save]);
 

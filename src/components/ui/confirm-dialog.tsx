@@ -42,18 +42,13 @@ export function ConfirmDialog({
       <AlertDialogContent className="bg-background">
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>
-          {description && (
-            <AlertDialogDescription>{description}</AlertDialogDescription>
-          )}
+          {description && <AlertDialogDescription>{description}</AlertDialogDescription>}
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>{cancelLabel}</AlertDialogCancel>
           <AlertDialogAction
             onClick={onConfirm}
-            className={cn(
-              variant === "destructive" &&
-                buttonVariants({ variant: "destructive" }),
-            )}
+            className={cn(variant === "destructive" && buttonVariants({ variant: "destructive" }))}
           >
             {confirmLabel}
           </AlertDialogAction>

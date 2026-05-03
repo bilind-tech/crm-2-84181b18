@@ -6,11 +6,7 @@
 // nach Zeitraum sein müssen und nicht im /mahnung/status enthalten sind.
 
 import { useMemo } from "react";
-import {
-  useMahnEinstellungen,
-  useMahnStatus,
-  useRechnungen,
-} from "@/hooks/useApi";
+import { useMahnEinstellungen, useMahnStatus, useRechnungen } from "@/hooks/useApi";
 import { bestimmeMahnZustand } from "@/lib/mahnung/regeln";
 import { passtInZeitraum, type ZeitraumState } from "@/components/filters/ZeitraumFilter";
 

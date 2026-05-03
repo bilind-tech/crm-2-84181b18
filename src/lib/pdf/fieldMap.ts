@@ -14,16 +14,16 @@ export interface HotspotMeta {
 /** Statische Metadaten für bekannte Feld-IDs. Unbekannte (z.B. dynamische
  *  pos:<id>) werden zur Laufzeit ergänzt. */
 export const FIELD_META: Record<string, HotspotMeta> = {
-  logo:             { label: "Logo / Firma",       tab: "logo",       fieldId: "logo" },
-  "firma.absender": { label: "Absenderzeile",      tab: "logo",       fieldId: "firma.absender" },
-  "kunde":          { label: "Empfänger-Adresse",  tab: "stammdaten", fieldId: "kunde" },
-  "meta":           { label: "Meta / Daten",       tab: "stammdaten", fieldId: "meta" },
-  "titel":          { label: "Titel",              tab: "stammdaten", fieldId: "titel" },
-  "anrede":         { label: "Anrede",             tab: "stammdaten", fieldId: "ansprechpartner" },
-  "intro":          { label: "Einleitung",         tab: "texte",      fieldId: "intro" },
-  "tabelle":        { label: "Positionen",         tab: "positionen", fieldId: "positionen" },
-  "summe":          { label: "Summen / Steuer",    tab: "stammdaten", fieldId: "steuersatz" },
-  "outro":          { label: "Schlusstext",        tab: "texte",      fieldId: "outro" },
+  logo: { label: "Logo / Firma", tab: "logo", fieldId: "logo" },
+  "firma.absender": { label: "Absenderzeile", tab: "logo", fieldId: "firma.absender" },
+  kunde: { label: "Empfänger-Adresse", tab: "stammdaten", fieldId: "kunde" },
+  meta: { label: "Meta / Daten", tab: "stammdaten", fieldId: "meta" },
+  titel: { label: "Titel", tab: "stammdaten", fieldId: "titel" },
+  anrede: { label: "Anrede", tab: "stammdaten", fieldId: "ansprechpartner" },
+  intro: { label: "Einleitung", tab: "texte", fieldId: "intro" },
+  tabelle: { label: "Positionen", tab: "positionen", fieldId: "positionen" },
+  summe: { label: "Summen / Steuer", tab: "stammdaten", fieldId: "steuersatz" },
+  outro: { label: "Schlusstext", tab: "texte", fieldId: "outro" },
 };
 
 export function metaForId(id: string): HotspotMeta {
@@ -43,14 +43,14 @@ export interface FallbackHotspot {
 }
 
 export const FALLBACK_HOTSPOTS_SEITE_1: FallbackHotspot[] = [
-  { id: "logo",     page: 1, box: { x: 0.04, y: 0.02, w: 0.30, h: 0.07 } },
-  { id: "firma.absender", page: 1, box: { x: 0.50, y: 0.03, w: 0.46, h: 0.05 } },
-  { id: "kunde",    page: 1, box: { x: 0.04, y: 0.13, w: 0.45, h: 0.10 } },
-  { id: "meta",     page: 1, box: { x: 0.55, y: 0.13, w: 0.41, h: 0.10 } },
-  { id: "titel",    page: 1, box: { x: 0.04, y: 0.25, w: 0.92, h: 0.04 } },
-  { id: "anrede",   page: 1, box: { x: 0.04, y: 0.31, w: 0.92, h: 0.03 } },
-  { id: "intro",    page: 1, box: { x: 0.04, y: 0.35, w: 0.92, h: 0.07 } },
-  { id: "tabelle",  page: 1, box: { x: 0.04, y: 0.43, w: 0.92, h: 0.30 } },
-  { id: "summe",    page: 1, box: { x: 0.55, y: 0.74, w: 0.41, h: 0.09 } },
-  { id: "outro",    page: 1, box: { x: 0.04, y: 0.84, w: 0.92, h: 0.07 } },
+  { id: "logo", page: 1, box: { x: 0.04, y: 0.02, w: 0.3, h: 0.07 } },
+  { id: "firma.absender", page: 1, box: { x: 0.5, y: 0.03, w: 0.46, h: 0.05 } },
+  { id: "kunde", page: 1, box: { x: 0.04, y: 0.13, w: 0.45, h: 0.1 } },
+  { id: "meta", page: 1, box: { x: 0.55, y: 0.13, w: 0.41, h: 0.1 } },
+  { id: "titel", page: 1, box: { x: 0.04, y: 0.25, w: 0.92, h: 0.04 } },
+  { id: "anrede", page: 1, box: { x: 0.04, y: 0.31, w: 0.92, h: 0.03 } },
+  { id: "intro", page: 1, box: { x: 0.04, y: 0.35, w: 0.92, h: 0.07 } },
+  { id: "tabelle", page: 1, box: { x: 0.04, y: 0.43, w: 0.92, h: 0.3 } },
+  { id: "summe", page: 1, box: { x: 0.55, y: 0.74, w: 0.41, h: 0.09 } },
+  { id: "outro", page: 1, box: { x: 0.04, y: 0.84, w: 0.92, h: 0.07 } },
 ];

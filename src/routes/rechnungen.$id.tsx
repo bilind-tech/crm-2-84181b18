@@ -93,8 +93,7 @@ function Page() {
         title={r.titel}
         subtitle={
           <>
-            <span className="font-mono">{r.nummer}</span> ·{" "}
-            {formatDate(r.rechnungsdatum)} · fällig{" "}
+            <span className="font-mono">{r.nummer}</span> · {formatDate(r.rechnungsdatum)} · fällig{" "}
             {formatDate(r.faelligkeitsdatum)} · Status{" "}
             <span className="capitalize">{r.status}</span>
           </>
@@ -126,9 +125,12 @@ function Page() {
       {quellAngebot && (
         <div className="flex items-center justify-between rounded-2xl border border-border bg-muted/30 p-4">
           <div>
-            <p className="text-xs uppercase tracking-wider text-muted-foreground">Erstellt aus Angebot</p>
+            <p className="text-xs uppercase tracking-wider text-muted-foreground">
+              Erstellt aus Angebot
+            </p>
             <p className="mt-0.5 text-sm">
-              <span className="font-mono font-semibold">{quellAngebot.nummer}</span> · {quellAngebot.titel}
+              <span className="font-mono font-semibold">{quellAngebot.nummer}</span> ·{" "}
+              {quellAngebot.titel}
             </p>
           </div>
           <Link
@@ -144,7 +146,9 @@ function Page() {
       <div className="grid gap-6 lg:grid-cols-[380px_1fr]">
         <div className="space-y-4">
           <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-            <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Beträge</p>
+            <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Beträge
+            </p>
             <Row label="Netto" value={formatEUR(s.netto)} />
             <Row label={`MwSt ${r.steuersatz}%`} value={formatEUR(s.steuer)} />
             <div className="my-2 h-px bg-border" />
@@ -164,7 +168,9 @@ function Page() {
 
           {r.zahlungen.length > 0 && (
             <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-              <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Zahlungen</p>
+              <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Zahlungen
+              </p>
               <ul className="space-y-2 text-sm">
                 {r.zahlungen.map((z) => {
                   return (
@@ -199,7 +205,9 @@ function Page() {
                                 delZahlung.mutate(z.id, {
                                   onSuccess: () => toast.success("Zahlung gelöscht"),
                                   onError: (e) =>
-                                    toast.error(e instanceof Error ? e.message : "Löschen fehlgeschlagen"),
+                                    toast.error(
+                                      e instanceof Error ? e.message : "Löschen fehlgeschlagen",
+                                    ),
                                 }),
                             )
                           }
@@ -215,7 +223,9 @@ function Page() {
           )}
 
           <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-            <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Positionen</p>
+            <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Positionen
+            </p>
             <ul className="space-y-3">
               {r.positionen.map((p, i) => {
                 const istPauschal = p.modus === "pauschal";
@@ -226,7 +236,8 @@ function Page() {
                   <li key={p.id} className="text-sm">
                     <div className="flex items-baseline justify-between gap-3">
                       <span className="min-w-0 font-medium">
-                        {i + 1}. {istPauschal ? (p.beschreibung.split("\n")[0] || "Pauschal") : p.beschreibung}
+                        {i + 1}.{" "}
+                        {istPauschal ? p.beschreibung.split("\n")[0] || "Pauschal" : p.beschreibung}
                       </span>
                       <span className="whitespace-nowrap font-semibold tabular-nums">
                         {formatEUR(summe)}
@@ -250,7 +261,9 @@ function Page() {
 
           {r.optionen && (
             <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-              <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Optionen</p>
+              <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Optionen
+              </p>
               <ul className="space-y-1.5 text-sm text-muted-foreground">
                 <li>{r.optionen.materialBereitgestellt ? "✓" : "✗"} Material bereitgestellt</li>
                 <li>{r.optionen.standardAnschreiben ? "✓" : "✗"} Standard-Anschreiben</li>
@@ -274,7 +287,9 @@ function Page() {
           errorMessage={pdf.error}
           drive={r.drive}
           pdfUrl={pdf.url}
-          viewButton={<PdfViewButton kind="rechnung" beleg={r} variant="icon-text" label="PDF ansehen" />}
+          viewButton={
+            <PdfViewButton kind="rechnung" beleg={r} variant="icon-text" label="PDF ansehen" />
+          }
         />
       </div>
 

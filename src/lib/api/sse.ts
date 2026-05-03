@@ -19,13 +19,21 @@ let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
 function notifyState(): void {
   for (const l of stateListeners) {
-    try { l(connected); } catch { /* ignore */ }
+    try {
+      l(connected);
+    } catch {
+      /* ignore */
+    }
   }
 }
 
 function dispatch(type: string, data: unknown, id?: number): void {
   for (const l of listeners) {
-    try { l({ type, data, id }); } catch { /* ignore listener errors */ }
+    try {
+      l({ type, data, id });
+    } catch {
+      /* ignore listener errors */
+    }
   }
 }
 
@@ -44,14 +52,24 @@ function open(): void {
   // Native EventSource ruft addEventListener pro Event-Name. Wir kennen die
   // wichtigen Typen aus dem Backend.
   const knownEvents = [
-    "hello", "error", "maintenance",
+    "hello",
+    "error",
+    "maintenance",
     "aktivitaet:neu",
-    "benachrichtigung:neu", "benachrichtigung:gelesen", "benachrichtigung:weg",
-    "beleg:mutated", "zahlung:erfasst",
-    "email:gesendet", "email:fehler",
-    "drive:hochgeladen", "drive:fehler", "drive:upload-changed",
-    "auth:login", "auth:logout",
-    "backup:erstellt", "backup:fehler",
+    "benachrichtigung:neu",
+    "benachrichtigung:gelesen",
+    "benachrichtigung:weg",
+    "beleg:mutated",
+    "zahlung:erfasst",
+    "email:gesendet",
+    "email:fehler",
+    "drive:hochgeladen",
+    "drive:fehler",
+    "drive:upload-changed",
+    "auth:login",
+    "auth:logout",
+    "backup:erstellt",
+    "backup:fehler",
     "einstellung:geaendert",
   ];
 
@@ -61,7 +79,11 @@ function open(): void {
       const id = me.lastEventId ? Number(me.lastEventId) : undefined;
       if (Number.isFinite(id)) lastEventId = id!;
       let data: unknown = me.data;
-      try { data = JSON.parse(me.data); } catch { /* keep string */ }
+      try {
+        data = JSON.parse(me.data);
+      } catch {
+        /* keep string */
+      }
       dispatch(name, data, id);
     });
   }
@@ -74,7 +96,13 @@ function open(): void {
 
   es.onerror = () => {
     // Auto-reconnect über Browser hat unklare Garantien — wir machen es selbst.
-    if (es) { try { es.close(); } catch { /* noop */ } }
+    if (es) {
+      try {
+        es.close();
+      } catch {
+        /* noop */
+      }
+    }
     es = null;
     connected = false;
     notifyState();
@@ -100,24 +128,42 @@ export function startSse(): void {
 
 export function stopSse(): void {
   active = false;
-  if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
-  if (es) { try { es.close(); } catch { /* noop */ } es = null; }
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
+  if (es) {
+    try {
+      es.close();
+    } catch {
+      /* noop */
+    }
+    es = null;
+  }
   connected = false;
   notifyState();
 }
 
 export function onSse(listener: SseListener): () => void {
   listeners.add(listener);
-  return () => { listeners.delete(listener); };
+  return () => {
+    listeners.delete(listener);
+  };
 }
 
-export function getLastEventId(): number | null { return lastEventId; }
+export function getLastEventId(): number | null {
+  return lastEventId;
+}
 
-export function isSseConnected(): boolean { return connected; }
+export function isSseConnected(): boolean {
+  return connected;
+}
 
 /** Subscribe auf Verbindungsstatus. Liefert sofort den aktuellen Wert. */
 export function onSseStatus(cb: (connected: boolean) => void): () => void {
   stateListeners.add(cb);
   cb(connected);
-  return () => { stateListeners.delete(cb); };
+  return () => {
+    stateListeners.delete(cb);
+  };
 }

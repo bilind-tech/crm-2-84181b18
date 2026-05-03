@@ -98,9 +98,7 @@ export function PasswortAendernDialog({
             />
           </div>
           {fehler && (
-            <p className="rounded bg-destructive/10 px-3 py-2 text-sm text-destructive">
-              {fehler}
-            </p>
+            <p className="rounded bg-destructive/10 px-3 py-2 text-sm text-destructive">{fehler}</p>
           )}
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>

@@ -37,9 +37,7 @@ export function KundenObjektPicker({
 
   const kunden = useMemo(
     () =>
-      [...(kundenQ.data ?? [])].sort((a, b) =>
-        kundenAnzeige(a).localeCompare(kundenAnzeige(b)),
-      ),
+      [...(kundenQ.data ?? [])].sort((a, b) => kundenAnzeige(a).localeCompare(kundenAnzeige(b))),
     [kundenQ.data],
   );
   const objekte = objekteQ.data ?? [];
@@ -51,18 +49,12 @@ export function KundenObjektPicker({
   }, [objekte, objektId, showObjekt, onObjektChange]);
 
   return (
-    <div
-      className={
-        showObjekt ? "grid gap-3 sm:grid-cols-2" : "grid gap-3 sm:max-w-md"
-      }
-    >
+    <div className={showObjekt ? "grid gap-3 sm:grid-cols-2" : "grid gap-3 sm:max-w-md"}>
       <div className="space-y-1.5">
         <Label>Kunde *</Label>
         <Select
           value={kundeId ?? ""}
-          onValueChange={(v) =>
-            onKundeChange(kunden.find((k) => k.id === v))
-          }
+          onValueChange={(v) => onKundeChange(kunden.find((k) => k.id === v))}
         >
           <SelectTrigger>
             <SelectValue placeholder="Kunde auswählen …" />
@@ -88,11 +80,7 @@ export function KundenObjektPicker({
           <Label>Objekt (optional)</Label>
           <Select
             value={objektId ?? ""}
-            onValueChange={(v) =>
-              onObjektChange?.(
-                v ? objekte.find((o) => o.id === v) : undefined,
-              )
-            }
+            onValueChange={(v) => onObjektChange?.(v ? objekte.find((o) => o.id === v) : undefined)}
             disabled={!kundeId || objekte.length === 0}
           >
             <SelectTrigger>

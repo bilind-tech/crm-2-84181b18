@@ -5,8 +5,22 @@
 import { useEffect, useState } from "react";
 import { LoadingPlaceholder } from "@/components/layout/LoadingPlaceholder";
 import { toast } from "sonner";
-import { Plus, Trash2, Pencil, Star, Check, AlertCircle, Loader2, Eye, Code2, Zap, Send, ShieldCheck, ShieldAlert, Info } from "lucide-react";
-
+import {
+  Plus,
+  Trash2,
+  Pencil,
+  Star,
+  Check,
+  AlertCircle,
+  Loader2,
+  Eye,
+  Code2,
+  Zap,
+  Send,
+  ShieldCheck,
+  ShieldAlert,
+  Info,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -76,11 +90,16 @@ export function EmailVorlagenTab() {
         </div>
 
         {vorlagen.length === 0 ? (
-          <p className="py-8 text-center text-sm text-muted-foreground">Noch keine Vorlagen angelegt.</p>
+          <p className="py-8 text-center text-sm text-muted-foreground">
+            Noch keine Vorlagen angelegt.
+          </p>
         ) : (
           <ul className="divide-y divide-border">
             {vorlagen.map((v) => (
-              <li key={v.id} className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
+              <li
+                key={v.id}
+                className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0"
+              >
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <p className="truncate text-sm font-medium">{v.name}</p>
@@ -213,7 +232,9 @@ function VorlageDialog({
             </Field>
             <Field label="Kontext" required>
               <Select value={kontext} onValueChange={(v) => setKontext(v as EmailKontext)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="angebot">Angebot</SelectItem>
                   <SelectItem value="rechnung">Rechnung</SelectItem>
@@ -237,7 +258,9 @@ function VorlageDialog({
                   onClick={() => setMode("html")}
                   className={cn(
                     "inline-flex items-center rounded-md px-2.5 py-1 text-xs font-medium",
-                    mode === "html" ? "bg-card shadow-sm ring-1 ring-border" : "text-muted-foreground",
+                    mode === "html"
+                      ? "bg-card shadow-sm ring-1 ring-border"
+                      : "text-muted-foreground",
                   )}
                 >
                   <Code2 className="mr-1 h-3.5 w-3.5" /> HTML
@@ -247,7 +270,9 @@ function VorlageDialog({
                   onClick={() => setMode("vorschau")}
                   className={cn(
                     "inline-flex items-center rounded-md px-2.5 py-1 text-xs font-medium",
-                    mode === "vorschau" ? "bg-card shadow-sm ring-1 ring-border" : "text-muted-foreground",
+                    mode === "vorschau"
+                      ? "bg-card shadow-sm ring-1 ring-border"
+                      : "text-muted-foreground",
                   )}
                 >
                   <Eye className="mr-1 h-3.5 w-3.5" /> Vorschau
@@ -283,11 +308,11 @@ function VorlageDialog({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Abbrechen</Button>
+          <Button variant="outline" onClick={onClose}>
+            Abbrechen
+          </Button>
           <Button
-            onClick={() =>
-              onSave({ name, kontext, betreff, koerperHtml, istStandard })
-            }
+            onClick={() => onSave({ name, kontext, betreff, koerperHtml, istStandard })}
             disabled={!name.trim() || !betreff.trim()}
           >
             <Check className="mr-1.5 h-4 w-4" /> Speichern
@@ -327,11 +352,16 @@ export function EmailSignaturenTab() {
         </div>
 
         {signaturen.length === 0 ? (
-          <p className="py-8 text-center text-sm text-muted-foreground">Noch keine Signaturen angelegt.</p>
+          <p className="py-8 text-center text-sm text-muted-foreground">
+            Noch keine Signaturen angelegt.
+          </p>
         ) : (
           <ul className="divide-y divide-border">
             {signaturen.map((s) => (
-              <li key={s.id} className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
+              <li
+                key={s.id}
+                className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0"
+              >
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <p className="truncate text-sm font-medium">{s.name}</p>
@@ -399,11 +429,19 @@ export function EmailSignaturenTab() {
             if (editing) {
               update.mutate(
                 { id: editing.id, ...data },
-                { onSuccess: () => { toast.success("Signatur aktualisiert"); setEditing(null); } },
+                {
+                  onSuccess: () => {
+                    toast.success("Signatur aktualisiert");
+                    setEditing(null);
+                  },
+                },
               );
             } else {
               create.mutate(data, {
-                onSuccess: () => { toast.success("Signatur angelegt"); setCreating(false); },
+                onSuccess: () => {
+                  toast.success("Signatur angelegt");
+                  setCreating(false);
+                },
               });
             }
           }}
@@ -452,14 +490,20 @@ function SignaturDialog({
                 <button
                   type="button"
                   onClick={() => setMode("html")}
-                  className={cn("rounded-md px-2.5 py-1 text-xs", mode === "html" && "bg-card ring-1 ring-border")}
+                  className={cn(
+                    "rounded-md px-2.5 py-1 text-xs",
+                    mode === "html" && "bg-card ring-1 ring-border",
+                  )}
                 >
                   <Code2 className="mr-1 inline h-3.5 w-3.5" /> HTML
                 </button>
                 <button
                   type="button"
                   onClick={() => setMode("vorschau")}
-                  className={cn("rounded-md px-2.5 py-1 text-xs", mode === "vorschau" && "bg-card ring-1 ring-border")}
+                  className={cn(
+                    "rounded-md px-2.5 py-1 text-xs",
+                    mode === "vorschau" && "bg-card ring-1 ring-border",
+                  )}
                 >
                   <Eye className="mr-1 inline h-3.5 w-3.5" /> Vorschau
                 </button>
@@ -494,7 +538,9 @@ function SignaturDialog({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Abbrechen</Button>
+          <Button variant="outline" onClick={onClose}>
+            Abbrechen
+          </Button>
           <Button onClick={() => onSave({ name, html, istStandard })} disabled={!name.trim()}>
             <Check className="mr-1.5 h-4 w-4" /> Speichern
           </Button>
@@ -514,7 +560,7 @@ export function SmtpTab() {
   // Schnelltest entfernt — Verbindung-prüfen (verify) ist die robuste Variante.
   const verify = useVerifySmtp();
   const sendTest = useSendTestMail();
-  
+
   const [form, setForm] = useState({
     server: smtp?.server ?? "",
     port: smtp?.port ?? 587,
@@ -711,9 +757,7 @@ export function SmtpTab() {
           </Field>
           <Field
             label={
-              smtp.passwortGesetzt
-                ? "Passwort (gesetzt — leer lassen um zu behalten)"
-                : "Passwort"
+              smtp.passwortGesetzt ? "Passwort (gesetzt — leer lassen um zu behalten)" : "Passwort"
             }
             required={!smtp.passwortGesetzt}
           >
@@ -792,11 +836,7 @@ export function SmtpTab() {
           />
           <Button
             onClick={handleSendTest}
-            disabled={
-              sendTest.isPending ||
-              !smtp.passwortGesetzt ||
-              !testEmpfaenger.trim()
-            }
+            disabled={sendTest.isPending || !smtp.passwortGesetzt || !testEmpfaenger.trim()}
             className="gap-1.5"
           >
             {sendTest.isPending ? (
@@ -817,8 +857,8 @@ export function SmtpTab() {
       <div className="flex items-start gap-2 rounded-xl border border-border bg-muted/30 p-4 text-sm text-muted-foreground">
         <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
         <span>
-          Das Passwort wird im Pi-Backend mit AES-GCM verschlüsselt abgelegt und ist nicht
-          mehr lesbar — nur der Versanddienst kann es entschlüsseln. Im Mock-Modus wird das Passwort
+          Das Passwort wird im Pi-Backend mit AES-GCM verschlüsselt abgelegt und ist nicht mehr
+          lesbar — nur der Versanddienst kann es entschlüsseln. Im Mock-Modus wird das Passwort
           nicht persistiert.
         </span>
       </div>

@@ -30,16 +30,22 @@ interface BackendBenachrichtigung {
 }
 
 const ALLOWED_AKT_TYPEN: ReadonlySet<AktivitaetTyp> = new Set<AktivitaetTyp>([
-  "kunde_angelegt", "kunde_geaendert",
+  "kunde_angelegt",
+  "kunde_geaendert",
   "objekt_angelegt",
-  "angebot_angelegt", "angebot_versendet", "angebot_in_rechnung_umgewandelt",
-  "rechnung_angelegt", "rechnung_versendet",
+  "angebot_angelegt",
+  "angebot_versendet",
+  "angebot_in_rechnung_umgewandelt",
+  "rechnung_angelegt",
+  "rechnung_versendet",
   "zahlung_erfasst",
   "dokument_hochgeladen",
   "einstellung_geaendert",
   "backup_erstellt",
-  "dauerauftrag_angelegt", "dauerauftrag_lauf_erzeugt",
-  "zahlungseingang_zugeordnet", "zahlungseingang_importiert",
+  "dauerauftrag_angelegt",
+  "dauerauftrag_lauf_erzeugt",
+  "zahlungseingang_zugeordnet",
+  "zahlungseingang_importiert",
   "system",
 ]);
 
@@ -53,7 +59,9 @@ function toIsoDateTime(s: string): string {
   return s.replace(" ", "T") + "Z";
 }
 
-function routeKey(route?: string | null): { route: string; params?: Record<string, string> } | undefined {
+function routeKey(
+  route?: string | null,
+): { route: string; params?: Record<string, string> } | undefined {
   if (!route) return undefined;
   // Backend liefert konkrete Pfade wie "/rechnungen/123" oder "/kunden/abc".
   // Frontend-Typ erwartet ein abstraktes route+params-Pattern.
@@ -70,15 +78,16 @@ export function adaptAktivitaet(b: BackendAktivitaet): Aktivitaet {
     zeitpunkt: toIsoDateTime(b.zeitpunkt),
     typ: toAktTyp(b.art),
     beschreibung: b.beschreibung || b.titel,
-    entitaet: b.bezugArt && b.bezugId
-      ? { typ: b.bezugArt, id: b.bezugId as ID }
-      : undefined,
+    entitaet: b.bezugArt && b.bezugId ? { typ: b.bezugArt, id: b.bezugId as ID } : undefined,
   };
 }
 
 export function adaptBenachrichtigung(b: BackendBenachrichtigung): Benachrichtigung {
   const typMap: Record<BackendBenachrichtigung["prioritaet"], BenachrichtigungTyp> = {
-    info: "info", erfolg: "erfolg", warnung: "warnung", fehler: "fehler",
+    info: "info",
+    erfolg: "erfolg",
+    warnung: "warnung",
+    fehler: "fehler",
   };
   return {
     id: b.id as ID,
@@ -94,7 +103,12 @@ export function adaptBenachrichtigung(b: BackendBenachrichtigung): Benachrichtig
 // Backend-Listenform: { items: [...] } oder direkt Array (Mock).
 export function unwrapList<T>(raw: unknown): T[] {
   if (Array.isArray(raw)) return raw as T[];
-  if (raw && typeof raw === "object" && "items" in raw && Array.isArray((raw as { items: T[] }).items)) {
+  if (
+    raw &&
+    typeof raw === "object" &&
+    "items" in raw &&
+    Array.isArray((raw as { items: T[] }).items)
+  ) {
     return (raw as { items: T[] }).items;
   }
   return [];

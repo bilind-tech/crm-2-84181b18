@@ -221,7 +221,11 @@ function MobileUploadPage() {
               "shadow-[0_8px_22px_-8px_rgba(37,99,235,0.55)] ring-1 ring-inset ring-white/15 disabled:opacity-60"
             }
           >
-            {uploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Upload className="h-5 w-5" />}
+            {uploading ? (
+              <Loader2 className="h-5 w-5 animate-spin" />
+            ) : (
+              <Upload className="h-5 w-5" />
+            )}
             <span>{uploading ? "Wird hochgeladen…" : `Alle senden (${dateien.length})`}</span>
           </button>
         </div>

@@ -14,7 +14,15 @@ import {
   type DragEvent,
   forwardRef,
 } from "react";
-import { FileUp, FileText, Image as ImageIcon, X, RefreshCw, ChevronDown, Upload } from "lucide-react";
+import {
+  FileUp,
+  FileText,
+  Image as ImageIcon,
+  X,
+  RefreshCw,
+  ChevronDown,
+  Upload,
+} from "lucide-react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { ACCEPT_PATTERN, MAX_BYTES, uploadDokument } from "@/lib/dokument/upload";
@@ -25,13 +33,22 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import type { Dokument, DokumentTyp } from "@/lib/api/types";
 
 const ACCEPT_MIMES = new Set([
-  "image/jpeg", "image/png", "image/webp", "image/heic", "image/heif", "application/pdf",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/heic",
+  "image/heif",
+  "application/pdf",
 ]);
 const CONCURRENCY = 3;
 
@@ -93,7 +110,11 @@ function validateFile(file: File): { ok: boolean; grund?: string } {
 
 function makePreview(file: File): string | undefined {
   if (file.type.startsWith("image/")) {
-    try { return URL.createObjectURL(file); } catch { return undefined; }
+    try {
+      return URL.createObjectURL(file);
+    } catch {
+      return undefined;
+    }
   }
   return undefined;
 }
@@ -229,7 +250,9 @@ export const DokumentUploadPanel = forwardRef<DokumentUploadPanelHandle, Dokumen
       if (e.dataTransfer.files?.length) addFiles(e.dataTransfer.files);
     }
 
-    const wartendCount = items.filter((it) => it.status === "wartet" || it.status === "fehler").length;
+    const wartendCount = items.filter(
+      (it) => it.status === "wartet" || it.status === "fehler",
+    ).length;
     const showBulk = !kundeId; // Wenn schon am Kunden, müssen wir Kunde nicht abfragen
 
     const hidden = (
@@ -251,16 +274,23 @@ export const DokumentUploadPanel = forwardRef<DokumentUploadPanelHandle, Dokumen
         {/* Drop-Zone */}
         {!compact && (
           <div
-            onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDrag(true);
+            }}
             onDragLeave={() => setDrag(false)}
             onDrop={onDrop}
             onClick={() => inputRef.current?.click()}
             role="button"
             tabIndex={0}
-            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") inputRef.current?.click(); }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") inputRef.current?.click();
+            }}
             className={cn(
               "flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed bg-card p-6 text-center transition sm:p-10",
-              drag ? "border-primary bg-primary/5" : "border-border hover:border-primary/60 hover:bg-muted/30",
+              drag
+                ? "border-primary bg-primary/5"
+                : "border-border hover:border-primary/60 hover:bg-muted/30",
               busy && "pointer-events-none opacity-70",
             )}
           >
@@ -290,7 +320,16 @@ export const DokumentUploadPanel = forwardRef<DokumentUploadPanelHandle, Dokumen
         {items.length > 0 && (
           <div className="space-y-2 rounded-2xl border border-border bg-card p-3">
             {items.map((it) => (
-              <StapelZeile key={it.id} item={it} onRemove={() => entferne(it.id)} onRetry={() => uploadOne(it).catch(() => {/* state schon gesetzt */})} />
+              <StapelZeile
+                key={it.id}
+                item={it}
+                onRemove={() => entferne(it.id)}
+                onRetry={() =>
+                  uploadOne(it).catch(() => {
+                    /* state schon gesetzt */
+                  })
+                }
+              />
             ))}
           </div>
         )}
@@ -303,7 +342,9 @@ export const DokumentUploadPanel = forwardRef<DokumentUploadPanelHandle, Dokumen
               onClick={() => setMetaOffen((v) => !v)}
               className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left text-sm font-medium"
             >
-              <span>Allen Dokumenten zuweisen <span className="text-muted-foreground">(optional)</span></span>
+              <span>
+                Allen Dokumenten zuweisen <span className="text-muted-foreground">(optional)</span>
+              </span>
               <ChevronDown className={cn("h-4 w-4 transition", metaOffen && "rotate-180")} />
             </button>
             {metaOffen && (
@@ -312,14 +353,24 @@ export const DokumentUploadPanel = forwardRef<DokumentUploadPanelHandle, Dokumen
                   <Label className="text-xs font-medium">Kunde</Label>
                   <Select
                     value={bulk.kundeId ?? "none"}
-                    onValueChange={(v) => setBulk((b) => ({ ...b, kundeId: v === "none" ? undefined : v, objektId: undefined }))}
+                    onValueChange={(v) =>
+                      setBulk((b) => ({
+                        ...b,
+                        kundeId: v === "none" ? undefined : v,
+                        objektId: undefined,
+                      }))
+                    }
                   >
-                    <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
+                    <SelectTrigger>
+                      <SelectValue placeholder="—" />
+                    </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">— Kein Kunde —</SelectItem>
                       {kunden.map((k) => (
                         <SelectItem key={k.id} value={k.id}>
-                          {k.firmenname || `${k.vorname ?? ""} ${k.nachname ?? ""}`.trim() || k.nummer}
+                          {k.firmenname ||
+                            `${k.vorname ?? ""} ${k.nachname ?? ""}`.trim() ||
+                            k.nummer}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -329,7 +380,9 @@ export const DokumentUploadPanel = forwardRef<DokumentUploadPanelHandle, Dokumen
                   <Label className="text-xs font-medium">Objekt</Label>
                   <Select
                     value={bulk.objektId ?? "none"}
-                    onValueChange={(v) => setBulk((b) => ({ ...b, objektId: v === "none" ? undefined : v }))}
+                    onValueChange={(v) =>
+                      setBulk((b) => ({ ...b, objektId: v === "none" ? undefined : v }))
+                    }
                     disabled={!bulk.kundeId}
                   >
                     <SelectTrigger>
@@ -338,7 +391,9 @@ export const DokumentUploadPanel = forwardRef<DokumentUploadPanelHandle, Dokumen
                     <SelectContent>
                       <SelectItem value="none">— Kein Objekt —</SelectItem>
                       {objekte.map((o) => (
-                        <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>
+                        <SelectItem key={o.id} value={o.id}>
+                          {o.name}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -347,9 +402,13 @@ export const DokumentUploadPanel = forwardRef<DokumentUploadPanelHandle, Dokumen
                   <Label className="text-xs font-medium">Typ</Label>
                   <Select
                     value={bulk.typ ?? "auto"}
-                    onValueChange={(v) => setBulk((b) => ({ ...b, typ: v === "auto" ? undefined : (v as DokumentTyp) }))}
+                    onValueChange={(v) =>
+                      setBulk((b) => ({ ...b, typ: v === "auto" ? undefined : (v as DokumentTyp) }))
+                    }
                   >
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="auto">Automatisch</SelectItem>
                       <SelectItem value="rechnung">Rechnung</SelectItem>
@@ -365,13 +424,17 @@ export const DokumentUploadPanel = forwardRef<DokumentUploadPanelHandle, Dokumen
                   <Input
                     type="date"
                     value={bulk.faelligAm ?? ""}
-                    onChange={(e) => setBulk((b) => ({ ...b, faelligAm: e.target.value || undefined }))}
+                    onChange={(e) =>
+                      setBulk((b) => ({ ...b, faelligAm: e.target.value || undefined }))
+                    }
                   />
                 </div>
                 <div className="flex items-center justify-between rounded-xl border border-border bg-muted/30 p-3 sm:col-span-2">
                   <div>
                     <p className="text-sm font-medium">Steuerrelevant</p>
-                    <p className="text-xs text-muted-foreground">Für die Jahres-Übersicht markieren.</p>
+                    <p className="text-xs text-muted-foreground">
+                      Für die Jahres-Übersicht markieren.
+                    </p>
                   </div>
                   <Switch
                     checked={!!bulk.steuerrelevant}
@@ -386,7 +449,13 @@ export const DokumentUploadPanel = forwardRef<DokumentUploadPanelHandle, Dokumen
         {/* Aktionen */}
         {items.length > 0 && (
           <div className="flex flex-wrap items-center justify-end gap-2">
-            <Button type="button" variant="ghost" onClick={leeren} disabled={busy} className="rounded-xl">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={leeren}
+              disabled={busy}
+              className="rounded-xl"
+            >
               Liste leeren
             </Button>
             <Button
@@ -396,7 +465,9 @@ export const DokumentUploadPanel = forwardRef<DokumentUploadPanelHandle, Dokumen
               className="rounded-xl"
             >
               <Upload className="mr-2 h-4 w-4" />
-              {busy ? "Lädt hoch…" : `Alle hochladen${wartendCount > 0 ? ` (${wartendCount})` : ""}`}
+              {busy
+                ? "Lädt hoch…"
+                : `Alle hochladen${wartendCount > 0 ? ` (${wartendCount})` : ""}`}
             </Button>
           </div>
         )}
@@ -406,7 +477,9 @@ export const DokumentUploadPanel = forwardRef<DokumentUploadPanelHandle, Dokumen
 );
 
 function StapelZeile({
-  item, onRemove, onRetry,
+  item,
+  onRemove,
+  onRetry,
 }: {
   item: StapelItem;
   onRemove: () => void;
@@ -436,12 +509,26 @@ function StapelZeile({
         </div>
       </div>
       {(item.status === "fehler" || item.status === "wartet") && item.status === "fehler" && (
-        <Button type="button" variant="ghost" size="icon" onClick={onRetry} className="h-8 w-8" title="Erneut">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          onClick={onRetry}
+          className="h-8 w-8"
+          title="Erneut"
+        >
           <RefreshCw className="h-4 w-4" />
         </Button>
       )}
       {item.status !== "laedt" && (
-        <Button type="button" variant="ghost" size="icon" onClick={onRemove} className="h-8 w-8" title="Entfernen">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          onClick={onRemove}
+          className="h-8 w-8"
+          title="Entfernen"
+        >
           <X className="h-4 w-4" />
         </Button>
       )}
@@ -454,7 +541,9 @@ function StatusZeile({ item }: { item: StapelItem }) {
     return <p className="text-xs text-destructive">{item.fehler ?? "Ungültig"}</p>;
   }
   if (item.status === "fehler") {
-    return <p className="text-xs text-destructive">Fehler: {item.fehler ?? "Upload fehlgeschlagen"}</p>;
+    return (
+      <p className="text-xs text-destructive">Fehler: {item.fehler ?? "Upload fehlgeschlagen"}</p>
+    );
   }
   if (item.status === "fertig") {
     return <p className="text-xs text-emerald-600 dark:text-emerald-400">Hochgeladen</p>;

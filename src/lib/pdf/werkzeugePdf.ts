@@ -116,12 +116,18 @@ function footer(firma?: Firmendaten) {
   return function () {
     const f = firma ?? ({} as Firmendaten);
     const cell = (lines: (string | null | undefined)[]) => ({
-      stack: lines.filter(Boolean).map((l) => ({ text: l as string, fontSize: 7, color: COLOR_TEXT })),
+      stack: lines
+        .filter(Boolean)
+        .map((l) => ({ text: l as string, fontSize: 7, color: COLOR_TEXT })),
     });
     return {
       margin: [55, 0, 55, 12] as [number, number, number, number],
       stack: [
-        { canvas: [{ type: "line", x1: 0, y1: 0, x2: 485, y2: 0, lineWidth: 0.5, lineColor: COLOR_LINE }] },
+        {
+          canvas: [
+            { type: "line", x1: 0, y1: 0, x2: 485, y2: 0, lineWidth: 0.5, lineColor: COLOR_LINE },
+          ],
+        },
         {
           margin: [0, 8, 0, 0] as [number, number, number, number],
           columns: [
@@ -143,8 +149,21 @@ function footer(firma?: Firmendaten) {
 
 function metaBox(meta: { label: string; wert: string }[]) {
   const body: unknown[][] = meta.map((m) => [
-    { text: m.label, fontSize: 9.5, border: [false, false, false, false], margin: [0, 1, 8, 1], lineHeight: 1.2 },
-    { text: m.wert, fontSize: 9.5, alignment: "right", border: [false, false, false, false], margin: [0, 1, 0, 1], lineHeight: 1.2 },
+    {
+      text: m.label,
+      fontSize: 9.5,
+      border: [false, false, false, false],
+      margin: [0, 1, 8, 1],
+      lineHeight: 1.2,
+    },
+    {
+      text: m.wert,
+      fontSize: 9.5,
+      alignment: "right",
+      border: [false, false, false, false],
+      margin: [0, 1, 0, 1],
+      lineHeight: 1.2,
+    },
   ]);
   return {
     width: 235,
@@ -176,10 +195,17 @@ function sectionTitle(text: string) {
 }
 
 function thinLine() {
-  return { canvas: [{ type: "line", x1: 0, y1: 0, x2: 485, y2: 0, lineWidth: 0.4, lineColor: COLOR_LINE }] };
+  return {
+    canvas: [{ type: "line", x1: 0, y1: 0, x2: 485, y2: 0, lineWidth: 0.4, lineColor: COLOR_LINE }],
+  };
 }
 
-function unterschriftenBlock(linksLabel: string, linksName: string, rechtsLabel: string, rechtsName: string) {
+function unterschriftenBlock(
+  linksLabel: string,
+  linksName: string,
+  rechtsLabel: string,
+  rechtsName: string,
+) {
   return {
     margin: [0, 30, 0, 0] as [number, number, number, number],
     columns: [
@@ -187,7 +213,11 @@ function unterschriftenBlock(linksLabel: string, linksName: string, rechtsLabel:
         width: "*",
         stack: [
           { text: linksName || " ", fontSize: 10, margin: [0, 0, 0, 28] },
-          { canvas: [{ type: "line", x1: 0, y1: 0, x2: 220, y2: 0, lineWidth: 0.5, lineColor: COLOR_TEXT }] },
+          {
+            canvas: [
+              { type: "line", x1: 0, y1: 0, x2: 220, y2: 0, lineWidth: 0.5, lineColor: COLOR_TEXT },
+            ],
+          },
           { text: linksLabel, fontSize: 8, color: COLOR_MUTED, margin: [0, 3, 0, 0] },
         ],
       },
@@ -195,7 +225,11 @@ function unterschriftenBlock(linksLabel: string, linksName: string, rechtsLabel:
         width: "*",
         stack: [
           { text: rechtsName || " ", fontSize: 10, margin: [0, 0, 0, 28] },
-          { canvas: [{ type: "line", x1: 0, y1: 0, x2: 220, y2: 0, lineWidth: 0.5, lineColor: COLOR_TEXT }] },
+          {
+            canvas: [
+              { type: "line", x1: 0, y1: 0, x2: 220, y2: 0, lineWidth: 0.5, lineColor: COLOR_TEXT },
+            ],
+          },
           { text: rechtsLabel, fontSize: 8, color: COLOR_MUTED, margin: [0, 3, 0, 0] },
         ],
       },
@@ -253,9 +287,7 @@ const PROTOKOLL_ART_LABEL: Record<ProtokollArt, string> = {
   beides: "Übergabe- und Abnahmeprotokoll",
 };
 
-export async function generateUebergabeprotokollPdf(
-  data: UebergabeprotokollData,
-): Promise<Blob> {
+export async function generateUebergabeprotokollPdf(data: UebergabeprotokollData): Promise<Blob> {
   const titel = PROTOKOLL_ART_LABEL[data.art];
   const logo = await logoDataUrl(data.firma?.logoUrl);
 
@@ -346,13 +378,9 @@ export interface SchluesseluebergabeData {
   firma?: Firmendaten;
 }
 
-export async function generateSchluesseluebergabePdf(
-  data: SchluesseluebergabeData,
-): Promise<Blob> {
+export async function generateSchluesseluebergabePdf(data: SchluesseluebergabeData): Promise<Blob> {
   const titel =
-    data.richtung === "ausgabe"
-      ? "Schlüsselübergabe — Ausgabe"
-      : "Schlüsselübergabe — Rücknahme";
+    data.richtung === "ausgabe" ? "Schlüsselübergabe — Ausgabe" : "Schlüsselübergabe — Rücknahme";
   const logo = await logoDataUrl(data.firma?.logoUrl);
 
   const meta: { label: string; wert: string }[] = [];
@@ -510,7 +538,14 @@ export function safeFilename(s: string): string {
 }
 
 // ─── Adapter: Generierung direkt aus Protokoll-Datensätzen ─────────────────
-import type { Protokoll, UebergabeProtokoll, SchluesselProtokoll, Kunde as KundeT, Objekt as ObjektT, Firmendaten as FirmaT } from "@/lib/api/types";
+import type {
+  Protokoll,
+  UebergabeProtokoll,
+  SchluesselProtokoll,
+  Kunde as KundeT,
+  Objekt as ObjektT,
+  Firmendaten as FirmaT,
+} from "@/lib/api/types";
 
 export async function generateProtokollPdf(
   p: Protokoll,
@@ -530,7 +565,9 @@ export async function generateProtokollPdf(
       vertreterAuftraggeber: s.vertreterAuftraggeber,
       vertreterAuftragnehmer: s.vertreterAuftragnehmer,
       bestaetigt: s.bestaetigt,
-      kunde, objekt, firma,
+      kunde,
+      objekt,
+      firma,
     });
   }
   const u = p as UebergabeProtokoll;
@@ -544,20 +581,33 @@ export async function generateProtokollPdf(
     leistungsumfang: u.leistungsumfang,
     bemerkungen: u.bemerkungen,
     ohneVorbehalt: u.ohneVorbehalt,
-    kunde, objekt, firma,
+    kunde,
+    objekt,
+    firma,
   });
 }
 
 export function protokollDateiname(p: Protokoll, kunde?: KundeT, objekt?: ObjektT): string {
-  const kn = safeFilename(kunde ? (kunde.firmenname || [kunde.vorname, kunde.nachname].filter(Boolean).join(" ") || kunde.nummer) : "Kunde");
+  const kn = safeFilename(
+    kunde
+      ? kunde.firmenname ||
+          [kunde.vorname, kunde.nachname].filter(Boolean).join(" ") ||
+          kunde.nummer
+      : "Kunde",
+  );
   const obj = objekt?.name ? safeFilename(objekt.name) : "";
   const d = p.datum ? new Date(p.datum) : new Date();
   const ddmmyyyy = isNaN(d.getTime())
     ? ""
     : `${String(d.getUTCDate()).padStart(2, "0")}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${d.getUTCFullYear()}`;
-  const prefix = p.kind === "schluessel"
-    ? "Schluesseluebergabe"
-    : p.art === "abnahme" ? "Abnahmeprotokoll" : p.art === "beides" ? "Protokoll" : "Uebergabeprotokoll";
+  const prefix =
+    p.kind === "schluessel"
+      ? "Schluesseluebergabe"
+      : p.art === "abnahme"
+        ? "Abnahmeprotokoll"
+        : p.art === "beides"
+          ? "Protokoll"
+          : "Uebergabeprotokoll";
   const teile = [`${prefix} ${p.nummer.replace("/", "-")}`, kn];
   if (obj) teile.push(`– ${obj}`);
   if (ddmmyyyy) teile.push(`(${ddmmyyyy})`);
@@ -566,7 +616,13 @@ export function protokollDateiname(p: Protokoll, kunde?: KundeT, objekt?: Objekt
 
 export function protokollTitel(p: Protokoll): string {
   if (p.kind === "schluessel") {
-    return p.richtung === "ausgabe" ? "Schlüsselübergabe — Ausgabe" : "Schlüsselübergabe — Rücknahme";
+    return p.richtung === "ausgabe"
+      ? "Schlüsselübergabe — Ausgabe"
+      : "Schlüsselübergabe — Rücknahme";
   }
-  return p.art === "abnahme" ? "Abnahmeprotokoll" : p.art === "beides" ? "Übergabe- und Abnahmeprotokoll" : "Übergabeprotokoll";
+  return p.art === "abnahme"
+    ? "Abnahmeprotokoll"
+    : p.art === "beides"
+      ? "Übergabe- und Abnahmeprotokoll"
+      : "Übergabeprotokoll";
 }

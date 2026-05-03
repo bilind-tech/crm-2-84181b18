@@ -4,12 +4,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { piApi, PiApiError } from "@/lib/api/piClient";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { useSidebar } from "@/components/ui/sidebar";
 
@@ -80,10 +75,13 @@ export function PiStatusIndikator() {
   );
 
   const label =
-    phase === "online" ? `Online · v${q.data?.version ?? ""}`
-    : phase === "wartung" ? "Wartung läuft"
-    : phase === "loading" ? "Verbinde…"
-    : "Pi nicht erreichbar";
+    phase === "online"
+      ? `Online · v${q.data?.version ?? ""}`
+      : phase === "wartung"
+        ? "Wartung läuft"
+        : phase === "loading"
+          ? "Verbinde…"
+          : "Pi nicht erreichbar";
 
   const tooltip =
     phase === "online" && q.data

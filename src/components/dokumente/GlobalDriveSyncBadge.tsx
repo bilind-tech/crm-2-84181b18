@@ -57,7 +57,9 @@ export function GlobalDriveSyncBadge({ dokumente }: Props) {
         </TooltipTrigger>
         <TooltipContent>
           <p className="text-xs">{detail}</p>
-          <p className="mt-0.5 text-[10px] text-muted-foreground">Klick öffnet die Drive-Einstellungen.</p>
+          <p className="mt-0.5 text-[10px] text-muted-foreground">
+            Klick öffnet die Drive-Einstellungen.
+          </p>
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>

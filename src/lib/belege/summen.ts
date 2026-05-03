@@ -11,9 +11,7 @@ export function summenRechnung(
   positionen: Position[],
   rabattGesamt: number,
 ): { netto: number; steuer: number; brutto: number } {
-  const netto =
-    positionen.reduce((s, p) => s + summePosition(p), 0) *
-    (1 - rabattGesamt / 100);
+  const netto = positionen.reduce((s, p) => s + summePosition(p), 0) * (1 - rabattGesamt / 100);
   let steuer = 0;
   for (const p of positionen) {
     steuer += summePosition(p) * (p.steuersatz / 100);

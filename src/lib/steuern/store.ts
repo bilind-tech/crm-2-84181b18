@@ -62,7 +62,11 @@ function readJson<T>(key: string, fallback: T): T {
 function lsRemove(...keys: string[]) {
   if (typeof window === "undefined") return;
   for (const k of keys) {
-    try { window.localStorage.removeItem(k); } catch { /* ignore */ }
+    try {
+      window.localStorage.removeItem(k);
+    } catch {
+      /* ignore */
+    }
   }
 }
 
@@ -73,7 +77,11 @@ function isMigrated(): boolean {
 
 function setMigrated() {
   if (typeof window === "undefined") return;
-  try { window.localStorage.setItem(MIGRATED_KEY, "true"); } catch { /* ignore */ }
+  try {
+    window.localStorage.setItem(MIGRATED_KEY, "true");
+  } catch {
+    /* ignore */
+  }
 }
 
 // ---------- Query-Keys ----------
@@ -145,7 +153,9 @@ export function useSteuerEinstellungen() {
                 geschaetzterBetrag: p.geschaetzterBetrag ?? 0,
                 notiz: p.notiz ?? null,
               });
-            } catch { /* einzelne dürfen scheitern */ }
+            } catch {
+              /* einzelne dürfen scheitern */
+            }
           }
           qc.invalidateQueries({ queryKey: steuerKeys.manuell });
         }
@@ -153,7 +163,9 @@ export function useSteuerEinstellungen() {
           for (const [postenId, b] of Object.entries(localBezahlt)) {
             try {
               await api.put(`/steuern/bezahlt/${encodeURIComponent(postenId)}`, b);
-            } catch { /* überspringen */ }
+            } catch {
+              /* überspringen */
+            }
           }
           qc.invalidateQueries({ queryKey: steuerKeys.bezahlt });
         }
@@ -206,22 +218,24 @@ export function useManuellePosten() {
   });
 
   const posten: SteuerPosten[] = useMemo(() => {
-    return (q.data ?? []).map((p): SteuerPosten => ({
-      id: p.id,
-      art: p.art,
-      titel: p.titel,
-      zeitraum: {
-        jahr: p.zeitraum.jahr,
-        monat: p.zeitraum.monat ?? undefined,
-        quartal: (p.zeitraum.quartal ?? undefined) as 1 | 2 | 3 | 4 | undefined,
-      },
-      faelligAm: p.faelligAm,
-      geschaetzterBetrag: p.geschaetzterBetrag,
-      automatisch: false,
-      status: "offen",
-      notiz: p.notiz ?? undefined,
-      erstelltAm: p.erstelltAm,
-    }));
+    return (q.data ?? []).map(
+      (p): SteuerPosten => ({
+        id: p.id,
+        art: p.art,
+        titel: p.titel,
+        zeitraum: {
+          jahr: p.zeitraum.jahr,
+          monat: p.zeitraum.monat ?? undefined,
+          quartal: (p.zeitraum.quartal ?? undefined) as 1 | 2 | 3 | 4 | undefined,
+        },
+        faelligAm: p.faelligAm,
+        geschaetzterBetrag: p.geschaetzterBetrag,
+        automatisch: false,
+        status: "offen",
+        notiz: p.notiz ?? undefined,
+        erstelltAm: p.erstelltAm,
+      }),
+    );
   }, [q.data]);
 
   const addMut = useMutation({
@@ -284,10 +298,7 @@ export function useBezahltMarkierungen() {
 
   const setMut = useMutation({
     mutationFn: ({ postenId, eintrag }: { postenId: string; eintrag: BezahltMarkierung }) =>
-      api.put<ServerBezahlt>(
-        `/steuern/bezahlt/${encodeURIComponent(postenId)}`,
-        eintrag,
-      ),
+      api.put<ServerBezahlt>(`/steuern/bezahlt/${encodeURIComponent(postenId)}`, eintrag),
     // Optimistic Update
     onMutate: async ({ postenId, eintrag }) => {
       await qc.cancelQueries({ queryKey: steuerKeys.bezahlt });

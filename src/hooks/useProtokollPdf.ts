@@ -7,7 +7,7 @@ import type { Firmendaten, Kunde, Objekt, Protokoll } from "@/lib/api/types";
 export type ProtokollPdfStatus = "idle" | "loading" | "ready" | "error";
 
 const VOLATILE = new Set(["aktualisiertAm", "erstelltAm"]);
-const stable = <T,>(o: T) => JSON.stringify(o, (k, v) => (VOLATILE.has(k) ? undefined : v));
+const stable = <T>(o: T) => JSON.stringify(o, (k, v) => (VOLATILE.has(k) ? undefined : v));
 
 export function useProtokollPdf(
   protokoll: Protokoll | undefined,
@@ -52,10 +52,13 @@ export function useProtokollPdf(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, kunde, objekt, firma]);
 
-  useEffect(() => () => {
-    if (url) URL.revokeObjectURL(url);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  useEffect(
+    () => () => {
+      if (url) URL.revokeObjectURL(url);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    },
+    [],
+  );
 
   return { url, status, error, blob };
 }

@@ -3,11 +3,7 @@
 
 import type { Rechnung, Dokument } from "@/lib/api/types";
 import { summenRechnung } from "@/lib/belege/summen";
-import type {
-  SteuerEinstellungen,
-  SteuerPosten,
-  UstRhythmus,
-} from "./types";
+import type { SteuerEinstellungen, SteuerPosten, UstRhythmus } from "./types";
 
 // ---------- Helpers ----------
 
@@ -28,7 +24,10 @@ function istVollBezahlt(r: Rechnung): boolean {
   return summe >= brutto - 0.005;
 }
 
-function periode(date: string, rhythmus: UstRhythmus): { jahr: number; monat?: number; quartal?: 1 | 2 | 3 | 4 } {
+function periode(
+  date: string,
+  rhythmus: UstRhythmus,
+): { jahr: number; monat?: number; quartal?: 1 | 2 | 3 | 4 } {
   const d = new Date(date);
   const jahr = d.getFullYear();
   const monat = d.getMonth() + 1;
@@ -58,7 +57,20 @@ function periodeKey(p: { jahr: number; monat?: number; quartal?: 1 | 2 | 3 | 4 }
 }
 
 function periodeLabel(p: { jahr: number; monat?: number; quartal?: 1 | 2 | 3 | 4 }): string {
-  const monate = ["Jan", "Feb", "Mär", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dez"];
+  const monate = [
+    "Jan",
+    "Feb",
+    "Mär",
+    "Apr",
+    "Mai",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Okt",
+    "Nov",
+    "Dez",
+  ];
   if (p.monat) return `${monate[p.monat - 1]} ${p.jahr}`;
   if (p.quartal) return `Q${p.quartal} ${p.jahr}`;
   return String(p.jahr);
@@ -88,7 +100,13 @@ export function aggregiereUst(
     const p = periode(datum, rhythmus);
     const key = periodeKey(p);
     const sums = summenRechnung(r.positionen, r.rabattGesamt);
-    const agg = map.get(key) ?? { zeitraum: p, ust: 0, vorsteuer: 0, rechnungIds: [], dokumentIds: [] };
+    const agg = map.get(key) ?? {
+      zeitraum: p,
+      ust: 0,
+      vorsteuer: 0,
+      rechnungIds: [],
+      dokumentIds: [],
+    };
     agg.ust += sums.steuer;
     agg.rechnungIds.push(r.id);
     map.set(key, agg);
@@ -101,13 +119,21 @@ export function aggregiereUst(
     // Vorsteuer = brutto / (1 + satz) * satz, Default 19 %
     const satz = (d.ustSatz ?? 19) / 100;
     const vorsteuer = (d.betrag / (1 + satz)) * satz;
-    const agg = map.get(key) ?? { zeitraum: p, ust: 0, vorsteuer: 0, rechnungIds: [], dokumentIds: [] };
+    const agg = map.get(key) ?? {
+      zeitraum: p,
+      ust: 0,
+      vorsteuer: 0,
+      rechnungIds: [],
+      dokumentIds: [],
+    };
     agg.vorsteuer += vorsteuer;
     agg.dokumentIds.push(d.id);
     map.set(key, agg);
   }
 
-  return Array.from(map.values()).sort((a, b) => periodeKey(a.zeitraum).localeCompare(periodeKey(b.zeitraum)));
+  return Array.from(map.values()).sort((a, b) =>
+    periodeKey(a.zeitraum).localeCompare(periodeKey(b.zeitraum)),
+  );
 }
 
 // ---------- Gewinn-Aggregation YTD ----------
@@ -197,10 +223,10 @@ export function generiereAutomatischePosten(
       status: istErstattung
         ? "offen" // Erstattungen bleiben „offen" bis vom FA gezahlt
         : Math.abs(zahllast) <= 0.005
-        ? "bezahlt"
-        : istVergangen
-        ? "ueberfaellig"
-        : "offen",
+          ? "bezahlt"
+          : istVergangen
+            ? "ueberfaellig"
+            : "offen",
       automatisch: true,
       berechnungsgrundlage: {
         rechnungIds: u.rechnungIds,
@@ -211,8 +237,8 @@ export function generiereAutomatischePosten(
       notiz: istErstattung
         ? `Vorsteuer-Überhang — Erstattung vom Finanzamt erwartet.`
         : einstellungen.ustPufferSatz > 0
-        ? `Inkl. ${einstellungen.ustPufferSatz} % Vorsteuer-Puffer für noch nicht erfasste Belege.`
-        : undefined,
+          ? `Inkl. ${einstellungen.ustPufferSatz} % Vorsteuer-Puffer für noch nicht erfasste Belege.`
+          : undefined,
       erstelltAm: now,
     });
   }
@@ -231,8 +257,7 @@ export function generiereAutomatischePosten(
 
     // Nächster KSt/Soli-Quartalstermin (10.03/06/09/12)
     const kstMonate = [3, 6, 9, 12];
-    const naechsterKst =
-      kstMonate.find((m) => new Date(jahr, m - 1, 10) >= heute) ?? kstMonate[0];
+    const naechsterKst = kstMonate.find((m) => new Date(jahr, m - 1, 10) >= heute) ?? kstMonate[0];
     const kstFaellig = `${jahr}-${String(naechsterKst).padStart(2, "0")}-10`;
 
     // Nächster GewSt-Quartalstermin (15.02/05/08/11)
@@ -322,7 +347,9 @@ export function berechneKennzahlen(
 
   const offenSumme = offene.reduce((s, p) => s + p.geschaetzterBetrag, 0);
   const bezahltJahrSumme = posten
-    .filter((p) => p.status === "bezahlt" && p.bezahltAm && new Date(p.bezahltAm).getFullYear() === jahr)
+    .filter(
+      (p) => p.status === "bezahlt" && p.bezahltAm && new Date(p.bezahltAm).getFullYear() === jahr,
+    )
     .reduce((s, p) => s + (p.tatsaechlicherBetrag ?? p.geschaetzterBetrag), 0);
 
   const g = gewinnYtd(rechnungen, dokumente, jahr);

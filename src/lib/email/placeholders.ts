@@ -41,7 +41,7 @@ function flatten(ctx: PlaceholderContext): Record<string, string> {
     out["kunde.firmenname"] = k.firmenname ?? "";
     out["kunde.vorname"] = k.vorname ?? "";
     out["kunde.nachname"] = k.nachname ?? "";
-    out["kunde.anrede"] = k.anrede ? ANREDE_LABELS[k.anrede] ?? "" : "";
+    out["kunde.anrede"] = k.anrede ? (ANREDE_LABELS[k.anrede] ?? "") : "";
     out["kunde.email"] = k.email ?? "";
     out["kunde.nummer"] = k.nummer;
     const name = k.firmenname || `${k.vorname ?? ""} ${k.nachname ?? ""}`.trim();

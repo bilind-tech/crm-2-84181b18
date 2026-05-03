@@ -18,10 +18,7 @@ function stableStringify<T>(obj: T): string {
   return JSON.stringify(obj, (key, value) => (VOLATILE_KEYS.has(key) ? undefined : value));
 }
 
-export function useBelegEditor<T extends Angebot | Rechnung>(
-  kind: BelegKind,
-  beleg: T,
-) {
+export function useBelegEditor<T extends Angebot | Rechnung>(kind: BelegKind, beleg: T) {
   const [draft, setDraft] = useState<T>(beleg);
   const lastSavedRef = useRef<string>(stableStringify(beleg));
   const draftRef = useRef<T>(beleg);
@@ -42,10 +39,7 @@ export function useBelegEditor<T extends Angebot | Rechnung>(
     lastSavedRef.current = incoming;
   }, [beleg]);
 
-  const isDirty = useMemo(
-    () => stableStringify(draft) !== lastSavedRef.current,
-    [draft],
-  );
+  const isDirty = useMemo(() => stableStringify(draft) !== lastSavedRef.current, [draft]);
 
   const updateAngebot = useUpdateAngebot(kind === "angebot" ? draft.id : "");
   const updateRechnung = useUpdateRechnung(kind === "rechnung" ? draft.id : "");
@@ -56,10 +50,7 @@ export function useBelegEditor<T extends Angebot | Rechnung>(
   }, []);
 
   const setOption = useCallback(
-    <K extends keyof NonNullable<T["optionen"]>>(
-      key: K,
-      value: NonNullable<T["optionen"]>[K],
-    ) => {
+    <K extends keyof NonNullable<T["optionen"]>>(key: K, value: NonNullable<T["optionen"]>[K]) => {
       setDraft((prev) => ({
         ...prev,
         optionen: {
@@ -75,23 +66,26 @@ export function useBelegEditor<T extends Angebot | Rechnung>(
     [],
   );
 
-  const save = useCallback(async (opts?: { silent?: boolean }) => {
-    if (!isDirty) return;
-    try {
-      const payload = { ...draft } as Partial<T>;
-      if (kind === "angebot") {
-        await updateAngebot.mutateAsync(payload as Partial<Angebot>);
-      } else {
-        await updateRechnung.mutateAsync(payload as Partial<Rechnung>);
+  const save = useCallback(
+    async (opts?: { silent?: boolean }) => {
+      if (!isDirty) return;
+      try {
+        const payload = { ...draft } as Partial<T>;
+        if (kind === "angebot") {
+          await updateAngebot.mutateAsync(payload as Partial<Angebot>);
+        } else {
+          await updateRechnung.mutateAsync(payload as Partial<Rechnung>);
+        }
+        lastSavedRef.current = stableStringify(draft);
+        // PDF-Cache (React Query) verwerfen → Detailseite holt neue Version.
+        invalidatePdf(kind, draft.id);
+        if (!opts?.silent) toast.success("Gespeichert", { duration: 1500 });
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Speichern fehlgeschlagen");
       }
-      lastSavedRef.current = stableStringify(draft);
-      // PDF-Cache (React Query) verwerfen → Detailseite holt neue Version.
-      invalidatePdf(kind, draft.id);
-      if (!opts?.silent) toast.success("Gespeichert", { duration: 1500 });
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Speichern fehlgeschlagen");
-    }
-  }, [draft, isDirty, kind, updateAngebot, updateRechnung, invalidatePdf]);
+    },
+    [draft, isDirty, kind, updateAngebot, updateRechnung, invalidatePdf],
+  );
 
   // Autosave nach 1.5s ohne Änderung — silent (kein Toast).
   useEffect(() => {

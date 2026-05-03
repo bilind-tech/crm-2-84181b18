@@ -127,12 +127,7 @@ export interface Position {
   ausfuehrung?: string;
 }
 
-export type AngebotStatus =
-  | "entwurf"
-  | "versendet"
-  | "angenommen"
-  | "abgelehnt"
-  | "abgelaufen";
+export type AngebotStatus = "entwurf" | "versendet" | "angenommen" | "abgelehnt" | "abgelaufen";
 
 export interface BelegOptionen {
   /** Standardsatz „Reinigungsmittel & Werkzeuge werden bereitgestellt" einfügen */
@@ -209,13 +204,7 @@ export type RechnungStatus =
   | "ueberfaellig"
   | "storniert";
 
-export type Zahlungsmethode =
-  | "ueberweisung"
-  | "bar"
-  | "karte"
-  | "paypal"
-  | "sepa"
-  | "sonstiges";
+export type Zahlungsmethode = "ueberweisung" | "bar" | "karte" | "paypal" | "sepa" | "sonstiges";
 
 export interface Zahlung {
   id: ID;
@@ -611,7 +600,6 @@ export interface SicherheitsEinstellungen {
   autoLockMinuten: number;
 }
 
-
 export interface AppearanceEinstellungen {
   theme: "system" | "hell" | "dunkel";
   akzentfarbe: string; // hex
@@ -651,7 +639,7 @@ export interface GoogleDriveEinstellungen {
   /** Pfad-Templates relativ zum Root für die Unterordner. */
   unterordnerSchema: {
     rechnungen: string; // z. B. "Rechnungen/{YYYY}/{MM}"
-    angebote: string;   // z. B. "Angebote/{YYYY}/{MM}"
+    angebote: string; // z. B. "Angebote/{YYYY}/{MM}"
     dokumente?: string; // z. B. "Dokumente/{YYYY}/{MM}"
     protokollUebergabe?: string; // z. B. "Protokolle/Übergabe-Abnahme/{YYYY}/{MM}"
     protokollSchluessel?: string; // z. B. "Protokolle/Schlüsselübergabe/{YYYY}/{MM}"

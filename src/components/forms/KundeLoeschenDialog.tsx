@@ -23,7 +23,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useDeleteKunde } from "@/hooks/useApi";
-import type { Kunde, Ansprechpartner, Objekt, Angebot, Rechnung, Dokument, Notiz } from "@/lib/api/types";
+import type {
+  Kunde,
+  Ansprechpartner,
+  Objekt,
+  Angebot,
+  Rechnung,
+  Dokument,
+  Notiz,
+} from "@/lib/api/types";
 
 type KundeDetail = Kunde & {
   ansprechpartner: Ansprechpartner[];
@@ -47,9 +55,7 @@ export function KundeLoeschenDialog({ kunde, open, onOpenChange }: Props) {
   const navigate = useNavigate();
 
   const fullName =
-    kunde.firmenname ||
-    `${kunde.vorname ?? ""} ${kunde.nachname ?? ""}`.trim() ||
-    kunde.nummer;
+    kunde.firmenname || `${kunde.vorname ?? ""} ${kunde.nachname ?? ""}`.trim() || kunde.nummer;
   const expected = fullName.trim();
   const matches = eingabe.trim().toLowerCase() === expected.toLowerCase();
 
@@ -62,12 +68,7 @@ export function KundeLoeschenDialog({ kunde, open, onOpenChange }: Props) {
     notizen: kunde.notizen.length,
   };
   const hatDaten =
-    counts.objekte +
-      counts.angebote +
-      counts.rechnungen +
-      counts.dokumente +
-      counts.notizen >
-    0;
+    counts.objekte + counts.angebote + counts.rechnungen + counts.dokumente + counts.notizen > 0;
 
   function reset() {
     setStep(1);
@@ -86,10 +87,7 @@ export function KundeLoeschenDialog({ kunde, open, onOpenChange }: Props) {
         handleOpenChange(false);
         navigate({ to: "/kunden" });
       },
-      onError: (e) =>
-        toast.error(
-          e instanceof Error ? e.message : "Löschen fehlgeschlagen",
-        ),
+      onError: (e) => toast.error(e instanceof Error ? e.message : "Löschen fehlgeschlagen"),
     });
   }
 
@@ -102,8 +100,7 @@ export function KundeLoeschenDialog({ kunde, open, onOpenChange }: Props) {
             Kunde löschen
           </DialogTitle>
           <DialogDescription>
-            <span className="font-medium text-foreground">{fullName}</span>
-            {" "}
+            <span className="font-medium text-foreground">{fullName}</span>{" "}
             <span className="font-mono text-xs">({kunde.nummer})</span>
           </DialogDescription>
         </DialogHeader>
@@ -111,8 +108,8 @@ export function KundeLoeschenDialog({ kunde, open, onOpenChange }: Props) {
         {step === 1 ? (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Diese Aktion ist <strong className="text-foreground">endgültig</strong>{" "}
-              und kann nicht rückgängig gemacht werden.
+              Diese Aktion ist <strong className="text-foreground">endgültig</strong> und kann nicht
+              rückgängig gemacht werden.
             </p>
             {hatDaten ? (
               <div className="rounded-xl border border-warning/30 bg-warning/5 p-3 text-sm">

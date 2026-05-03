@@ -7,8 +7,14 @@ function Page() {
   return (
     <div className="mx-auto max-w-2xl space-y-4">
       <h1 className="text-2xl font-semibold">Neues Objekt</h1>
-      <Card><CardContent className="p-6 text-sm text-muted-foreground">Detail-Formular folgt im nächsten Schritt.</CardContent></Card>
-      <Button variant="outline" onClick={() => navigate({ to: "/objekte" })}>Zurück</Button>
+      <Card>
+        <CardContent className="p-6 text-sm text-muted-foreground">
+          Detail-Formular folgt im nächsten Schritt.
+        </CardContent>
+      </Card>
+      <Button variant="outline" onClick={() => navigate({ to: "/objekte" })}>
+        Zurück
+      </Button>
     </div>
   );
 }

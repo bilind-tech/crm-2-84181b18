@@ -119,7 +119,9 @@ export function GlobalSearch({
   const resultsList = (
     <>
       <CommandEmpty>
-        {debouncedQ ? "Nichts gefunden." : "Tippe zum Suchen — Name, Nummer, Adresse, Titel oder Inhalt."}
+        {debouncedQ
+          ? "Nichts gefunden."
+          : "Tippe zum Suchen — Name, Nummer, Adresse, Titel oder Inhalt."}
       </CommandEmpty>
       {Object.entries(grouped).map(([typ, items]) => {
         const Icon = ICONS[typ] ?? FileText;
@@ -206,7 +208,11 @@ export function GlobalSearch({
   // Desktop: zentraler Command-Dialog. shouldFilter=false, sonst frisst cmdk Backend-Treffer.
   return (
     <CommandDialog open={open} onOpenChange={onOpenChange} shouldFilter={false}>
-      <CommandInput placeholder="Suche überall — Name, Nummer, Adresse, Titel oder Inhalt …" value={q} onValueChange={setQ} />
+      <CommandInput
+        placeholder="Suche überall — Name, Nummer, Adresse, Titel oder Inhalt …"
+        value={q}
+        onValueChange={setQ}
+      />
       <CommandList>{resultsList}</CommandList>
     </CommandDialog>
   );

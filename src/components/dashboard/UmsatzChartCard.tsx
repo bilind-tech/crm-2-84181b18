@@ -10,13 +10,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import {
-  BarChart3,
-  AreaChart as AreaIcon,
-  TrendingUp,
-  TrendingDown,
-  Minus,
-} from "lucide-react";
+import { BarChart3, AreaChart as AreaIcon, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { useUmsatz } from "@/hooks/useApi";
 import { formatEUR } from "@/lib/format";
 
@@ -81,18 +75,13 @@ export function UmsatzChartCard({ onMonatKlick }: Props) {
 
   // Datenquelle je nach Zeitraum
   const istJahr =
-    state.zeitraum === "jahr" ||
-    state.zeitraum === "letztesJahr" ||
-    state.zeitraum === "quartal";
-  const jahrParam =
-    state.zeitraum === "letztesJahr" ? letztesJahr : aktJahr;
+    state.zeitraum === "jahr" || state.zeitraum === "letztesJahr" || state.zeitraum === "quartal";
+  const jahrParam = state.zeitraum === "letztesJahr" ? letztesJahr : aktJahr;
 
   const aktuell = useUmsatz(istJahr ? { jahr: jahrParam, monat: "alle" } : undefined);
   // Vorperiode für Δ-Berechnung
   const vorperiode = useUmsatz(
-    istJahr
-      ? { jahr: String(parseInt(jahrParam) - 1), monat: "alle" }
-      : undefined,
+    istJahr ? { jahr: String(parseInt(jahrParam) - 1), monat: "alle" } : undefined,
   );
   // Für 6m/12m: dieselben „letzten 12 Monate" — Vorperiode = clientseitig zerlegen
   const datenAlle = aktuell.data ?? [];
@@ -152,8 +141,7 @@ export function UmsatzChartCard({ onMonatKlick }: Props) {
   const summe = sichtbar.reduce((s, u) => s + u[state.wert], 0);
   const summeVor = vorperiodeWerte.reduce((s, u) => s + u[state.wert], 0);
   const mittel = sichtbar.length > 0 ? summe / sichtbar.length : 0;
-  const deltaPct =
-    summeVor > 0 ? ((summe - summeVor) / summeVor) * 100 : null;
+  const deltaPct = summeVor > 0 ? ((summe - summeVor) / summeVor) * 100 : null;
 
   const mittelLabel = state.zeitraum === "quartal" ? "Ø / Quartal" : "Ø / Monat";
 
@@ -178,14 +166,8 @@ export function UmsatzChartCard({ onMonatKlick }: Props) {
             value={state.zeitraum}
             onChange={(zeitraum) => setState((s) => ({ ...s, zeitraum }))}
           />
-          <TypToggle
-            value={state.typ}
-            onChange={(typ) => setState((s) => ({ ...s, typ }))}
-          />
-          <WertToggle
-            value={state.wert}
-            onChange={(wert) => setState((s) => ({ ...s, wert }))}
-          />
+          <TypToggle value={state.typ} onChange={(typ) => setState((s) => ({ ...s, typ }))} />
+          <WertToggle value={state.wert} onChange={(wert) => setState((s) => ({ ...s, wert }))} />
         </div>
       </div>
 
@@ -199,9 +181,7 @@ export function UmsatzChartCard({ onMonatKlick }: Props) {
           <span className="text-xs text-muted-foreground">{mittelLabel} </span>
           <span className="font-semibold">{formatEUR(mittel)}</span>
         </div>
-        {deltaPct !== null && (
-          <DeltaPill pct={deltaPct} />
-        )}
+        {deltaPct !== null && <DeltaPill pct={deltaPct} />}
       </div>
 
       {/* Chart */}
@@ -265,13 +245,7 @@ function ZeitraumToggle({
   );
 }
 
-function TypToggle({
-  value,
-  onChange,
-}: {
-  value: ChartTyp;
-  onChange: (v: ChartTyp) => void;
-}) {
+function TypToggle({ value, onChange }: { value: ChartTyp; onChange: (v: ChartTyp) => void }) {
   const opts: { v: ChartTyp; Icon: typeof BarChart3; title: string }[] = [
     { v: "bar", Icon: BarChart3, title: "Balken" },
     { v: "area", Icon: AreaIcon, title: "Fläche" },
@@ -298,13 +272,7 @@ function TypToggle({
   );
 }
 
-function WertToggle({
-  value,
-  onChange,
-}: {
-  value: Wert;
-  onChange: (v: Wert) => void;
-}) {
+function WertToggle({ value, onChange }: { value: Wert; onChange: (v: Wert) => void }) {
   return (
     <div className="inline-flex rounded-lg border border-border bg-muted/30 p-0.5">
       {(["brutto", "netto"] as Wert[]).map((v) => (
@@ -328,11 +296,7 @@ function WertToggle({
 function DeltaPill({ pct }: { pct: number }) {
   const istNull = Math.abs(pct) < 0.05;
   const Icon = istNull ? Minus : pct >= 0 ? TrendingUp : TrendingDown;
-  const color = istNull
-    ? "text-muted-foreground"
-    : pct >= 0
-      ? "text-success"
-      : "text-destructive";
+  const color = istNull ? "text-muted-foreground" : pct >= 0 ? "text-success" : "text-destructive";
   return (
     <div className={`inline-flex items-center gap-1 text-xs font-medium ${color}`}>
       <Icon className="h-3.5 w-3.5" />
@@ -379,12 +343,8 @@ function renderChart(
       ]}
     />
   );
-  const grid = (
-    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-  );
-  const xAxis = (
-    <XAxis dataKey="label" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
-  );
+  const grid = <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />;
+  const xAxis = <XAxis dataKey="label" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />;
   const yAxis = (
     <YAxis
       tick={{ fontSize: 11 }}
@@ -410,12 +370,7 @@ function renderChart(
         {xAxis}
         {yAxis}
         {tooltip}
-        <Bar
-          dataKey={aktiv}
-          fill={farbeAktiv}
-          radius={[8, 8, 0, 0]}
-          style={cursorStyle}
-        />
+        <Bar dataKey={aktiv} fill={farbeAktiv} radius={[8, 8, 0, 0]} style={cursorStyle} />
         {/* unsichtbar — nur für Tooltip */}
         <Bar dataKey={inaktiv} fill={farbeInaktiv} />
       </BarChart>
@@ -442,12 +397,7 @@ function renderChart(
         fill="url(#umsatzFlaeche)"
         activeDot={{ r: 5, style: cursorStyle }}
       />
-      <Area
-        type="monotone"
-        dataKey={inaktiv}
-        stroke="transparent"
-        fill="transparent"
-      />
+      <Area type="monotone" dataKey={inaktiv} stroke="transparent" fill="transparent" />
     </AreaChart>
   );
 }

@@ -26,11 +26,7 @@ export function PdfFieldOverlay({ hotspots, scale, openId, onOpenChange, renderE
         const meta = metaForId(h.id);
         const isOpen = openId === h.id;
         return (
-          <Popover
-            key={h.id}
-            open={isOpen}
-            onOpenChange={(o) => onOpenChange(o ? h.id : null)}
-          >
+          <Popover key={h.id} open={isOpen} onOpenChange={(o) => onOpenChange(o ? h.id : null)}>
             <PopoverTrigger asChild>
               <button
                 type="button"

@@ -1,20 +1,41 @@
 // Detail-Ansicht eines Protokolls: Meta links, Live-PDF-Vorschau rechts.
 // Aktionen: Drucken, PDF herunterladen, Bearbeiten, Abschließen, Löschen.
 import { createFileRoute, Link, Outlet, useMatches, useRouter } from "@tanstack/react-router";
-import { ArrowLeft, CheckCircle2, Download, FileCheck2, Loader2, Pencil, Trash2 } from "lucide-react";
+import {
+  ArrowLeft,
+  CheckCircle2,
+  Download,
+  FileCheck2,
+  Loader2,
+  Pencil,
+  Trash2,
+} from "lucide-react";
 import { toast } from "sonner";
 import { useState } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { NotFoundState } from "@/components/layout/NotFoundState";
 import { Button } from "@/components/ui/button";
 import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { PdfPreviewCard } from "@/components/pdf/PdfPreviewCard";
 import { PrintButton } from "@/components/pdf/PrintButton";
 import {
-  useAbschliessenProtokoll, useDeleteProtokoll, useDokument, useFirmendaten, useKunde, useObjekte, useProtokoll,
+  useAbschliessenProtokoll,
+  useDeleteProtokoll,
+  useDokument,
+  useFirmendaten,
+  useKunde,
+  useObjekte,
+  useProtokoll,
 } from "@/hooks/useApi";
 import { useProtokollPdf } from "@/hooks/useProtokollPdf";
 import { useDokumentBlobUrl } from "@/hooks/useDokumentBlobUrl";
@@ -43,11 +64,22 @@ function Page() {
   // Bei abgeschlossenen Protokollen: gespeicherte PDF aus Dokumenten laden (schnell, keine Re-Generierung).
   const dokQ = useDokument(istAbgeschlossen ? p?.dokumentId : undefined);
   const archived = useDokumentBlobUrl(dokQ.data ?? null);
-  const livePdf = useProtokollPdf(istAbgeschlossen ? undefined : p, kundeQ.data, objekt, firmaQ.data);
+  const livePdf = useProtokollPdf(
+    istAbgeschlossen ? undefined : p,
+    kundeQ.data,
+    objekt,
+    firmaQ.data,
+  );
   const pdf = istAbgeschlossen
     ? {
         url: archived.url || null,
-        status: (archived.loading ? "loading" : archived.url ? "ready" : archived.error ? "error" : "idle") as "idle" | "loading" | "ready" | "error",
+        status: (archived.loading
+          ? "loading"
+          : archived.url
+            ? "ready"
+            : archived.error
+              ? "error"
+              : "idle") as "idle" | "loading" | "ready" | "error",
         error: archived.error,
         blob: null as Blob | null,
       }
@@ -60,7 +92,8 @@ function Page() {
   if (protokollQ.isLoading) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center text-muted-foreground">
-        <Loader2 className="mr-2 h-5 w-5 animate-spin" />Lade …
+        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+        Lade …
       </div>
     );
   }
@@ -77,25 +110,37 @@ function Page() {
 
   const dateiname = protokollDateiname(p, kundeQ.data, objekt);
   const kundenName = kundeQ.data
-    ? (kundeQ.data.firmenname || [kundeQ.data.vorname, kundeQ.data.nachname].filter(Boolean).join(" "))
+    ? kundeQ.data.firmenname ||
+      [kundeQ.data.vorname, kundeQ.data.nachname].filter(Boolean).join(" ")
     : "—";
 
   const onDownload = async () => {
-    if (pdf.blob) { downloadBlob(pdf.blob, dateiname); return; }
+    if (pdf.blob) {
+      downloadBlob(pdf.blob, dateiname);
+      return;
+    }
     if (pdf.url) {
       try {
         const res = await fetch(pdf.url);
         const b = await res.blob();
         downloadBlob(b, dateiname);
         return;
-      } catch { /* fallthrough */ }
+      } catch {
+        /* fallthrough */
+      }
     }
     toast.error("PDF noch nicht bereit");
   };
 
   const onAbschliessen = async () => {
-    if (!p.kundeId) { toast.error("Bitte zuerst einen Kunden auswählen."); return; }
-    if (!pdf.blob) { toast.error("PDF wird noch erzeugt …"); return; }
+    if (!p.kundeId) {
+      toast.error("Bitte zuerst einen Kunden auswählen.");
+      return;
+    }
+    if (!pdf.blob) {
+      toast.error("PDF wird noch erzeugt …");
+      return;
+    }
     setBusy(true);
     try {
       const url = await blobToDataUrl(pdf.blob);
@@ -139,35 +184,57 @@ function Page() {
         actions={
           <>
             <Button variant="ghost" size="sm" asChild>
-              <Link to="/protokolle"><ArrowLeft className="mr-1.5 h-4 w-4" />Zurück</Link>
+              <Link to="/protokolle">
+                <ArrowLeft className="mr-1.5 h-4 w-4" />
+                Zurück
+              </Link>
             </Button>
-            <Button variant="outline" onClick={onDownload} disabled={!pdf.url && !pdf.blob} className="rounded-lg">
-              <Download className="mr-1.5 h-4 w-4" />PDF
+            <Button
+              variant="outline"
+              onClick={onDownload}
+              disabled={!pdf.url && !pdf.blob}
+              className="rounded-lg"
+            >
+              <Download className="mr-1.5 h-4 w-4" />
+              PDF
             </Button>
             <PrintButton url={pdf.url} variant="outline" size="default" />
             {istEntwurf && (
               <Button variant="outline" asChild className="rounded-lg">
                 <Link to="/protokolle/$id/bearbeiten" params={{ id }}>
-                  <Pencil className="mr-1.5 h-4 w-4" />Bearbeiten
+                  <Pencil className="mr-1.5 h-4 w-4" />
+                  Bearbeiten
                 </Link>
               </Button>
             )}
             {istEntwurf && (
-              <Button onClick={onAbschliessen} disabled={busy || !p.kundeId || !pdf.blob} className="rounded-lg">
-                {busy ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-1.5 h-4 w-4" />}
+              <Button
+                onClick={onAbschliessen}
+                disabled={busy || !p.kundeId || !pdf.blob}
+                className="rounded-lg"
+              >
+                {busy ? (
+                  <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="mr-1.5 h-4 w-4" />
+                )}
                 Abschließen
               </Button>
             )}
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button variant="ghost" className="text-destructive">
-                  <Trash2 className="mr-1.5 h-4 w-4" />Löschen
+                  <Trash2 className="mr-1.5 h-4 w-4" />
+                  Löschen
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
                   <AlertDialogTitle>Protokoll löschen?</AlertDialogTitle>
-                  <AlertDialogDescription>Dies kann nicht rückgängig gemacht werden. Verknüpfte Dokumente bleiben erhalten.</AlertDialogDescription>
+                  <AlertDialogDescription>
+                    Dies kann nicht rückgängig gemacht werden. Verknüpfte Dokumente bleiben
+                    erhalten.
+                  </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Abbrechen</AlertDialogCancel>
@@ -186,18 +253,31 @@ function Page() {
           <InfoCard label="Datum / Uhrzeit" value={`${p.datum} · ${p.uhrzeit}`} />
           {p.kind === "uebergabe" ? (
             <>
-              <InfoCard label="Art" value={
-                p.art === "abnahme" ? "Abnahme" : p.art === "beides" ? "Übergabe & Abnahme" : "Übergabe"
-              } />
+              <InfoCard
+                label="Art"
+                value={
+                  p.art === "abnahme"
+                    ? "Abnahme"
+                    : p.art === "beides"
+                      ? "Übergabe & Abnahme"
+                      : "Übergabe"
+                }
+              />
               <InfoCard label="Leistungsumfang" value={p.leistungsumfang || "—"} />
               {p.bemerkungen && <InfoCard label="Bemerkungen" value={p.bemerkungen} />}
             </>
           ) : (
             <>
-              <InfoCard label="Richtung" value={p.richtung === "ausgabe" ? "Ausgabe" : "Rücknahme"} />
+              <InfoCard
+                label="Richtung"
+                value={p.richtung === "ausgabe" ? "Ausgabe" : "Rücknahme"}
+              />
               <InfoCard label="Schlüssel" value={`${(p.schluessel ?? []).length} Position(en)`} />
               {p.pfandEur != null && p.pfandEur > 0 && (
-                <InfoCard label="Pfand" value={`${p.pfandEur.toLocaleString("de-DE", { minimumFractionDigits: 2 })} €`} />
+                <InfoCard
+                  label="Pfand"
+                  value={`${p.pfandEur.toLocaleString("de-DE", { minimumFractionDigits: 2 })} €`}
+                />
               )}
             </>
           )}
@@ -209,7 +289,10 @@ function Page() {
                   <p className="font-medium">Im Bereich „Dokumente" archiviert</p>
                   <p className="mt-0.5 text-xs text-muted-foreground">
                     Diese Version ist dauerhaft gespeichert und{" "}
-                    <Link to="/dokumente" className="text-primary underline">in Dokumenten einsehbar</Link>.
+                    <Link to="/dokumente" className="text-primary underline">
+                      in Dokumenten einsehbar
+                    </Link>
+                    .
                   </p>
                 </div>
               </div>
@@ -224,8 +307,14 @@ function Page() {
           pdfUrl={pdf.url}
           fileName={dateiname}
           viewButton={
-            <Button variant="outline" size="sm" onClick={onDownload} disabled={!pdf.url && !pdf.blob}>
-              <Download className="mr-1.5 h-4 w-4" />PDF
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onDownload}
+              disabled={!pdf.url && !pdf.blob}
+            >
+              <Download className="mr-1.5 h-4 w-4" />
+              PDF
             </Button>
           }
         />

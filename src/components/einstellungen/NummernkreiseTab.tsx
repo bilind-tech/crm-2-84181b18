@@ -71,7 +71,8 @@ export function NummernkreiseTab() {
                 className="font-mono"
               />
               <p className="mt-1 text-xs text-muted-foreground">
-                Vorschau: <span className="font-mono text-foreground">{preview(form[row.key])}</span>
+                Vorschau:{" "}
+                <span className="font-mono text-foreground">{preview(form[row.key])}</span>
               </p>
             </Field>
           ))}

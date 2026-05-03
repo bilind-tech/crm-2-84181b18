@@ -63,8 +63,7 @@ export function LeistungsBeschreibung({
     const after = v.slice(selectionEnd);
     const len = marker.length;
     const innerLen = sel.length;
-    const surrounded =
-      innerLen > 0 && before.endsWith(marker) && after.startsWith(marker);
+    const surrounded = innerLen > 0 && before.endsWith(marker) && after.startsWith(marker);
     if (surrounded) {
       const next = before.slice(0, -len) + sel + after.slice(len);
       onChange(next);
@@ -95,9 +94,21 @@ export function LeistungsBeschreibung({
     // Cmd/Ctrl + B / I / U → Markdown-Wrap
     if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey) {
       const k = e.key.toLowerCase();
-      if (k === "b") { e.preventDefault(); wrapMarker("**"); return; }
-      if (k === "i") { e.preventDefault(); wrapMarker("*"); return; }
-      if (k === "u") { e.preventDefault(); wrapMarker("__"); return; }
+      if (k === "b") {
+        e.preventDefault();
+        wrapMarker("**");
+        return;
+      }
+      if (k === "i") {
+        e.preventDefault();
+        wrapMarker("*");
+        return;
+      }
+      if (k === "u") {
+        e.preventDefault();
+        wrapMarker("__");
+        return;
+      }
     }
 
     // Enter → Bullet fortsetzen, wenn aktuelle Zeile mit "• " beginnt

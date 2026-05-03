@@ -20,11 +20,7 @@ export interface BackendStatusResult {
 const POLL_MS = 30_000;
 
 export function useBackendUrl(): string {
-  return useSyncExternalStore(
-    subscribeBackendUrl,
-    getBackendUrl,
-    getBackendUrl,
-  );
+  return useSyncExternalStore(subscribeBackendUrl, getBackendUrl, getBackendUrl);
 }
 
 export function useBackendStatus(pollMs: number = POLL_MS): BackendStatusResult {

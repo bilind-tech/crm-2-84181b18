@@ -6,7 +6,10 @@ import { formatEUR, formatDate } from "@/lib/format";
 import { PageHeader, KpiCard } from "@/components/layout/PageHeader";
 import { PrimaryAction } from "@/components/layout/PrimaryAction";
 import { FilterBar } from "@/routes/angebote";
-import { DokumentUploadPanel, type DokumentUploadPanelHandle } from "@/components/dokumente/DokumentUploadPanel";
+import {
+  DokumentUploadPanel,
+  type DokumentUploadPanelHandle,
+} from "@/components/dokumente/DokumentUploadPanel";
 import { HandyScanDialog } from "@/components/dokumente/HandyScanDialog";
 import { DokumentBearbeitenDialog } from "@/components/dokumente/DokumentBearbeitenDialog";
 import { DokumentViewer } from "@/components/dokumente/DokumentViewer";
@@ -75,7 +78,9 @@ function Page() {
       const s = fristStatus(d);
       return s === "offen" || s === "bald" || s === "ueberfaellig";
     }).length;
-    const steuer = alle.filter((d) => d.steuerrelevant && d.dokumentdatum?.startsWith(String(jahr)));
+    const steuer = alle.filter(
+      (d) => d.steuerrelevant && d.dokumentdatum?.startsWith(String(jahr)),
+    );
     return {
       gesamt: alle.length,
       offen,
@@ -85,17 +90,20 @@ function Page() {
     };
   }, [alle, jahr]);
 
-  const tabCounts = useMemo(() => ({
-    alle: alle.length,
-    offen: alle.filter((d) => {
-      const s = fristStatus(d);
-      return s === "offen" || s === "bald" || s === "ueberfaellig";
-    }).length,
-    ueberfaellig: alle.filter((d) => fristStatus(d) === "ueberfaellig").length,
-    erledigt: alle.filter((d) => fristStatus(d) === "erledigt").length,
-    bilder: alle.filter((d) => d.typ === "bild").length,
-    steuer: alle.filter((d) => d.steuerrelevant).length,
-  }), [alle]);
+  const tabCounts = useMemo(
+    () => ({
+      alle: alle.length,
+      offen: alle.filter((d) => {
+        const s = fristStatus(d);
+        return s === "offen" || s === "bald" || s === "ueberfaellig";
+      }).length,
+      ueberfaellig: alle.filter((d) => fristStatus(d) === "ueberfaellig").length,
+      erledigt: alle.filter((d) => fristStatus(d) === "erledigt").length,
+      bilder: alle.filter((d) => d.typ === "bild").length,
+      steuer: alle.filter((d) => d.steuerrelevant).length,
+    }),
+    [alle],
+  );
 
   const filtered = useMemo(() => {
     let list = alle;
@@ -131,7 +139,13 @@ function Page() {
       // Überfällige zuerst, dann nach Frist, dann nach Hochgeladen-Datum
       const sa = fristStatus(a);
       const sb = fristStatus(b);
-      const prio: Record<string, number> = { ueberfaellig: 0, bald: 1, offen: 2, ohne: 3, erledigt: 4 };
+      const prio: Record<string, number> = {
+        ueberfaellig: 0,
+        bald: 1,
+        offen: 2,
+        ohne: 3,
+        erledigt: 4,
+      };
       if (prio[sa] !== prio[sb]) return prio[sa] - prio[sb];
       return new Date(b.hochgeladenAm).getTime() - new Date(a.hochgeladenAm).getTime();
     });
@@ -160,9 +174,22 @@ function Page() {
 
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         <KpiCard label="Dokumente gesamt" value={counts.gesamt} tone="primary" />
-        <KpiCard label="Offen" value={counts.offen} tone={counts.offen > 0 ? "warning" : "default"} />
-        <KpiCard label="Überfällig" value={counts.ueberfaellig} tone={counts.ueberfaellig > 0 ? "danger" : "default"} />
-        <KpiCard label={`Steuerrelevant ${jahr}`} value={counts.steuerrelevant} tone="success" sublabel={formatEUR(counts.summe)} />
+        <KpiCard
+          label="Offen"
+          value={counts.offen}
+          tone={counts.offen > 0 ? "warning" : "default"}
+        />
+        <KpiCard
+          label="Überfällig"
+          value={counts.ueberfaellig}
+          tone={counts.ueberfaellig > 0 ? "danger" : "default"}
+        />
+        <KpiCard
+          label={`Steuerrelevant ${jahr}`}
+          value={counts.steuerrelevant}
+          tone="success"
+          sublabel={formatEUR(counts.summe)}
+        />
       </div>
 
       <div ref={uploadPanelRef}>
@@ -193,7 +220,9 @@ function Page() {
             setObjektFilter("alle");
           }}
         >
-          <SelectTrigger className="h-9 sm:w-64"><SelectValue placeholder="Alle Kunden" /></SelectTrigger>
+          <SelectTrigger className="h-9 sm:w-64">
+            <SelectValue placeholder="Alle Kunden" />
+          </SelectTrigger>
           <SelectContent>
             <SelectItem value="alle">Alle Kunden</SelectItem>
             {kunden.map((k) => (
@@ -203,14 +232,22 @@ function Page() {
             ))}
           </SelectContent>
         </Select>
-        <Select value={objektFilter} onValueChange={setObjektFilter} disabled={kundeFilter === "alle"}>
+        <Select
+          value={objektFilter}
+          onValueChange={setObjektFilter}
+          disabled={kundeFilter === "alle"}
+        >
           <SelectTrigger className="h-9 sm:w-64">
-            <SelectValue placeholder={kundeFilter === "alle" ? "Erst Kunde wählen" : "Alle Objekte"} />
+            <SelectValue
+              placeholder={kundeFilter === "alle" ? "Erst Kunde wählen" : "Alle Objekte"}
+            />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="alle">Alle Objekte</SelectItem>
             {objekteFuerFilter.map((o) => (
-              <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>
+              <SelectItem key={o.id} value={o.id}>
+                {o.name}
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -244,7 +281,12 @@ function Page() {
           {/* Mobil: Karten-Liste */}
           <div className="grid gap-3 sm:hidden">
             {filtered.map((d) => (
-              <DokumentCard key={d.id} d={d} kundeName={d.kundeId ? kundeMap.get(d.kundeId) : undefined} onClick={() => setViewing(d)} />
+              <DokumentCard
+                key={d.id}
+                d={d}
+                kundeName={d.kundeId ? kundeMap.get(d.kundeId) : undefined}
+                onClick={() => setViewing(d)}
+              />
             ))}
           </div>
 
@@ -292,13 +334,19 @@ function Page() {
                       </td>
                       <td className="px-4 py-3">
                         {status !== "ohne" && (
-                          <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${fristBadgeClass(status)}`}>
-                            {status === "ueberfaellig" && <AlertTriangle className="mr-1 h-3 w-3" />}
+                          <span
+                            className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${fristBadgeClass(status)}`}
+                          >
+                            {status === "ueberfaellig" && (
+                              <AlertTriangle className="mr-1 h-3 w-3" />
+                            )}
                             {FRIST_LABEL[status]}
                           </span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-right">{d.betrag ? formatEUR(d.betrag) : "—"}</td>
+                      <td className="px-4 py-3 text-right">
+                        {d.betrag ? formatEUR(d.betrag) : "—"}
+                      </td>
                     </tr>
                   );
                 })}
@@ -347,12 +395,12 @@ function DokumentCard({
           <DriveSyncBadge dokument={d} />
         </div>
         <p className="truncate text-xs text-muted-foreground">{d.dateiname}</p>
-        {kundeName && (
-          <p className="truncate text-xs text-muted-foreground">{kundeName}</p>
-        )}
+        {kundeName && <p className="truncate text-xs text-muted-foreground">{kundeName}</p>}
         <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs">
           {status !== "ohne" && (
-            <span className={`inline-flex items-center rounded-full border px-2 py-0.5 font-medium ${fristBadgeClass(status)}`}>
+            <span
+              className={`inline-flex items-center rounded-full border px-2 py-0.5 font-medium ${fristBadgeClass(status)}`}
+            >
               {status === "ueberfaellig" && <AlertTriangle className="mr-0.5 h-3 w-3" />}
               {FRIST_LABEL[status]}
             </span>
@@ -365,7 +413,9 @@ function DokumentCard({
           )}
         </div>
       </div>
-      {d.betrag ? <div className="text-right text-sm font-semibold">{formatEUR(d.betrag)}</div> : null}
+      {d.betrag ? (
+        <div className="text-right text-sm font-semibold">{formatEUR(d.betrag)}</div>
+      ) : null}
     </button>
   );
 }

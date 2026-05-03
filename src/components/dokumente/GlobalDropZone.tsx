@@ -95,9 +95,10 @@ export function GlobalDropZone() {
     : ctxKundeId
       ? "Dokumente zu diesem Kunden hochladen"
       : "Dokumente hochladen";
-  const beschreibung = ctxObjektId || ctxKundeId
-    ? "Werden automatisch dem aktuellen Kontext zugeordnet."
-    : "Optional einem Kunden oder Objekt zuweisen — nicht verpflichtend.";
+  const beschreibung =
+    ctxObjektId || ctxKundeId
+      ? "Werden automatisch dem aktuellen Kontext zugeordnet."
+      : "Optional einem Kunden oder Objekt zuweisen — nicht verpflichtend.";
 
   return (
     <>

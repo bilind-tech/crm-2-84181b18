@@ -48,8 +48,7 @@ export function MahnLaeufeListe() {
                     </span>
                   </p>
                   <p className="truncate text-xs text-muted-foreground">
-                    {l.geprueft} geprüft · {l.vorschlaege} Vorschläge ·{" "}
-                    {l.versendet} versendet
+                    {l.geprueft} geprüft · {l.vorschlaege} Vorschläge · {l.versendet} versendet
                     {l.uebersprungen > 0 && ` · ${l.uebersprungen} übersprungen`}
                   </p>
                 </div>

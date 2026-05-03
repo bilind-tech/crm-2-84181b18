@@ -54,10 +54,7 @@ export function PrintButton(props: Props) {
     }
   };
 
-  const isDisabled =
-    disabled ||
-    busy ||
-    ("url" in props && !props.url);
+  const isDisabled = disabled || busy || ("url" in props && !props.url);
 
   return (
     <Button

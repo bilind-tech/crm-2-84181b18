@@ -75,7 +75,10 @@ export function DokumentBearbeitenDialog({ dokument, open, onOpenChange }: Props
   }, [dokument]);
 
   if (!dokument) return null;
-  const status = fristStatus({ faelligAm: faelligAm || undefined, erledigtAm: erledigt ? new Date().toISOString() : undefined });
+  const status = fristStatus({
+    faelligAm: faelligAm || undefined,
+    erledigtAm: erledigt ? new Date().toISOString() : undefined,
+  });
 
   async function speichern() {
     if (!dokument) return;
@@ -91,9 +94,7 @@ export function DokumentBearbeitenDialog({ dokument, open, onOpenChange }: Props
         steuerrelevant,
         kundeId: kundeId || undefined,
         objektId: objektId || undefined,
-        erledigtAm: erledigt
-          ? dokument.erledigtAm ?? new Date().toISOString()
-          : undefined,
+        erledigtAm: erledigt ? (dokument.erledigtAm ?? new Date().toISOString()) : undefined,
       });
       toast.success("Dokument gespeichert");
       onOpenChange(false);
@@ -137,7 +138,9 @@ export function DokumentBearbeitenDialog({ dokument, open, onOpenChange }: Props
 
             {status !== "ohne" && (
               <div className="flex items-center justify-between rounded-xl border border-border bg-card px-3 py-2">
-                <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${fristBadgeClass(status)}`}>
+                <span
+                  className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${fristBadgeClass(status)}`}
+                >
                   {FRIST_LABEL[status]}
                 </span>
                 <button
@@ -169,24 +172,38 @@ export function DokumentBearbeitenDialog({ dokument, open, onOpenChange }: Props
               <div>
                 <Label htmlFor="d-typ">Typ</Label>
                 <Select value={typ} onValueChange={(v) => setTyp(v as DokumentTyp)}>
-                  <SelectTrigger id="d-typ"><SelectValue /></SelectTrigger>
+                  <SelectTrigger id="d-typ">
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
                     {TYPEN.map((t) => (
-                      <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                      <SelectItem key={t.value} value={t.value}>
+                        {t.label}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
               <div>
                 <Label htmlFor="d-datum">Dokumentdatum</Label>
-                <Input id="d-datum" type="date" value={dokumentdatum} onChange={(e) => setDokumentdatum(e.target.value)} />
+                <Input
+                  id="d-datum"
+                  type="date"
+                  value={dokumentdatum}
+                  onChange={(e) => setDokumentdatum(e.target.value)}
+                />
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label htmlFor="d-frist">Frist (bis wann erledigen)</Label>
-                <Input id="d-frist" type="date" value={faelligAm} onChange={(e) => setFaelligAm(e.target.value)} />
+                <Input
+                  id="d-frist"
+                  type="date"
+                  value={faelligAm}
+                  onChange={(e) => setFaelligAm(e.target.value)}
+                />
               </div>
               <div>
                 <Label htmlFor="d-betrag">Betrag (€)</Label>
@@ -203,7 +220,12 @@ export function DokumentBearbeitenDialog({ dokument, open, onOpenChange }: Props
 
             <div>
               <Label htmlFor="d-besch">Beschreibung</Label>
-              <Textarea id="d-besch" rows={2} value={beschreibung} onChange={(e) => setBeschreibung(e.target.value)} />
+              <Textarea
+                id="d-besch"
+                rows={2}
+                value={beschreibung}
+                onChange={(e) => setBeschreibung(e.target.value)}
+              />
             </div>
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -217,12 +239,16 @@ export function DokumentBearbeitenDialog({ dokument, open, onOpenChange }: Props
                     if (!next) setObjektId("");
                   }}
                 >
-                  <SelectTrigger id="d-kunde"><SelectValue placeholder="— Kein Kunde —" /></SelectTrigger>
+                  <SelectTrigger id="d-kunde">
+                    <SelectValue placeholder="— Kein Kunde —" />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="_none">— Kein Kunde —</SelectItem>
                     {kunden.map((k) => (
                       <SelectItem key={k.id} value={k.id}>
-                        {k.firmenname || `${k.vorname ?? ""} ${k.nachname ?? ""}`.trim() || k.nummer}
+                        {k.firmenname ||
+                          `${k.vorname ?? ""} ${k.nachname ?? ""}`.trim() ||
+                          k.nummer}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -241,7 +267,9 @@ export function DokumentBearbeitenDialog({ dokument, open, onOpenChange }: Props
                   <SelectContent>
                     <SelectItem value="_none">— Kein Objekt —</SelectItem>
                     {objekte.map((o) => (
-                      <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>
+                      <SelectItem key={o.id} value={o.id}>
+                        {o.name}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -260,13 +288,21 @@ export function DokumentBearbeitenDialog({ dokument, open, onOpenChange }: Props
           </div>
 
           <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:justify-between">
-            <Button variant="ghost" onClick={loeschen} className="text-destructive hover:bg-destructive/10 hover:text-destructive">
+            <Button
+              variant="ghost"
+              onClick={loeschen}
+              className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+            >
               <Trash2 className="mr-1.5 h-4 w-4" />
               Löschen
             </Button>
             <div className="flex gap-2">
-              <Button variant="outline" onClick={() => onOpenChange(false)}>Abbrechen</Button>
-              <Button onClick={speichern} disabled={update.isPending}>Speichern</Button>
+              <Button variant="outline" onClick={() => onOpenChange(false)}>
+                Abbrechen
+              </Button>
+              <Button onClick={speichern} disabled={update.isPending}>
+                Speichern
+              </Button>
             </div>
           </DialogFooter>
         </DialogContent>

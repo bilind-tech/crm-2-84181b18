@@ -66,7 +66,9 @@ function ErrorView({ error, reset }: { error: Error; reset: () => void }) {
       </div>
       <div className="max-w-md space-y-1">
         <h2 className="text-lg font-semibold">Editor konnte nicht geladen werden</h2>
-        <p className="text-sm text-muted-foreground">{error.message || "Unbekannter Fehler beim Laden des PDF-Editors."}</p>
+        <p className="text-sm text-muted-foreground">
+          {error.message || "Unbekannter Fehler beim Laden des PDF-Editors."}
+        </p>
       </div>
       <div className="flex gap-2">
         <Button variant="outline" asChild>
@@ -74,7 +76,14 @@ function ErrorView({ error, reset }: { error: Error; reset: () => void }) {
             <ArrowLeft className="mr-1.5 h-4 w-4" /> Zurück zu Angeboten
           </Link>
         </Button>
-        <Button onClick={() => { router.invalidate(); reset(); }}>Erneut versuchen</Button>
+        <Button
+          onClick={() => {
+            router.invalidate();
+            reset();
+          }}
+        >
+          Erneut versuchen
+        </Button>
       </div>
     </div>
   );

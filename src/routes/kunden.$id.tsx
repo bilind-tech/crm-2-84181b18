@@ -46,7 +46,10 @@ function Page() {
 
   const fullName = k.firmenname || `${k.vorname ?? ""} ${k.nachname ?? ""}`.trim();
   const initialen =
-    (k.firmenname ? k.firmenname.slice(0, 2) : `${(k.vorname ?? "")[0] ?? ""}${(k.nachname ?? "")[0] ?? ""}`)
+    (k.firmenname
+      ? k.firmenname.slice(0, 2)
+      : `${(k.vorname ?? "")[0] ?? ""}${(k.nachname ?? "")[0] ?? ""}`
+    )
       .toUpperCase()
       .slice(0, 2) || "K";
 
@@ -95,12 +98,15 @@ function Page() {
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-xl font-semibold tracking-tight">{fullName}</h2>
-            <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium capitalize ${statusToneMap[k.status] ?? statusToneMap.aktiv}`}>
+            <span
+              className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium capitalize ${statusToneMap[k.status] ?? statusToneMap.aktiv}`}
+            >
               {k.status}
             </span>
           </div>
           <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
-            <Building2 className="h-4 w-4" /> {aktiveObjekte} aktive {aktiveObjekte === 1 ? "Objekt" : "Objekte"}
+            <Building2 className="h-4 w-4" /> {aktiveObjekte} aktive{" "}
+            {aktiveObjekte === 1 ? "Objekt" : "Objekte"}
           </p>
         </div>
       </div>
@@ -108,7 +114,9 @@ function Page() {
       {/* Tabs */}
       <Tabs defaultValue="uebersicht">
         <TabsList className="no-scrollbar flex h-11 w-full justify-start gap-1 overflow-x-auto rounded-full bg-muted p-1">
-          <TabsTrigger value="uebersicht" className="shrink-0 rounded-full px-3 sm:px-5">Übersicht</TabsTrigger>
+          <TabsTrigger value="uebersicht" className="shrink-0 rounded-full px-3 sm:px-5">
+            Übersicht
+          </TabsTrigger>
           <TabsTrigger value="ansprechpartner" className="shrink-0 rounded-full px-3 sm:px-5">
             Ansprechpartner ({k.ansprechpartner.length})
           </TabsTrigger>
@@ -135,7 +143,9 @@ function Page() {
             {k.kuerzel && <Row label="Kürzel" value={k.kuerzel} mono />}
             <Row label="Typ" value={k.typ === "firma" ? "Firma" : "Privat"} />
             {k.firmenname && <Row label="Firma" value={k.firmenname} />}
-            {(k.vorname || k.nachname) && <Row label="Person" value={`${k.vorname ?? ""} ${k.nachname ?? ""}`.trim()} />}
+            {(k.vorname || k.nachname) && (
+              <Row label="Person" value={`${k.vorname ?? ""} ${k.nachname ?? ""}`.trim()} />
+            )}
             {k.email && <Row label="E-Mail" value={k.email} />}
             {k.telefon && <Row label="Telefon" value={k.telefon} />}
             {k.mobil && <Row label="Mobil" value={k.mobil} />}
@@ -160,7 +170,10 @@ function Page() {
             {k.tags.length > 0 ? (
               <div className="flex flex-wrap gap-1.5">
                 {k.tags.map((t) => (
-                  <span key={t} className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
+                  <span
+                    key={t}
+                    className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary"
+                  >
                     {t}
                   </span>
                 ))}
@@ -201,12 +214,25 @@ function Page() {
                 </thead>
                 <tbody>
                   {k.objekte.map((o) => (
-                    <tr key={o.id} className="border-b border-border last:border-0 hover:bg-muted/30">
-                      <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{o.nummer}</td>
-                      <td className="px-4 py-3 font-medium">
-                        <Link to="/objekte/$id" params={{ id: o.id }} className="hover:text-primary">{o.name}</Link>
+                    <tr
+                      key={o.id}
+                      className="border-b border-border last:border-0 hover:bg-muted/30"
+                    >
+                      <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
+                        {o.nummer}
                       </td>
-                      <td className="px-4 py-3 capitalize text-muted-foreground">{o.frequenz.replace("_", " ")}</td>
+                      <td className="px-4 py-3 font-medium">
+                        <Link
+                          to="/objekte/$id"
+                          params={{ id: o.id }}
+                          className="hover:text-primary"
+                        >
+                          {o.name}
+                        </Link>
+                      </td>
+                      <td className="px-4 py-3 capitalize text-muted-foreground">
+                        {o.frequenz.replace("_", " ")}
+                      </td>
                       <td className="px-4 py-3 text-right">{o.qmZuReinigen ?? "—"}</td>
                     </tr>
                   ))}
@@ -242,13 +268,28 @@ function Page() {
                     const hatRechnung = k.rechnungen.some((r) => r.quellAngebotId === a.id);
                     const flow = angebotFlow(a, hatRechnung);
                     return (
-                      <tr key={a.id} className="border-b border-border last:border-0 hover:bg-muted/30">
-                        <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{a.nummer}</td>
-                        <td className="px-4 py-3 font-medium">
-                          <Link to="/angebote/$id" params={{ id: a.id }} className="hover:text-primary">{a.titel}</Link>
+                      <tr
+                        key={a.id}
+                        className="border-b border-border last:border-0 hover:bg-muted/30"
+                      >
+                        <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
+                          {a.nummer}
                         </td>
-                        <td className="px-4 py-3 text-muted-foreground">{formatDate(a.gueltigBis)}</td>
-                        <td className="px-4 py-3 text-right font-semibold">{formatEUR(s.brutto)}</td>
+                        <td className="px-4 py-3 font-medium">
+                          <Link
+                            to="/angebote/$id"
+                            params={{ id: a.id }}
+                            className="hover:text-primary"
+                          >
+                            {a.titel}
+                          </Link>
+                        </td>
+                        <td className="px-4 py-3 text-muted-foreground">
+                          {formatDate(a.gueltigBis)}
+                        </td>
+                        <td className="px-4 py-3 text-right font-semibold">
+                          {formatEUR(s.brutto)}
+                        </td>
                         <td className="px-4 py-3">
                           <FlowBar steps={flow.steps} size="sm" />
                         </td>
@@ -263,7 +304,11 @@ function Page() {
 
         <TabsContent value="rechnungen" className="mt-6 space-y-3">
           <div className="flex justify-end">
-            <Button onClick={() => setOpenRechnung(true)} variant="outline" className="rounded-full">
+            <Button
+              onClick={() => setOpenRechnung(true)}
+              variant="outline"
+              className="rounded-full"
+            >
               <Plus className="mr-1 h-4 w-4" /> Neue Rechnung
             </Button>
           </div>
@@ -288,12 +333,25 @@ function Page() {
                     const offen = Math.max(0, s.brutto - bezahlt);
                     const flow = rechnungFlow(r);
                     return (
-                      <tr key={r.id} className="border-b border-border last:border-0 hover:bg-muted/30">
-                        <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{r.nummer}</td>
-                        <td className="px-4 py-3 text-muted-foreground">{formatDate(r.rechnungsdatum)}</td>
-                        <td className="px-4 py-3 text-muted-foreground">{formatDate(r.faelligkeitsdatum)}</td>
+                      <tr
+                        key={r.id}
+                        className="border-b border-border last:border-0 hover:bg-muted/30"
+                      >
+                        <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
+                          {r.nummer}
+                        </td>
+                        <td className="px-4 py-3 text-muted-foreground">
+                          {formatDate(r.rechnungsdatum)}
+                        </td>
+                        <td className="px-4 py-3 text-muted-foreground">
+                          {formatDate(r.faelligkeitsdatum)}
+                        </td>
                         <td className="px-4 py-3 text-right">
-                          <Link to="/rechnungen/$id" params={{ id: r.id }} className="font-semibold hover:text-primary">
+                          <Link
+                            to="/rechnungen/$id"
+                            params={{ id: r.id }}
+                            className="font-semibold hover:text-primary"
+                          >
                             {formatEUR(s.brutto)}
                           </Link>
                           {offen > 0 && offen < s.brutto && (
@@ -342,7 +400,9 @@ function Page() {
               {k.notizen.map((n) => (
                 <li key={n.id} className="rounded-2xl border border-border bg-card p-4">
                   <p className="text-sm font-medium">{n.titel}</p>
-                  <p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">{n.inhalt}</p>
+                  <p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">
+                    {n.inhalt}
+                  </p>
                 </li>
               ))}
             </ul>
@@ -353,10 +413,20 @@ function Page() {
       <SlideOver open={openObjekt} onOpenChange={setOpenObjekt} title="Neues Objekt">
         <ObjektForm kompakt onClose={() => setOpenObjekt(false)} defaultKundeId={k.id} />
       </SlideOver>
-      <SlideOver open={openAngebot} onOpenChange={setOpenAngebot} title="Neues Angebot" description={`Für ${fullName}`}>
+      <SlideOver
+        open={openAngebot}
+        onOpenChange={setOpenAngebot}
+        title="Neues Angebot"
+        description={`Für ${fullName}`}
+      >
         <AngebotForm onClose={() => setOpenAngebot(false)} defaultKundeId={k.id} />
       </SlideOver>
-      <SlideOver open={openRechnung} onOpenChange={setOpenRechnung} title="Neue Rechnung" description={`Für ${fullName}`}>
+      <SlideOver
+        open={openRechnung}
+        onOpenChange={setOpenRechnung}
+        title="Neue Rechnung"
+        description={`Für ${fullName}`}
+      >
         <RechnungForm onClose={() => setOpenRechnung(false)} defaultKundeId={k.id} />
       </SlideOver>
       <KundeBearbeitenDialog kunde={k} open={openEdit} onOpenChange={setOpenEdit} />
@@ -368,7 +438,9 @@ function Page() {
 function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-      <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{title}</p>
+      <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+        {title}
+      </p>
       <div className="space-y-2">{children}</div>
     </div>
   );

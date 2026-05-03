@@ -1,7 +1,10 @@
 import * as React from "react";
 import { Input } from "@/components/ui/input";
 
-interface SmartInputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "value" | "onChange"> {
+interface SmartInputProps extends Omit<
+  React.InputHTMLAttributes<HTMLInputElement>,
+  "value" | "onChange"
+> {
   /** Präfix, das beim ersten Mount automatisch eingesetzt wird. z.B. "+49 " oder "https://" */
   prefix: string;
   value: string;
@@ -41,7 +44,8 @@ export const SmartInput = React.forwardRef<HTMLInputElement, SmartInputProps>(
     const autoInputMode: React.HTMLAttributes<HTMLInputElement>["inputMode"] =
       rest.inputMode ??
       (prefix.startsWith("+") ? "tel" : prefix.startsWith("http") ? "url" : undefined);
-    const autoType = rest.type ?? (prefix.startsWith("+") ? "tel" : prefix.startsWith("http") ? "url" : undefined);
+    const autoType =
+      rest.type ?? (prefix.startsWith("+") ? "tel" : prefix.startsWith("http") ? "url" : undefined);
 
     return (
       <Input
@@ -54,7 +58,7 @@ export const SmartInput = React.forwardRef<HTMLInputElement, SmartInputProps>(
         {...rest}
       />
     );
-  }
+  },
 );
 SmartInput.displayName = "SmartInput";
 

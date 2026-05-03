@@ -3,7 +3,13 @@
 // geöffnet. Pre-Files werden beim Öffnen automatisch in den Stapel gelegt.
 
 import { useEffect, useRef } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import {
   DokumentUploadPanel,
   type DokumentUploadPanelHandle,

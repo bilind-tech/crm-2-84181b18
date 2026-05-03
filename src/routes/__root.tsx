@@ -1,4 +1,10 @@
-import { Outlet, createRootRoute, HeadContent, Scripts, useRouterState } from "@tanstack/react-router";
+import {
+  Outlet,
+  createRootRoute,
+  HeadContent,
+  Scripts,
+  useRouterState,
+} from "@tanstack/react-router";
 import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 
@@ -20,13 +26,30 @@ export const Route = createRootRoute({
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "MCC Reinigungs-CRM" },
-      { name: "description", content: "Lokales CRM- und Rechnungssystem für den Reinigungsbetrieb." },
+      {
+        name: "description",
+        content: "Lokales CRM- und Rechnungssystem für den Reinigungsbetrieb.",
+      },
       { property: "og:title", content: "MCC Reinigungs-CRM" },
       { name: "twitter:title", content: "MCC Reinigungs-CRM" },
-      { property: "og:description", content: "Lokales CRM- und Rechnungssystem für den Reinigungsbetrieb." },
-      { name: "twitter:description", content: "Lokales CRM- und Rechnungssystem für den Reinigungsbetrieb." },
-      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/27767323-00e8-41f2-983d-70471b4acef2/id-preview-bef97fbb--654d32e6-fa04-4c44-af92-d308868b6c93.lovable.app-1777838953314.png" },
-      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/27767323-00e8-41f2-983d-70471b4acef2/id-preview-bef97fbb--654d32e6-fa04-4c44-af92-d308868b6c93.lovable.app-1777838953314.png" },
+      {
+        property: "og:description",
+        content: "Lokales CRM- und Rechnungssystem für den Reinigungsbetrieb.",
+      },
+      {
+        name: "twitter:description",
+        content: "Lokales CRM- und Rechnungssystem für den Reinigungsbetrieb.",
+      },
+      {
+        property: "og:image",
+        content:
+          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/27767323-00e8-41f2-983d-70471b4acef2/id-preview-bef97fbb--654d32e6-fa04-4c44-af92-d308868b6c93.lovable.app-1777838953314.png",
+      },
+      {
+        name: "twitter:image",
+        content:
+          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/27767323-00e8-41f2-983d-70471b4acef2/id-preview-bef97fbb--654d32e6-fa04-4c44-af92-d308868b6c93.lovable.app-1777838953314.png",
+      },
       { name: "twitter:card", content: "summary_large_image" },
       { property: "og:type", content: "website" },
     ],
@@ -136,7 +159,7 @@ function Shell() {
         </div>
       </div>
       <UeberfaelligPopup />
-      
+
       <GlobalDropZone />
     </SidebarProvider>
   );

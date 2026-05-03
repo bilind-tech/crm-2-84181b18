@@ -12,12 +12,7 @@ import { piApi, PiApiError } from "@/lib/api/piClient";
 import { useBackendStatus } from "@/hooks/useBackendStatus";
 import { isBackendUrlExplicit } from "@/lib/api/backendUrl";
 
-export type AuthMode =
-  | "loading"
-  | "needs-setup"
-  | "logged-out"
-  | "logged-in"
-  | "backend-offline";
+export type AuthMode = "loading" | "needs-setup" | "logged-out" | "logged-in" | "backend-offline";
 
 interface PiUser {
   id: string;

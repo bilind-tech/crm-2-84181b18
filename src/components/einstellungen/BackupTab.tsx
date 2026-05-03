@@ -135,8 +135,8 @@ export function BackupTab() {
   const letztes = useMemo(() => {
     const erf = historie.filter((b) => b.status === "erfolg");
     return (
-      [...erf].sort(
-        (a, b) => (b.abgeschlossenAm ?? "").localeCompare(a.abgeschlossenAm ?? ""),
+      [...erf].sort((a, b) =>
+        (b.abgeschlossenAm ?? "").localeCompare(a.abgeschlossenAm ?? ""),
       )[0] ?? null
     );
   }, [historie]);
@@ -151,8 +151,11 @@ export function BackupTab() {
   const weeklies = erfolge.filter((b) => b.kategorie === "weekly");
   const monthlies = erfolge.filter((b) => b.kategorie === "monthly");
   const sondern = erfolge.filter(
-    (b) => b.kategorie === "manuell" || b.kategorie === "manual"
-      || b.kategorie === "pre-restore" || b.kategorie === "pre-update",
+    (b) =>
+      b.kategorie === "manuell" ||
+      b.kategorie === "manual" ||
+      b.kategorie === "pre-restore" ||
+      b.kategorie === "pre-update",
   );
   const hatLaufendes = inArbeit.length > 0;
   const maintenanceActive = !!restoreState?.maintenance.active;
@@ -191,11 +194,7 @@ export function BackupTab() {
   return (
     <div className="space-y-5 pb-24">
       {/* ─── Status-Karte ────────────────────────────────────────────── */}
-      <BackupStatusCard
-        letztes={letztes}
-        zeitpunkt={form.zeitpunkt}
-        autoBackup={form.autoBackup}
-      />
+      <BackupStatusCard letztes={letztes} zeitpunkt={form.zeitpunkt} autoBackup={form.autoBackup} />
 
       {/* ─── Health-Warnung (Backend liefert warn=true wenn > 36 h alt) ─ */}
       {health?.warn && form.autoBackup && (
@@ -213,7 +212,12 @@ export function BackupTab() {
                 Bitte prüfe Zeitplan und USB-SSD.
               </p>
             </div>
-            <Button size="sm" variant="outline" onClick={startManuell} disabled={create.isPending || hatLaufendes}>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={startManuell}
+              disabled={create.isPending || hatLaufendes}
+            >
               Jetzt sichern
             </Button>
           </div>
@@ -221,25 +225,29 @@ export function BackupTab() {
       )}
 
       {/* ─── Restore-Banner (Wartungsmodus) ───────────────────────────── */}
-      {(maintenanceActive || (restoreState?.restore && restoreState.restore.phase !== "done")) && restoreState?.restore && (
-        <div className="rounded-2xl border border-amber-500/40 bg-amber-500/10 p-4">
-          <div className="flex items-center gap-3">
-            <Loader2 className="h-5 w-5 animate-spin text-amber-600" />
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium">Wiederherstellung läuft … ({restoreState.restore.phase})</p>
-              <p className="text-xs text-muted-foreground">
-                {restoreState.restore.message ?? "Backend befindet sich im Wartungsmodus, bitte warten."}
-              </p>
-              <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-amber-500/20">
-                <div
-                  className="h-full bg-amber-500 transition-all"
-                  style={{ width: `${Math.max(5, restoreState.restore.percent)}%` }}
-                />
+      {(maintenanceActive || (restoreState?.restore && restoreState.restore.phase !== "done")) &&
+        restoreState?.restore && (
+          <div className="rounded-2xl border border-amber-500/40 bg-amber-500/10 p-4">
+            <div className="flex items-center gap-3">
+              <Loader2 className="h-5 w-5 animate-spin text-amber-600" />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium">
+                  Wiederherstellung läuft … ({restoreState.restore.phase})
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {restoreState.restore.message ??
+                    "Backend befindet sich im Wartungsmodus, bitte warten."}
+                </p>
+                <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-amber-500/20">
+                  <div
+                    className="h-full bg-amber-500 transition-all"
+                    style={{ width: `${Math.max(5, restoreState.restore.percent)}%` }}
+                  />
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
       {/* ─── In-Arbeit-Indikator ─────────────────────────────────────── */}
       {inArbeit.length > 0 && (
@@ -249,7 +257,8 @@ export function BackupTab() {
               <Loader2 className="h-5 w-5 animate-spin text-primary" />
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium">
-                  Backup läuft … <span className="text-muted-foreground font-normal">({b.phase})</span>
+                  Backup läuft …{" "}
+                  <span className="text-muted-foreground font-normal">({b.phase})</span>
                 </p>
                 <p className="text-xs text-muted-foreground">
                   Gestartet {formatRelativeShort(b.zeitpunktStart)} ·{" "}
@@ -273,7 +282,10 @@ export function BackupTab() {
       )}
 
       {/* ─── Manuelle Aktion ─────────────────────────────────────────── */}
-      <Section title="Backup jetzt erstellen" description="Erzeugt sofort eine Sicherung — unabhängig vom Zeitplan.">
+      <Section
+        title="Backup jetzt erstellen"
+        description="Erzeugt sofort eine Sicherung — unabhängig vom Zeitplan."
+      >
         <Button onClick={startManuell} disabled={create.isPending || hatLaufendes}>
           {create.isPending || hatLaufendes ? (
             <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
@@ -285,7 +297,10 @@ export function BackupTab() {
       </Section>
 
       {/* ─── Historie mit Rotation ──────────────────────────────────── */}
-      <Section title="Backup-Historie" description="Tagesweise · Wochenweise · Monatsweise · Sonderbackups.">
+      <Section
+        title="Backup-Historie"
+        description="Tagesweise · Wochenweise · Monatsweise · Sonderbackups."
+      >
         <BackupGroupList
           titel={`Letzte 7 Tage`}
           eintraege={dailies}
@@ -384,7 +399,10 @@ export function BackupTab() {
       </Section>
 
       {/* ─── Einstellungen ──────────────────────────────────────────── */}
-      <Section title="Automatische Backups" description="Tägliches SQLite-Snapshot auf USB-SSD mit Rotation.">
+      <Section
+        title="Automatische Backups"
+        description="Tägliches SQLite-Snapshot auf USB-SSD mit Rotation."
+      >
         <label className="mb-4 flex items-center justify-between gap-4 rounded-xl border border-border bg-muted/30 p-4">
           <div>
             <p className="text-sm font-medium">Auto-Backup aktiv</p>
@@ -468,9 +486,10 @@ export function BackupTab() {
               Erfordert eine verbundene Drive-Anbindung in Einstellungen → Google Drive.
             </p>
             <p className="mt-2 rounded-md border border-destructive/30 bg-destructive/5 px-2 py-1.5 text-xs text-destructive">
-              ⚠ Sicherheitshinweis: Backups in Google Drive enthalten den verschlüsselten Master-Key.
-              Wer Zugriff auf das verbundene Drive-Konto hat, kann SMTP-Passwort, OAuth-Token und
-              GitHub-PAT entschlüsseln. Drive-Konto entsprechend absichern (2FA aktiv).
+              ⚠ Sicherheitshinweis: Backups in Google Drive enthalten den verschlüsselten
+              Master-Key. Wer Zugriff auf das verbundene Drive-Konto hat, kann SMTP-Passwort,
+              OAuth-Token und GitHub-PAT entschlüsseln. Drive-Konto entsprechend absichern (2FA
+              aktiv).
             </p>
           </div>
           <Switch
@@ -588,12 +607,14 @@ function BackupGroupList({
   onDelete?: (b: BackupEintrag) => void;
 }) {
   if (eintraege.length === 0) return null;
-  const sorted = [...eintraege].sort(
-    (a, b) => (b.abgeschlossenAm ?? "").localeCompare(a.abgeschlossenAm ?? ""),
+  const sorted = [...eintraege].sort((a, b) =>
+    (b.abgeschlossenAm ?? "").localeCompare(a.abgeschlossenAm ?? ""),
   );
   const isDeletable = (b: BackupEintrag): boolean =>
-    b.kategorie === "manuell" || b.kategorie === "manual"
-      || b.kategorie === "pre-restore" || b.kategorie === "pre-update";
+    b.kategorie === "manuell" ||
+    b.kategorie === "manual" ||
+    b.kategorie === "pre-restore" ||
+    b.kategorie === "pre-update";
   return (
     <div className="mb-4 last:mb-0">
       <p className="mb-1 px-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">

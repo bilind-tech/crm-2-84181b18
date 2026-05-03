@@ -166,7 +166,9 @@ export function AnsprechpartnerPicker({ kundeId, value, onChange }: Props) {
             <div>
               <Label className="text-xs text-muted-foreground">Anrede</Label>
               <Select value={anrede} onValueChange={(v) => setAnrede(v as typeof anrede)}>
-                <SelectTrigger className="mt-1 h-9"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="mt-1 h-9">
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="herr">Herr</SelectItem>
                   <SelectItem value="frau">Frau</SelectItem>
@@ -177,26 +179,47 @@ export function AnsprechpartnerPicker({ kundeId, value, onChange }: Props) {
             </div>
             <div>
               <Label className="text-xs text-muted-foreground">Vorname</Label>
-              <Input className="mt-1 h-9" value={vorname} onChange={(e) => setVorname(e.target.value)} />
+              <Input
+                className="mt-1 h-9"
+                value={vorname}
+                onChange={(e) => setVorname(e.target.value)}
+              />
             </div>
             <div>
               <Label className="text-xs text-muted-foreground">Nachname *</Label>
-              <Input className="mt-1 h-9" value={nachname} onChange={(e) => setNachname(e.target.value)} />
+              <Input
+                className="mt-1 h-9"
+                value={nachname}
+                onChange={(e) => setNachname(e.target.value)}
+              />
             </div>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
               <Label className="text-xs text-muted-foreground">Position</Label>
-              <Input className="mt-1 h-9" value={position} onChange={(e) => setPosition(e.target.value)} />
+              <Input
+                className="mt-1 h-9"
+                value={position}
+                onChange={(e) => setPosition(e.target.value)}
+              />
             </div>
             <div>
               <Label className="text-xs text-muted-foreground">E-Mail</Label>
-              <Input className="mt-1 h-9" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+              <Input
+                className="mt-1 h-9"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
             </div>
           </div>
           <div className="flex justify-end gap-2">
-            <Button variant="outline" size="sm" onClick={() => setShowNew(false)}>Abbrechen</Button>
-            <Button size="sm" onClick={speichern} disabled={create.isPending}>Speichern</Button>
+            <Button variant="outline" size="sm" onClick={() => setShowNew(false)}>
+              Abbrechen
+            </Button>
+            <Button size="sm" onClick={speichern} disabled={create.isPending}>
+              Speichern
+            </Button>
           </div>
         </div>
       )}

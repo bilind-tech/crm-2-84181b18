@@ -16,7 +16,8 @@ const CLEANUP_DELAY = 60_000;
 function isLikelyIosSafari(): boolean {
   if (typeof navigator === "undefined") return false;
   const ua = navigator.userAgent;
-  const isIos = /iPad|iPhone|iPod/.test(ua) || (ua.includes("Macintosh") && "ontouchend" in document);
+  const isIos =
+    /iPad|iPhone|iPod/.test(ua) || (ua.includes("Macintosh") && "ontouchend" in document);
   const isSafari = /Safari/.test(ua) && !/CriOS|FxiOS|EdgiOS|Chrome/.test(ua);
   return isIos && isSafari;
 }
@@ -29,12 +30,18 @@ function openInNewTab(url: string): boolean {
     /* noop */
   }
   try {
-    import("sonner").then(({ toast }) => {
-      toast.error("Druck-Dialog konnte nicht geöffnet werden", {
-        description: "Bitte Pop-ups für diese Seite zulassen.",
+    import("sonner")
+      .then(({ toast }) => {
+        toast.error("Druck-Dialog konnte nicht geöffnet werden", {
+          description: "Bitte Pop-ups für diese Seite zulassen.",
+        });
+      })
+      .catch(() => {
+        /* noop */
       });
-    }).catch(() => { /* noop */ });
-  } catch { /* noop */ }
+  } catch {
+    /* noop */
+  }
   return false;
 }
 
@@ -63,7 +70,9 @@ export function printPdfBlobUrl(url: string): void {
     cleaned = true;
     try {
       window.removeEventListener("afterprint", cleanup);
-    } catch { /* noop */ }
+    } catch {
+      /* noop */
+    }
     setTimeout(() => {
       if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
     }, 100);
@@ -118,7 +127,11 @@ export function printPdfBlob(blob: Blob): void {
   } finally {
     // Spät freigeben — Druck-Dialog hält die Quelle solange offen.
     setTimeout(() => {
-      try { URL.revokeObjectURL(url); } catch { /* noop */ }
+      try {
+        URL.revokeObjectURL(url);
+      } catch {
+        /* noop */
+      }
     }, CLEANUP_DELAY);
   }
 }

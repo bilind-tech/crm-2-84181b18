@@ -22,7 +22,9 @@ interface Props {
 }
 
 const VOLATILE = new Set(["aktualisiertAm", "erstelltAm"]);
-function semKey<T>(o: T) { return JSON.stringify(o, (k, v) => (VOLATILE.has(k) ? undefined : v)); }
+function semKey<T>(o: T) {
+  return JSON.stringify(o, (k, v) => (VOLATILE.has(k) ? undefined : v));
+}
 
 export function ProtokollLivePreview({ draft, kunde, objekt, firma }: Props) {
   const ref = useRef<HTMLDivElement>(null);
@@ -35,15 +37,20 @@ export function ProtokollLivePreview({ draft, kunde, objekt, firma }: Props) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const el = ref.current; if (!el) return;
+    const el = ref.current;
+    if (!el) return;
     const measure = () => setWidth(el.clientWidth);
     measure();
-    const ro = new ResizeObserver(measure); ro.observe(el);
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
     return () => ro.disconnect();
   }, []);
 
   useEffect(() => {
-    if (!rendering) { setShowLoader(false); return; }
+    if (!rendering) {
+      setShowLoader(false);
+      return;
+    }
     const t = setTimeout(() => setShowLoader(true), 300);
     return () => clearTimeout(t);
   }, [rendering]);
@@ -53,12 +60,16 @@ export function ProtokollLivePreview({ draft, kunde, objekt, firma }: Props) {
   useEffect(() => {
     let cancelled = false;
     const t = setTimeout(async () => {
-      setRendering(true); setError(null);
+      setRendering(true);
+      setError(null);
       try {
         const blob = await generateProtokollPdf(draft, kunde, objekt, firma);
         if (cancelled) return;
         const url = URL.createObjectURL(blob);
-        setPendingUrl((prev) => { if (prev) URL.revokeObjectURL(prev); return url; });
+        setPendingUrl((prev) => {
+          if (prev) URL.revokeObjectURL(prev);
+          return url;
+        });
       } catch (e) {
         console.error(e);
         if (!cancelled) setError(e instanceof Error ? e.message : "PDF-Fehler");
@@ -66,15 +77,21 @@ export function ProtokollLivePreview({ draft, kunde, objekt, firma }: Props) {
         if (!cancelled) setRendering(false);
       }
     }, DEBOUNCE);
-    return () => { cancelled = true; clearTimeout(t); };
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draftKey, kunde, objekt, firma]);
 
-  useEffect(() => () => {
-    if (pdfUrl) URL.revokeObjectURL(pdfUrl);
-    if (pendingUrl) URL.revokeObjectURL(pendingUrl);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  useEffect(
+    () => () => {
+      if (pdfUrl) URL.revokeObjectURL(pdfUrl);
+      if (pendingUrl) URL.revokeObjectURL(pendingUrl);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    },
+    [],
+  );
 
   const renderWidth = Math.min(Math.max(width - 16, 280), 900);
 
@@ -99,10 +116,23 @@ export function ProtokollLivePreview({ draft, kunde, objekt, firma }: Props) {
         </div>
       )}
       {pdfUrl && width > 0 && (
-        <Document file={pdfUrl} onLoadSuccess={({ numPages }) => setNumPages(numPages)} loading={null} className="flex flex-col items-center gap-4">
+        <Document
+          file={pdfUrl}
+          onLoadSuccess={({ numPages }) => setNumPages(numPages)}
+          loading={null}
+          className="flex flex-col items-center gap-4"
+        >
           {Array.from({ length: numPages }, (_, i) => i + 1).map((n) => (
-            <div key={n} className="relative overflow-hidden rounded-md bg-background shadow-sm ring-1 ring-border">
-              <Page pageNumber={n} width={renderWidth} renderAnnotationLayer={false} renderTextLayer={false} />
+            <div
+              key={n}
+              className="relative overflow-hidden rounded-md bg-background shadow-sm ring-1 ring-border"
+            >
+              <Page
+                pageNumber={n}
+                width={renderWidth}
+                renderAnnotationLayer={false}
+                renderTextLayer={false}
+              />
             </div>
           ))}
         </Document>
@@ -112,10 +142,16 @@ export function ProtokollLivePreview({ draft, kunde, objekt, firma }: Props) {
           <Document
             file={pendingUrl}
             onLoadSuccess={() => {
-              setPdfUrl((prev) => { if (prev) URL.revokeObjectURL(prev); return pendingUrl; });
+              setPdfUrl((prev) => {
+                if (prev) URL.revokeObjectURL(prev);
+                return pendingUrl;
+              });
               setPendingUrl(null);
             }}
-            onLoadError={() => { if (pendingUrl) URL.revokeObjectURL(pendingUrl); setPendingUrl(null); }}
+            onLoadError={() => {
+              if (pendingUrl) URL.revokeObjectURL(pendingUrl);
+              setPendingUrl(null);
+            }}
             loading={null}
           >
             <Page pageNumber={1} width={1} renderAnnotationLayer={false} renderTextLayer={false} />

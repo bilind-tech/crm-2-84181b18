@@ -89,9 +89,7 @@ export function SteuerDetailDialog({ posten, onOpenChange }: Props) {
             <p className="mt-1 text-3xl font-bold tracking-tight">
               {formatEUR(posten.tatsaechlicherBetrag ?? posten.geschaetzterBetrag)}
             </p>
-            {posten.notiz && (
-              <p className="mt-2 text-sm text-muted-foreground">{posten.notiz}</p>
-            )}
+            {posten.notiz && <p className="mt-2 text-sm text-muted-foreground">{posten.notiz}</p>}
           </div>
 
           {/* Bezahlt-Info */}
@@ -102,9 +100,10 @@ export function SteuerDetailDialog({ posten, onOpenChange }: Props) {
               </p>
               <p className="mt-1 text-sm">
                 Am {formatDate(posten.bezahltAm)} ans Finanzamt überwiesen
-                {posten.tatsaechlicherBetrag != null && posten.tatsaechlicherBetrag !== posten.geschaetzterBetrag && (
-                  <> · Schätzung war {formatEUR(posten.geschaetzterBetrag)}</>
-                )}
+                {posten.tatsaechlicherBetrag != null &&
+                  posten.tatsaechlicherBetrag !== posten.geschaetzterBetrag && (
+                    <> · Schätzung war {formatEUR(posten.geschaetzterBetrag)}</>
+                  )}
               </p>
             </div>
           )}
@@ -120,7 +119,10 @@ export function SteuerDetailDialog({ posten, onOpenChange }: Props) {
                   <Row label="USt aus Rechnungen" value={formatEUR(grundlage.ust)} />
                 )}
                 {grundlage.vorsteuer != null && (
-                  <Row label="Vorsteuer aus Belegen" value={`− ${formatEUR(grundlage.vorsteuer)}`} />
+                  <Row
+                    label="Vorsteuer aus Belegen"
+                    value={`− ${formatEUR(grundlage.vorsteuer)}`}
+                  />
                 )}
                 {grundlage.vorsteuer != null && grundlage.vorsteuer > 0 && (
                   <p className="col-span-full mt-1 text-xs text-muted-foreground">
@@ -131,7 +133,10 @@ export function SteuerDetailDialog({ posten, onOpenChange }: Props) {
                   <Row label="Netto-Einnahmen YTD" value={formatEUR(grundlage.nettoEinnahmen)} />
                 )}
                 {grundlage.nettoAusgaben != null && (
-                  <Row label="Netto-Ausgaben YTD" value={`− ${formatEUR(grundlage.nettoAusgaben)}`} />
+                  <Row
+                    label="Netto-Ausgaben YTD"
+                    value={`− ${formatEUR(grundlage.nettoAusgaben)}`}
+                  />
                 )}
               </div>
             </div>

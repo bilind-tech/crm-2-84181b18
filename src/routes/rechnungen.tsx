@@ -102,7 +102,11 @@ function Page() {
 
   const counts = useMemo(() => {
     const offen = alle.filter((r) => r.status !== "bezahlt" && r.status !== "storniert");
-    const ueberfaellig = alle.filter((r) => r.status === "ueberfaellig" || (r.faelligkeitsdatum < heute && r.status !== "bezahlt" && r.status !== "storniert"));
+    const ueberfaellig = alle.filter(
+      (r) =>
+        r.status === "ueberfaellig" ||
+        (r.faelligkeitsdatum < heute && r.status !== "bezahlt" && r.status !== "storniert"),
+    );
     return {
       offenSumme: offen.reduce((a, r) => a + brutto(r) - bezahlt(r), 0),
       offenAnzahl: offen.length,
@@ -125,7 +129,9 @@ function Page() {
     list = list.filter((r) => passtInZeitraum(r.rechnungsdatum, zeitraum));
     if (q.trim()) {
       const t = q.toLowerCase();
-      list = list.filter((r) => r.nummer.toLowerCase().includes(t) || r.titel.toLowerCase().includes(t));
+      list = list.filter(
+        (r) => r.nummer.toLowerCase().includes(t) || r.titel.toLowerCase().includes(t),
+      );
     }
     return [...list].sort((a, b) => b.rechnungsdatum.localeCompare(a.rechnungsdatum));
   }, [alle, filter, q, zeitraum, nurDA]);
@@ -213,9 +219,13 @@ function Page() {
             r.status !== "bezahlt" && r.status !== "storniert" && r.faelligkeitsdatum < heute
               ? Math.floor((Date.parse(heute) - Date.parse(r.faelligkeitsdatum)) / 86400000)
               : 0;
-          const letzteZahlung = r.zahlungen.length > 0
-            ? r.zahlungen.reduce((max, z) => (z.datum > max ? z.datum : max), r.zahlungen[0].datum)
-            : null;
+          const letzteZahlung =
+            r.zahlungen.length > 0
+              ? r.zahlungen.reduce(
+                  (max, z) => (z.datum > max ? z.datum : max),
+                  r.zahlungen[0].datum,
+                )
+              : null;
           return (
             <MobileListCard
               key={r.id}
@@ -262,7 +272,11 @@ function Page() {
                 <>
                   <PdfViewButton kind="rechnung" beleg={r} />
                   <button
-                    onClick={(e) => { e.stopPropagation(); e.preventDefault(); setEmailFuer(r); }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      e.preventDefault();
+                      setEmailFuer(r);
+                    }}
                     className="rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-primary"
                     title="Per E-Mail versenden"
                   >
@@ -273,15 +287,29 @@ function Page() {
                       <CheckCircle2 className="h-4 w-4" />
                       <span>Bezahlt</span>
                     </span>
-                  ) : r.status !== "storniert" && (
-                    <button
-                      onClick={(e) => { e.stopPropagation(); e.preventDefault(); setZahlungFuer(r); }}
-                      className="inline-flex h-9 items-center gap-1.5 rounded-md border border-primary/30 bg-primary/5 px-3 text-sm font-medium text-primary hover:bg-primary/10"
-                      title={r.status === "teilbezahlt" ? "Restzahlung bestätigen" : "Zahlung bestätigen — voll oder teilweise"}
-                    >
-                      <CheckCircle2 className="h-4 w-4" />
-                      <span>{r.status === "teilbezahlt" ? "Restzahlung bestätigen" : "Zahlung bestätigen"}</span>
-                    </button>
+                  ) : (
+                    r.status !== "storniert" && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          e.preventDefault();
+                          setZahlungFuer(r);
+                        }}
+                        className="inline-flex h-9 items-center gap-1.5 rounded-md border border-primary/30 bg-primary/5 px-3 text-sm font-medium text-primary hover:bg-primary/10"
+                        title={
+                          r.status === "teilbezahlt"
+                            ? "Restzahlung bestätigen"
+                            : "Zahlung bestätigen — voll oder teilweise"
+                        }
+                      >
+                        <CheckCircle2 className="h-4 w-4" />
+                        <span>
+                          {r.status === "teilbezahlt"
+                            ? "Restzahlung bestätigen"
+                            : "Zahlung bestätigen"}
+                        </span>
+                      </button>
+                    )
                   )}
                   <button
                     onClick={() =>
@@ -314,126 +342,155 @@ function Page() {
       {/* Desktop: Tabelle */}
       <div className="hidden overflow-hidden rounded-2xl border border-border bg-card shadow-sm md:block">
         <div className="overflow-x-auto">
-        <table className="w-full min-w-[1100px] text-sm">
-          <thead>
-            <tr className="border-b border-border bg-muted/30 text-left text-xs uppercase tracking-wider text-muted-foreground">
-              <th className="px-4 py-3 font-medium">Nummer</th>
-              <th className="px-4 py-3 font-medium">Kunde</th>
-              <th className="px-4 py-3 font-medium">Datum</th>
-              <th className="px-4 py-3 font-medium">Fällig</th>
-              <th className="px-4 py-3 text-right font-medium">Brutto</th>
-              <th className="px-4 py-3 text-right font-medium">Offen</th>
-              <th className="px-4 py-3 font-medium">Status</th>
-              <th className="px-4 py-3 font-medium">Fortschritt</th>
-              <th className="whitespace-nowrap px-4 py-3 text-right font-medium">Aktionen</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((r) => {
-              const b = brutto(r);
-              const offen = b - bezahlt(r);
-              const tageUeber =
-                r.status !== "bezahlt" && r.status !== "storniert" && r.faelligkeitsdatum < heute
-                  ? Math.floor((Date.parse(heute) - Date.parse(r.faelligkeitsdatum)) / 86400000)
-                  : 0;
-              return (
-                <tr
-                  key={r.id}
-                  role="link"
-                  tabIndex={0}
-                  onClick={() => navigate({ to: "/rechnungen/$id", params: { id: r.id } })}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      navigate({ to: "/rechnungen/$id", params: { id: r.id } });
-                    }
-                  }}
-                  className="cursor-pointer border-b border-border last:border-0 transition-colors hover:bg-muted/40 focus:bg-muted/40 focus:outline-none"
-                >
-                  <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
-                    <span className="inline-flex items-center gap-1.5">
-                      {r.nummer}
-                      {r.optionen?.wiederkehrend && (
-                        <Repeat className="h-3 w-3 text-primary" aria-label="Dauerauftrag" />
-                      )}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 font-medium">{r.titel}</td>
-                  <td className="px-4 py-3 text-muted-foreground">{formatDate(r.rechnungsdatum)}</td>
-                  <td className="px-4 py-3 text-muted-foreground">{formatDate(r.faelligkeitsdatum)}</td>
-                  <td className="px-4 py-3 text-right font-semibold">{formatEUR(b)}</td>
-                  <td className={`px-4 py-3 text-right font-semibold ${tageUeber > 0 ? "text-destructive" : r.status === "bezahlt" ? "text-success" : ""}`}>
-                    {r.status === "bezahlt" ? (
-                      <span className="inline-flex items-center gap-1 text-xs"><CheckCircle2 className="h-3.5 w-3.5" /> bezahlt</span>
-                    ) : (
-                      <>
-                        {formatEUR(offen)}
-                        {tageUeber > 0 && (
-                          <div className="text-[10px] font-normal">+{tageUeber}d</div>
+          <table className="w-full min-w-[1100px] text-sm">
+            <thead>
+              <tr className="border-b border-border bg-muted/30 text-left text-xs uppercase tracking-wider text-muted-foreground">
+                <th className="px-4 py-3 font-medium">Nummer</th>
+                <th className="px-4 py-3 font-medium">Kunde</th>
+                <th className="px-4 py-3 font-medium">Datum</th>
+                <th className="px-4 py-3 font-medium">Fällig</th>
+                <th className="px-4 py-3 text-right font-medium">Brutto</th>
+                <th className="px-4 py-3 text-right font-medium">Offen</th>
+                <th className="px-4 py-3 font-medium">Status</th>
+                <th className="px-4 py-3 font-medium">Fortschritt</th>
+                <th className="whitespace-nowrap px-4 py-3 text-right font-medium">Aktionen</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((r) => {
+                const b = brutto(r);
+                const offen = b - bezahlt(r);
+                const tageUeber =
+                  r.status !== "bezahlt" && r.status !== "storniert" && r.faelligkeitsdatum < heute
+                    ? Math.floor((Date.parse(heute) - Date.parse(r.faelligkeitsdatum)) / 86400000)
+                    : 0;
+                return (
+                  <tr
+                    key={r.id}
+                    role="link"
+                    tabIndex={0}
+                    onClick={() => navigate({ to: "/rechnungen/$id", params: { id: r.id } })}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        navigate({ to: "/rechnungen/$id", params: { id: r.id } });
+                      }
+                    }}
+                    className="cursor-pointer border-b border-border last:border-0 transition-colors hover:bg-muted/40 focus:bg-muted/40 focus:outline-none"
+                  >
+                    <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
+                      <span className="inline-flex items-center gap-1.5">
+                        {r.nummer}
+                        {r.optionen?.wiederkehrend && (
+                          <Repeat className="h-3 w-3 text-primary" aria-label="Dauerauftrag" />
                         )}
-                      </>
-                    )}
-                  </td>
-                  <td className="px-4 py-3">{statusBadge(r.status)}</td>
-                  <td className="px-4 py-3">
-                    <FlowBar steps={rechnungFlow(r).steps} size="sm" />
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                    <div className="flex items-center justify-end gap-1.5 whitespace-nowrap text-muted-foreground">
-                      <PdfViewButton kind="rechnung" beleg={r} />
-                      <button
-                        onClick={(e) => { e.stopPropagation(); e.preventDefault(); setEmailFuer(r); }}
-                        className="rounded-md p-1.5 hover:bg-muted hover:text-primary"
-                        title="Per E-Mail versenden"
-                      >
-                        <Mail className="h-4 w-4" />
-                      </button>
-                      {istVollBezahlt(r) ? (
-                        <span className="inline-flex h-8 items-center gap-1 rounded-md border border-success/30 bg-success/10 px-2.5 text-xs font-medium text-success">
-                          <CheckCircle2 className="h-3.5 w-3.5" />
-                          <span>Bezahlt</span>
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 font-medium">{r.titel}</td>
+                    <td className="px-4 py-3 text-muted-foreground">
+                      {formatDate(r.rechnungsdatum)}
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground">
+                      {formatDate(r.faelligkeitsdatum)}
+                    </td>
+                    <td className="px-4 py-3 text-right font-semibold">{formatEUR(b)}</td>
+                    <td
+                      className={`px-4 py-3 text-right font-semibold ${tageUeber > 0 ? "text-destructive" : r.status === "bezahlt" ? "text-success" : ""}`}
+                    >
+                      {r.status === "bezahlt" ? (
+                        <span className="inline-flex items-center gap-1 text-xs">
+                          <CheckCircle2 className="h-3.5 w-3.5" /> bezahlt
                         </span>
-                      ) : r.status !== "storniert" && (
-                        <button
-                          onClick={(e) => { e.stopPropagation(); e.preventDefault(); setZahlungFuer(r); }}
-                          className="inline-flex h-8 items-center gap-1 rounded-md border border-primary/30 bg-primary/5 px-2.5 text-xs font-medium text-primary hover:bg-primary/10"
-                          title={r.status === "teilbezahlt" ? "Restzahlung bestätigen" : "Zahlung bestätigen — voll oder teilweise"}
-                        >
-                          <CheckCircle2 className="h-3.5 w-3.5" />
-                          <span>{r.status === "teilbezahlt" ? "Restzahlung bestätigen" : "Zahlung bestätigen"}</span>
-                        </button>
+                      ) : (
+                        <>
+                          {formatEUR(offen)}
+                          {tageUeber > 0 && (
+                            <div className="text-[10px] font-normal">+{tageUeber}d</div>
+                          )}
+                        </>
                       )}
-                      <button
-                        onClick={() =>
-                          confirm(
-                            {
-                              title: "Rechnung löschen?",
-                              description: `Rechnung ${r.nummer} dauerhaft entfernen. Erfasste Zahlungen gehen verloren.`,
-                              variant: "destructive",
-                              confirmLabel: "Löschen",
-                            },
-                            () => del.mutate(r.id),
+                    </td>
+                    <td className="px-4 py-3">{statusBadge(r.status)}</td>
+                    <td className="px-4 py-3">
+                      <FlowBar steps={rechnungFlow(r).steps} size="sm" />
+                    </td>
+                    <td
+                      className="whitespace-nowrap px-4 py-3"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div className="flex items-center justify-end gap-1.5 whitespace-nowrap text-muted-foreground">
+                        <PdfViewButton kind="rechnung" beleg={r} />
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            setEmailFuer(r);
+                          }}
+                          className="rounded-md p-1.5 hover:bg-muted hover:text-primary"
+                          title="Per E-Mail versenden"
+                        >
+                          <Mail className="h-4 w-4" />
+                        </button>
+                        {istVollBezahlt(r) ? (
+                          <span className="inline-flex h-8 items-center gap-1 rounded-md border border-success/30 bg-success/10 px-2.5 text-xs font-medium text-success">
+                            <CheckCircle2 className="h-3.5 w-3.5" />
+                            <span>Bezahlt</span>
+                          </span>
+                        ) : (
+                          r.status !== "storniert" && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                setZahlungFuer(r);
+                              }}
+                              className="inline-flex h-8 items-center gap-1 rounded-md border border-primary/30 bg-primary/5 px-2.5 text-xs font-medium text-primary hover:bg-primary/10"
+                              title={
+                                r.status === "teilbezahlt"
+                                  ? "Restzahlung bestätigen"
+                                  : "Zahlung bestätigen — voll oder teilweise"
+                              }
+                            >
+                              <CheckCircle2 className="h-3.5 w-3.5" />
+                              <span>
+                                {r.status === "teilbezahlt"
+                                  ? "Restzahlung bestätigen"
+                                  : "Zahlung bestätigen"}
+                              </span>
+                            </button>
                           )
-                        }
-                        className="rounded-md p-1.5 text-destructive hover:bg-destructive/10"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                      <ChevronRight className="h-4 w-4" />
-                    </div>
+                        )}
+                        <button
+                          onClick={() =>
+                            confirm(
+                              {
+                                title: "Rechnung löschen?",
+                                description: `Rechnung ${r.nummer} dauerhaft entfernen. Erfasste Zahlungen gehen verloren.`,
+                                variant: "destructive",
+                                confirmLabel: "Löschen",
+                              },
+                              () => del.mutate(r.id),
+                            )
+                          }
+                          className="rounded-md p-1.5 text-destructive hover:bg-destructive/10"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                        <ChevronRight className="h-4 w-4" />
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+              {filtered.length === 0 && (
+                <tr>
+                  <td colSpan={9} className="px-4 py-12 text-center text-sm text-muted-foreground">
+                    Keine Rechnungen gefunden.
                   </td>
                 </tr>
-              );
-            })}
-            {filtered.length === 0 && (
-              <tr>
-                <td colSpan={9} className="px-4 py-12 text-center text-sm text-muted-foreground">
-                  Keine Rechnungen gefunden.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
 
@@ -455,10 +512,7 @@ function Page() {
       )}
 
       {emailFuer && (
-        <RechnungEmailLauncher
-          rechnung={emailFuer}
-          onClose={() => setEmailFuer(null)}
-        />
+        <RechnungEmailLauncher rechnung={emailFuer} onClose={() => setEmailFuer(null)} />
       )}
 
       <RechnungAusDauerauftragDialog open={daDialog} onOpenChange={setDaDialog} />
@@ -474,7 +528,9 @@ function RechnungEmailLauncher({ rechnung, onClose }: { rechnung: Rechnung; onCl
   return (
     <EmailVersandDialog
       open
-      onOpenChange={(o) => { if (!o) onClose(); }}
+      onOpenChange={(o) => {
+        if (!o) onClose();
+      }}
       kontext="rechnung"
       kunde={kunde}
       rechnung={rechnung}

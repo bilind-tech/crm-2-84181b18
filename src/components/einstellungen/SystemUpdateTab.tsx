@@ -175,7 +175,8 @@ export function SystemUpdateTab() {
             <div className="min-w-0 flex-1">
               <p className="text-base font-semibold">{system.appName}</p>
               <p className="text-sm text-muted-foreground">
-                Version <span className="font-mono font-medium text-foreground">{system.version}</span>
+                Version{" "}
+                <span className="font-mono font-medium text-foreground">{system.version}</span>
                 {" · installiert "}
                 {formatDateTime(system.installedAt)}
               </p>
@@ -217,7 +218,8 @@ export function SystemUpdateTab() {
             <div className="min-w-0 flex-1">
               <p className="font-medium">Es läuft bereits ein Update.</p>
               <p className="text-xs text-muted-foreground">
-                Bitte warten, bis der Vorgang abgeschlossen ist. Upload und Rollback sind so lange gesperrt.
+                Bitte warten, bis der Vorgang abgeschlossen ist. Upload und Rollback sind so lange
+                gesperrt.
               </p>
             </div>
             <Button size="sm" variant="outline" onClick={() => setActiveLaufId(aktuellerLauf.id)}>
@@ -241,7 +243,10 @@ export function SystemUpdateTab() {
       </Section>
 
       {/* ─── Versionshistorie ───────────────────────────────────────── */}
-      <Section title="Versionshistorie" description="Frühere Versionen — Rollback nur auf die direkt vorherige.">
+      <Section
+        title="Versionshistorie"
+        description="Frühere Versionen — Rollback nur auf die direkt vorherige."
+      >
         <ul className="divide-y divide-border rounded-xl border border-border bg-card">
           {versionen.map((v) => (
             <VersionRow
@@ -320,7 +325,9 @@ function UpdatePackagePreview({
             />
             <ul className="ml-7 mt-1 space-y-0.5 text-xs text-muted-foreground">
               {info.pendingMigrations.map((m) => (
-                <li key={m} className="font-mono">• {m}</li>
+                <li key={m} className="font-mono">
+                  • {m}
+                </li>
               ))}
             </ul>
           </div>
@@ -336,15 +343,15 @@ function UpdatePackagePreview({
         <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3 text-xs text-emerald-700 dark:text-emerald-400">
           <p className="font-medium">Deine Daten bleiben unberührt.</p>
           <p className="mt-1 text-emerald-700/80 dark:text-emerald-400/80">
-            Kunden, Angebote, Rechnungen, Zahlungen, Anhänge und Einstellungen
-            werden bei diesem Update nicht verändert, gelöscht oder überschrieben.
-            Es wird ausschließlich der Programmcode getauscht.
+            Kunden, Angebote, Rechnungen, Zahlungen, Anhänge und Einstellungen werden bei diesem
+            Update nicht verändert, gelöscht oder überschrieben. Es wird ausschließlich der
+            Programmcode getauscht.
           </p>
         </div>
         <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-700 dark:text-amber-400">
           <AlertTriangle className="mr-1 inline h-3.5 w-3.5" />
-          Vor dem Update wird automatisch ein Sicherheitsbackup erstellt. Bei
-          Fehler wird automatisch zurückgerollt.
+          Vor dem Update wird automatisch ein Sicherheitsbackup erstellt. Bei Fehler wird
+          automatisch zurückgerollt.
         </div>
       </div>
 
@@ -525,9 +532,11 @@ function UpdateProgressDialog({
                   Sicherheits-Backup ist vorhanden
                 </p>
                 <p className="mt-0.5 text-muted-foreground">
-                  Vor dem Update wurde automatisch ein Backup angelegt
-                  (ID <span className="font-mono">{lauf.safetyBackupId.slice(0, 8)}</span>).
-                  Es kann jederzeit unter <span className="font-medium">Backup &amp; Wiederherstellung</span> eingespielt werden.
+                  Vor dem Update wurde automatisch ein Backup angelegt (ID{" "}
+                  <span className="font-mono">{lauf.safetyBackupId.slice(0, 8)}</span>). Es kann
+                  jederzeit unter{" "}
+                  <span className="font-medium">Backup &amp; Wiederherstellung</span> eingespielt
+                  werden.
                 </p>
               </div>
             )}

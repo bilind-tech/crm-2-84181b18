@@ -6,11 +6,7 @@ import { Search, Wrench } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Input } from "@/components/ui/input";
 import { WerkzeugCard } from "@/components/werkzeuge/WerkzeugCard";
-import {
-  WERKZEUGE,
-  WERKZEUG_GRUPPEN,
-  type WerkzeugDefinition,
-} from "@/lib/werkzeuge/registry";
+import { WERKZEUGE, WERKZEUG_GRUPPEN, type WerkzeugDefinition } from "@/lib/werkzeuge/registry";
 
 export const Route = createFileRoute("/werkzeuge/")({ component: WerkzeugeHub });
 
@@ -21,9 +17,7 @@ function WerkzeugeHub() {
     const term = q.trim().toLowerCase();
     if (!term) return WERKZEUGE;
     return WERKZEUGE.filter(
-      (w) =>
-        w.titel.toLowerCase().includes(term) ||
-        w.beschreibung.toLowerCase().includes(term),
+      (w) => w.titel.toLowerCase().includes(term) || w.beschreibung.toLowerCase().includes(term),
     );
   }, [q]);
 
@@ -69,9 +63,7 @@ function WerkzeugeHub() {
       })}
 
       {q && gefiltert.length === 0 && (
-        <p className="text-sm text-muted-foreground">
-          Kein Werkzeug zu „{q}" gefunden.
-        </p>
+        <p className="text-sm text-muted-foreground">Kein Werkzeug zu „{q}" gefunden.</p>
       )}
     </div>
   );

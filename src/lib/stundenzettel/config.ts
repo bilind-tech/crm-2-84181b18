@@ -51,13 +51,15 @@ export function useStundenzettelUrl(): {
     const backend = q.data?.externeUrl?.trim() ?? "";
 
     if (local && !backend) {
-      void patchStundenzettel(local).then(() => {
-        localStorage.setItem(MIGRATION_MARKER, "1");
-        localStorage.removeItem(STORAGE_KEY);
-        qc.invalidateQueries({ queryKey: QUERY_KEY });
-      }).catch(() => {
-        /* Migration darf scheitern — wird beim nächsten Mount erneut versucht */
-      });
+      void patchStundenzettel(local)
+        .then(() => {
+          localStorage.setItem(MIGRATION_MARKER, "1");
+          localStorage.removeItem(STORAGE_KEY);
+          qc.invalidateQueries({ queryKey: QUERY_KEY });
+        })
+        .catch(() => {
+          /* Migration darf scheitern — wird beim nächsten Mount erneut versucht */
+        });
     } else {
       // Nichts zu migrieren — Marker setzen, damit wir nicht jedes Mal prüfen.
       localStorage.setItem(MIGRATION_MARKER, "1");

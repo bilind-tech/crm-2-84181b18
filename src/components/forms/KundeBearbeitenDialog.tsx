@@ -6,7 +6,13 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -23,7 +29,10 @@ import { useKundenZaehler, useUpdateKunde, useKuerzelFrei } from "@/hooks/useApi
 import type { Kunde } from "@/lib/api/types";
 
 function sanitizeKuerzel(v: string): string {
-  return v.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 4);
+  return v
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "")
+    .slice(0, 4);
 }
 
 interface Props {
@@ -111,7 +120,9 @@ export function KundeBearbeitenDialog({ kunde, open, onOpenChange }: Props) {
       return;
     }
     if (kuerzelKonflikt) {
-      toast.error(`Kürzel «${kuerzel}» ist bereits vergeben (${kuerzelKonflikt.nummer} • ${kuerzelKonflikt.name}).`);
+      toast.error(
+        `Kürzel «${kuerzel}» ist bereits vergeben (${kuerzelKonflikt.nummer} • ${kuerzelKonflikt.name}).`,
+      );
       return;
     }
     try {
@@ -143,22 +154,26 @@ export function KundeBearbeitenDialog({ kunde, open, onOpenChange }: Props) {
       <DialogContent className="bg-background w-[calc(100vw-1rem)] max-w-2xl max-h-[90vh] overflow-y-auto overflow-x-hidden">
         <DialogHeader>
           <DialogTitle>Kunde bearbeiten</DialogTitle>
-          <DialogDescription>
-            Stammdaten und Belegnummern dieses Kunden anpassen.
-          </DialogDescription>
+          <DialogDescription>Stammdaten und Belegnummern dieses Kunden anpassen.</DialogDescription>
         </DialogHeader>
 
         <Tabs defaultValue="stamm" className="mt-2">
           <TabsList className="no-scrollbar flex h-10 w-full justify-start gap-1 overflow-x-auto rounded-full bg-muted p-1">
-            <TabsTrigger value="stamm" className="shrink-0 rounded-full px-3 sm:px-5">Stammdaten</TabsTrigger>
-            <TabsTrigger value="beleg" className="shrink-0 rounded-full px-3 sm:px-5">Belegnummern</TabsTrigger>
+            <TabsTrigger value="stamm" className="shrink-0 rounded-full px-3 sm:px-5">
+              Stammdaten
+            </TabsTrigger>
+            <TabsTrigger value="beleg" className="shrink-0 rounded-full px-3 sm:px-5">
+              Belegnummern
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="stamm" className="mt-5 space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Status">
                 <Select value={status} onValueChange={(v) => setStatus(v as Kunde["status"])}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="aktiv">Aktiv</SelectItem>
                     <SelectItem value="interessent">Interessent</SelectItem>
@@ -177,17 +192,31 @@ export function KundeBearbeitenDialog({ kunde, open, onOpenChange }: Props) {
               )}
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Vorname"><Input value={vorname} onChange={(e) => setVorname(e.target.value)} /></Field>
+              <Field label="Vorname">
+                <Input value={vorname} onChange={(e) => setVorname(e.target.value)} />
+              </Field>
               {kunde.typ === "firma" && (
-                <Field label="Nachname"><Input value={nachname} onChange={(e) => setNachname(e.target.value)} /></Field>
+                <Field label="Nachname">
+                  <Input value={nachname} onChange={(e) => setNachname(e.target.value)} />
+                </Field>
               )}
-              <Field label="E-Mail"><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></Field>
-              <Field label="Telefon"><Input value={telefon} onChange={(e) => setTelefon(e.target.value)} /></Field>
+              <Field label="E-Mail">
+                <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+              </Field>
+              <Field label="Telefon">
+                <Input value={telefon} onChange={(e) => setTelefon(e.target.value)} />
+              </Field>
             </div>
-            <Field label="Straße"><Input value={strasse} onChange={(e) => setStrasse(e.target.value)} /></Field>
+            <Field label="Straße">
+              <Input value={strasse} onChange={(e) => setStrasse(e.target.value)} />
+            </Field>
             <div className="grid gap-4 sm:grid-cols-3">
-              <Field label="PLZ"><Input value={plz} onChange={(e) => setPlz(e.target.value)} /></Field>
-              <Field label="Ort" className="sm:col-span-2"><Input value={ort} onChange={(e) => setOrt(e.target.value)} /></Field>
+              <Field label="PLZ">
+                <Input value={plz} onChange={(e) => setPlz(e.target.value)} />
+              </Field>
+              <Field label="Ort" className="sm:col-span-2">
+                <Input value={ort} onChange={(e) => setOrt(e.target.value)} />
+              </Field>
             </div>
             <Field label="Notizen">
               <Textarea rows={4} value={notizen} onChange={(e) => setNotizen(e.target.value)} />
@@ -253,7 +282,9 @@ export function KundeBearbeitenDialog({ kunde, open, onOpenChange }: Props) {
         </Tabs>
 
         <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Abbrechen</Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Abbrechen
+          </Button>
           <Button onClick={speichern} disabled={update.isPending || !!kuerzelKonflikt}>
             {update.isPending ? "Speichere…" : "Speichern"}
           </Button>

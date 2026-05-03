@@ -67,9 +67,17 @@ export function LogoFirmaPanel({ draft, firma, setOption }: Props) {
         <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/20 p-3">
           <div className="grid h-16 w-28 shrink-0 place-content-center overflow-hidden rounded bg-background ring-1 ring-border">
             {logoOverride ? (
-              <img src={logoOverride} alt="Logo-Override" className="max-h-full max-w-full object-contain" />
+              <img
+                src={logoOverride}
+                alt="Logo-Override"
+                className="max-h-full max-w-full object-contain"
+              />
             ) : firma.logoUrl ? (
-              <img src={firma.logoUrl} alt="Standard-Logo" className="max-h-full max-w-full object-contain opacity-60" />
+              <img
+                src={firma.logoUrl}
+                alt="Standard-Logo"
+                className="max-h-full max-w-full object-contain opacity-60"
+              />
             ) : (
               <span className="text-[10px] text-muted-foreground">Kein Logo</span>
             )}

@@ -5,11 +5,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   useBenachrichtigungen,
@@ -87,7 +83,9 @@ export function AppHeader() {
             </div>
             <ScrollArea className="max-h-80">
               {benachrichtigungen.length === 0 && (
-                <p className="p-6 text-center text-sm text-muted-foreground">Keine Benachrichtigungen</p>
+                <p className="p-6 text-center text-sm text-muted-foreground">
+                  Keine Benachrichtigungen
+                </p>
               )}
               {benachrichtigungen.map((b) => (
                 <button
@@ -113,16 +111,18 @@ export function AppHeader() {
                         b.typ === "warnung"
                           ? "bg-warning"
                           : b.typ === "fehler"
-                          ? "bg-destructive"
-                          : b.typ === "erfolg"
-                          ? "bg-success"
-                          : "bg-primary"
+                            ? "bg-destructive"
+                            : b.typ === "erfolg"
+                              ? "bg-success"
+                              : "bg-primary"
                       }`}
                     />
                     <div className="min-w-0">
                       <p className="font-medium">{b.titel}</p>
                       <p className="text-muted-foreground">{b.text}</p>
-                      <p className="mt-1 text-[11px] text-muted-foreground">{formatDateTime(b.zeitpunkt)}</p>
+                      <p className="mt-1 text-[11px] text-muted-foreground">
+                        {formatDateTime(b.zeitpunkt)}
+                      </p>
                     </div>
                   </div>
                 </button>

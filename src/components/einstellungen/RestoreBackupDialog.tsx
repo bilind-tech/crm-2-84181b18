@@ -84,8 +84,8 @@ export function RestoreBackupDialog({
               ALLE Änderungen seit diesem Backup gehen verloren.
             </span>
             <span className="block text-muted-foreground">
-              Es wird automatisch ein Sicherheitsbackup vor der Wiederherstellung erstellt.
-              Du kannst danach jederzeit dorthin zurück.
+              Es wird automatisch ein Sicherheitsbackup vor der Wiederherstellung erstellt. Du
+              kannst danach jederzeit dorthin zurück.
             </span>
           </DialogDescription>
         </DialogHeader>
@@ -96,8 +96,8 @@ export function RestoreBackupDialog({
             Daten werden ausschließlich aus dem gewählten Backup geladen.
           </p>
           <p className="mt-1 pl-5 text-emerald-700/80 dark:text-emerald-400/80">
-            Außerhalb dieses Wiederherstellungs-Vorgangs wird im Datenverzeichnis
-            nichts verändert, gelöscht oder überschrieben.
+            Außerhalb dieses Wiederherstellungs-Vorgangs wird im Datenverzeichnis nichts verändert,
+            gelöscht oder überschrieben.
           </p>
         </div>
 
@@ -105,9 +105,7 @@ export function RestoreBackupDialog({
           <div className="space-y-1.5">
             <label className="text-xs font-medium">
               1. Tippe{" "}
-              <code className="rounded bg-muted px-1 py-0.5 text-xs font-bold">
-                {BESTAETIGUNG}
-              </code>{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs font-bold">{BESTAETIGUNG}</code>{" "}
               zur Bestätigung
             </label>
             <Input

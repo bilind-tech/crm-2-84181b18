@@ -81,7 +81,12 @@ function PasswordInput({
 
 function formatLockedUntil(iso: string): string {
   const d = new Date(iso);
-  return d.toLocaleString("de-DE", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" });
+  return d.toLocaleString("de-DE", {
+    hour: "2-digit",
+    minute: "2-digit",
+    day: "2-digit",
+    month: "2-digit",
+  });
 }
 
 function useCountdown(targetIso: string | null): string {
@@ -141,9 +146,7 @@ function LoginForm({ onRecovery }: { onRecovery: () => void }) {
               Zu viele Fehlversuche. Erneut möglich in{" "}
               <strong className="font-mono text-base">{countdown}</strong>
             </p>
-            <p className="mt-1 text-xs opacity-80">
-              Entsperrt um {formatLockedUntil(lockedUntil)}
-            </p>
+            <p className="mt-1 text-xs opacity-80">Entsperrt um {formatLockedUntil(lockedUntil)}</p>
           </div>
           <Button type="button" variant="secondary" className="w-full" disabled>
             Anmelden in {countdown}
@@ -167,7 +170,9 @@ function LoginForm({ onRecovery }: { onRecovery: () => void }) {
           />
         </div>
         {fehler && (
-          <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{fehler}</p>
+          <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            {fehler}
+          </p>
         )}
         <Button type="submit" className="w-full" disabled={loading}>
           {loading ? "Anmelden …" : "Anmelden"}
@@ -239,7 +244,8 @@ function RecoveryAnzeige({
             <ShieldAlert className="h-3.5 w-3.5" />
             Wichtig — Recovery-Code
           </div>
-          {hinweis} Speichere oder drucke den Code <strong>jetzt</strong>. Er wird nur ein einziges Mal angezeigt.
+          {hinweis} Speichere oder drucke den Code <strong>jetzt</strong>. Er wird nur ein einziges
+          Mal angezeigt.
         </div>
         <div className="rounded-md border border-border bg-muted/40 p-4 text-center font-mono text-base tracking-wider">
           {code}
@@ -257,12 +263,7 @@ function RecoveryAnzeige({
           >
             {kopiert ? "Kopiert" : "Kopieren"}
           </Button>
-          <Button
-            type="button"
-            variant="secondary"
-            className="flex-1"
-            onClick={druckRecovery}
-          >
+          <Button type="button" variant="secondary" className="flex-1" onClick={druckRecovery}>
             Drucken
           </Button>
         </div>
@@ -342,7 +343,12 @@ function SetupForm() {
         </div>
         <div className="space-y-2">
           <Label htmlFor="setup-pw">Passwort (min. 12 Zeichen)</Label>
-          <PasswordInput id="setup-pw" value={password} onChange={setPassword} autoComplete="new-password" />
+          <PasswordInput
+            id="setup-pw"
+            value={password}
+            onChange={setPassword}
+            autoComplete="new-password"
+          />
         </div>
         <div className="space-y-2">
           <Label htmlFor="setup-token">Setup-Token</Label>
@@ -355,7 +361,9 @@ function SetupForm() {
           />
         </div>
         {fehler && (
-          <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{fehler}</p>
+          <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            {fehler}
+          </p>
         )}
         <Button type="submit" className="w-full" disabled={loading}>
           <UserPlus className="mr-2 h-4 w-4" />
@@ -425,7 +433,11 @@ function RecoveryForm({ onZurueck }: { onZurueck: () => void }) {
           <Label htmlFor="rec-pw">Neues Passwort (min. 12 Zeichen)</Label>
           <PasswordInput id="rec-pw" value={pw} onChange={setPw} autoComplete="new-password" />
         </div>
-        {fehler && <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{fehler}</p>}
+        {fehler && (
+          <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            {fehler}
+          </p>
+        )}
         <Button type="submit" className="w-full" disabled={loading}>
           {loading ? "Speichere …" : "Passwort zurücksetzen"}
         </Button>
@@ -457,7 +469,8 @@ function BackendOfflineScreen() {
             Backend nicht erreichbar
           </div>
           <p className="text-muted-foreground">
-            <code>{url}</code> antwortet nicht. Prüfe ob der Pi läuft und im Netzwerk erreichbar ist.
+            <code>{url}</code> antwortet nicht. Prüfe ob der Pi läuft und im Netzwerk erreichbar
+            ist.
           </p>
           {lastError && <p className="mt-1 text-xs text-rose-700">{lastError}</p>}
         </div>

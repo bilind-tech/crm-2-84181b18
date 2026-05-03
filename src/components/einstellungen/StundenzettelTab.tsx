@@ -6,10 +6,7 @@ import { ExternalLink, Save as SaveIcon, Clock } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import {
-  useStundenzettelUrl,
-  useSetStundenzettelUrl,
-} from "@/lib/stundenzettel/config";
+import { useStundenzettelUrl, useSetStundenzettelUrl } from "@/lib/stundenzettel/config";
 import { ApiError } from "@/lib/api/client";
 import { PiApiError } from "@/lib/api/piClient";
 
@@ -63,8 +60,8 @@ export function StundenzettelTab() {
           <div>
             <h2 className="text-lg font-semibold">Stundenzettel-App</h2>
             <p className="text-sm text-muted-foreground">
-              Externe App, die auf dem Pi unter einer eigenen Adresse läuft. Wird im
-              CRM eingebettet im Bereich „Stundenzettel" angezeigt.
+              Externe App, die auf dem Pi unter einer eigenen Adresse läuft. Wird im CRM eingebettet
+              im Bereich „Stundenzettel" angezeigt.
             </p>
           </div>
         </div>
@@ -74,22 +71,23 @@ export function StundenzettelTab() {
             <Label className="text-xs font-medium">Adresse der Stundenzettel-App</Label>
             <Input
               value={draft}
-              onChange={(e) => { setDraft(e.target.value); setServerError(null); }}
+              onChange={(e) => {
+                setDraft(e.target.value);
+                setServerError(null);
+              }}
               placeholder="z. B. http://mycleancenter.local:4001"
               disabled={isLoading}
             />
             <p className="text-xs text-muted-foreground">
-              Lokale LAN-Adresse oder eigene Domain. Gilt geräteübergreifend für alle
-              Browser im Netzwerk. Leer lassen, solange die App noch nicht eingerichtet ist.
+              Lokale LAN-Adresse oder eigene Domain. Gilt geräteübergreifend für alle Browser im
+              Netzwerk. Leer lassen, solange die App noch nicht eingerichtet ist.
             </p>
             {!valid && (
               <p className="text-xs text-destructive">
                 URL muss mit http:// oder https:// beginnen.
               </p>
             )}
-            {valid && serverError && (
-              <p className="text-xs text-destructive">{serverError}</p>
-            )}
+            {valid && serverError && <p className="text-xs text-destructive">{serverError}</p>}
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -120,24 +118,31 @@ export function StundenzettelTab() {
         <ol className="ml-5 list-decimal space-y-1 text-muted-foreground">
           <li>
             Stundenzettel-App-Ordner auf den Pi kopieren (z. B. nach
-            <code className="mx-1 rounded bg-background px-1.5 py-0.5">/opt/mycleancenter-stundenzettel/</code>).
+            <code className="mx-1 rounded bg-background px-1.5 py-0.5">
+              /opt/mycleancenter-stundenzettel/
+            </code>
+            ).
           </li>
           <li>
             Als <code className="mx-1 rounded bg-background px-1.5 py-0.5">systemd</code>-Dienst
             einrichten, damit sie automatisch beim Boot startet und 24/7 läuft.
           </li>
           <li>
-            Eigenen Port wählen (z. B. <code className="mx-1 rounded bg-background px-1.5 py-0.5">4001</code>),
-            damit sie nicht mit dem CRM-Backend kollidiert.
+            Eigenen Port wählen (z. B.{" "}
+            <code className="mx-1 rounded bg-background px-1.5 py-0.5">4001</code>), damit sie nicht
+            mit dem CRM-Backend kollidiert.
           </li>
           <li>
-            Die LAN-Adresse (z. B. <code className="mx-1 rounded bg-background px-1.5 py-0.5">http://mycleancenter.local:4001</code>)
-            oben eintragen und speichern.
+            Die LAN-Adresse (z. B.{" "}
+            <code className="mx-1 rounded bg-background px-1.5 py-0.5">
+              http://mycleancenter.local:4001
+            </code>
+            ) oben eintragen und speichern.
           </li>
         </ol>
         <p className="mt-3 text-xs text-muted-foreground">
-          Wenn die andere App das Einbetten in iframes blockiert (CSP/X-Frame-Options),
-          öffnet sich der Link automatisch in einem neuen Tab.
+          Wenn die andere App das Einbetten in iframes blockiert (CSP/X-Frame-Options), öffnet sich
+          der Link automatisch in einem neuen Tab.
         </p>
       </div>
     </div>

@@ -16,9 +16,7 @@ function csvEscape(v: unknown): string {
 
 function toCsv(rows: Array<Record<string, unknown>>, headers: string[]): string {
   const head = headers.map(csvEscape).join(";");
-  const body = rows
-    .map((r) => headers.map((h) => csvEscape(r[h])).join(";"))
-    .join("\n");
+  const body = rows.map((r) => headers.map((h) => csvEscape(r[h])).join(";")).join("\n");
   return "\uFEFF" + head + "\n" + body + "\n"; // BOM für Excel
 }
 
@@ -67,7 +65,7 @@ export async function buildSteuerExport(input: ExportInput): Promise<Blob> {
       for (const p of r.positionen) {
         const netto =
           p.modus === "pauschal"
-            ? p.pauschalpreisNetto ?? 0
+            ? (p.pauschalpreisNetto ?? 0)
             : p.menge * p.einzelpreisNetto * (1 - (p.rabatt ?? 0) / 100);
         const stUst = netto * (p.steuersatz / 100);
         if (Math.abs(p.steuersatz - 19) < 0.5) ust19 += stUst;
@@ -138,10 +136,9 @@ export async function buildSteuerExport(input: ExportInput): Promise<Blob> {
     (u) => u.zeitraum.jahr === jahr,
   );
   const ustRows = ust.map((u) => ({
-    Periode:
-      u.zeitraum.monat
-        ? `${u.zeitraum.jahr}-${String(u.zeitraum.monat).padStart(2, "0")}`
-        : u.zeitraum.quartal
+    Periode: u.zeitraum.monat
+      ? `${u.zeitraum.jahr}-${String(u.zeitraum.monat).padStart(2, "0")}`
+      : u.zeitraum.quartal
         ? `${u.zeitraum.jahr}-Q${u.zeitraum.quartal}`
         : `${u.zeitraum.jahr}`,
     "USt EUR": u.ust.toFixed(2),
@@ -166,12 +163,7 @@ export async function buildSteuerExport(input: ExportInput): Promise<Blob> {
   ];
   zip.file(
     `gewinn-${jahr}.csv`,
-    toCsv(gewinnRows, [
-      "Jahr",
-      "Netto-Einnahmen EUR",
-      "Netto-Ausgaben EUR",
-      "Gewinn EUR",
-    ]),
+    toCsv(gewinnRows, ["Jahr", "Netto-Einnahmen EUR", "Netto-Ausgaben EUR", "Gewinn EUR"]),
   );
 
   // --- README ---

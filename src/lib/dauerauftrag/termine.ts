@@ -31,10 +31,14 @@ function stichtagImMonat(da: Dauerauftrag, jahr: number, monatIdx: number): Date
 /** Schritt zwischen zwei Läufen in Monaten je nach Frequenz. */
 function frequenzMonate(da: Dauerauftrag): number {
   switch (da.frequenz) {
-    case "monatlich": return 1;
-    case "quartalsweise": return 3;
-    case "halbjaehrlich": return 6;
-    case "jaehrlich": return 12;
+    case "monatlich":
+      return 1;
+    case "quartalsweise":
+      return 3;
+    case "halbjaehrlich":
+      return 6;
+    case "jaehrlich":
+      return 12;
   }
 }
 
@@ -52,18 +56,17 @@ function ersterStichtagAb(da: Dauerauftrag, ab: Date): Date {
   // Bei quartalsweise/halbjährlich/jährlich richten wir uns nach dem Anker-Monat von laufzeitVon
   while (kandidat < von) {
     monat += schritt;
-    while (monat > 11) { monat -= 12; jahr += 1; }
+    while (monat > 11) {
+      monat -= 12;
+      jahr += 1;
+    }
     kandidat = stichtagImMonat(da, jahr, monat);
   }
   return kandidat;
 }
 
 /** Nächste N Stichtage ab `ab` (inklusive Heute, falls noch fällig). */
-export function berechneNaechsteLauftermine(
-  da: Dauerauftrag,
-  ab: Date,
-  n: number,
-): Date[] {
+export function berechneNaechsteLauftermine(da: Dauerauftrag, ab: Date, n: number): Date[] {
   if (n <= 0) return [];
   if (da.status === "beendet") return [];
   const ende = da.laufzeitBis ? new Date(da.laufzeitBis) : null;
@@ -78,7 +81,10 @@ export function berechneNaechsteLauftermine(
     if (ende && kandidat > ende) break;
     ergebnis.push(new Date(kandidat));
     monat += schritt;
-    while (monat > 11) { monat -= 12; jahr += 1; }
+    while (monat > 11) {
+      monat -= 12;
+      jahr += 1;
+    }
     kandidat = stichtagImMonat(da, jahr, monat);
   }
   return ergebnis;
@@ -101,8 +107,18 @@ export function periodeFuer(da: Dauerauftrag, datum: Date): string {
 }
 
 const MONATE_DE = [
-  "Januar", "Februar", "März", "April", "Mai", "Juni",
-  "Juli", "August", "September", "Oktober", "November", "Dezember",
+  "Januar",
+  "Februar",
+  "März",
+  "April",
+  "Mai",
+  "Juni",
+  "Juli",
+  "August",
+  "September",
+  "Oktober",
+  "November",
+  "Dezember",
 ];
 
 /** Menschenlesbare Bezeichnung der Periode: "April 2026", "Q2 2026", … */
@@ -110,10 +126,14 @@ export function periodeBezeichnung(da: Dauerauftrag, datum: Date): string {
   const j = datum.getFullYear();
   const m = datum.getMonth();
   switch (da.frequenz) {
-    case "monatlich": return `${MONATE_DE[m]} ${j}`;
-    case "quartalsweise": return `Q${Math.floor(m / 3) + 1} ${j}`;
-    case "halbjaehrlich": return `${m < 6 ? "1. Halbjahr" : "2. Halbjahr"} ${j}`;
-    case "jaehrlich": return `Jahr ${j}`;
+    case "monatlich":
+      return `${MONATE_DE[m]} ${j}`;
+    case "quartalsweise":
+      return `Q${Math.floor(m / 3) + 1} ${j}`;
+    case "halbjaehrlich":
+      return `${m < 6 ? "1. Halbjahr" : "2. Halbjahr"} ${j}`;
+    case "jaehrlich":
+      return `Jahr ${j}`;
   }
 }
 
@@ -147,9 +167,13 @@ export function istPausiert(da: Dauerauftrag, heute: Date = new Date()): boolean
 /** Monatlicher Brutto-Wert für MRR-Anzeige. Quartalsweise → /3, jährlich → /12. */
 export function monatlicheBrutto(da: Dauerauftrag, brutto: number): number {
   switch (da.frequenz) {
-    case "monatlich": return brutto;
-    case "quartalsweise": return brutto / 3;
-    case "halbjaehrlich": return brutto / 6;
-    case "jaehrlich": return brutto / 12;
+    case "monatlich":
+      return brutto;
+    case "quartalsweise":
+      return brutto / 3;
+    case "halbjaehrlich":
+      return brutto / 6;
+    case "jaehrlich":
+      return brutto / 12;
   }
 }

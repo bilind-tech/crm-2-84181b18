@@ -10,9 +10,7 @@ export function PageHeader({ title, subtitle, actions }: Props) {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{title}</h1>
-          {subtitle && (
-            <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
-          )}
+          {subtitle && <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>}
         </div>
         {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
       </div>
@@ -33,32 +31,32 @@ export function KpiCard({ label, value, sublabel, tone = "default", icon: Icon }
     tone === "success"
       ? "text-success"
       : tone === "danger"
-      ? "text-destructive"
-      : tone === "warning"
-      ? "text-warning"
-      : tone === "primary"
-      ? "text-primary"
-      : "text-foreground";
+        ? "text-destructive"
+        : tone === "warning"
+          ? "text-warning"
+          : tone === "primary"
+            ? "text-primary"
+            : "text-foreground";
   const accentBar =
     tone === "success"
       ? "bg-success"
       : tone === "danger"
-      ? "bg-destructive"
-      : tone === "warning"
-      ? "bg-warning"
-      : tone === "primary"
-      ? "bg-primary"
-      : "bg-muted-foreground/30";
+        ? "bg-destructive"
+        : tone === "warning"
+          ? "bg-warning"
+          : tone === "primary"
+            ? "bg-primary"
+            : "bg-muted-foreground/30";
   const iconBg =
     tone === "success"
       ? "bg-success/10 text-success"
       : tone === "danger"
-      ? "bg-destructive/10 text-destructive"
-      : tone === "warning"
-      ? "bg-warning/10 text-warning"
-      : tone === "primary"
-      ? "bg-primary/10 text-primary"
-      : "bg-muted text-muted-foreground";
+        ? "bg-destructive/10 text-destructive"
+        : tone === "warning"
+          ? "bg-warning/10 text-warning"
+          : tone === "primary"
+            ? "bg-primary/10 text-primary"
+            : "bg-muted text-muted-foreground";
   return (
     <div className="relative min-w-0 overflow-hidden rounded-xl border border-border bg-card p-3 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition hover:shadow-md sm:p-5">
       <span className={`absolute left-0 top-0 h-full w-1 ${accentBar}`} aria-hidden />
@@ -67,7 +65,9 @@ export function KpiCard({ label, value, sublabel, tone = "default", icon: Icon }
           <p className="truncate text-[10px] font-semibold uppercase tracking-wider text-muted-foreground sm:text-xs">
             {label}
           </p>
-          <p className={`mt-1.5 truncate text-lg font-bold tracking-tight sm:mt-2 sm:text-2xl ${valueColor}`}>
+          <p
+            className={`mt-1.5 truncate text-lg font-bold tracking-tight sm:mt-2 sm:text-2xl ${valueColor}`}
+          >
             {value}
           </p>
           {sublabel && (
