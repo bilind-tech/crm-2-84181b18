@@ -233,7 +233,7 @@ export function EmailVersandDialog({
   const istValide = an.trim().length > 0 && betreff.trim().length > 0;
 
   const handleSend = () => {
-    if (!smtpKonfiguriert) {
+    if (!smtpKonfiguriert && !demoModus) {
       toast.error("SMTP nicht konfiguriert", {
         description:
           "Bitte unter Einstellungen → E-Mail Server, Benutzer und Passwort hinterlegen.",
