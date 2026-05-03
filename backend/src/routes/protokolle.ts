@@ -38,6 +38,16 @@ export async function protokolleRoutes(app: FastifyInstance): Promise<void> {
     },
   );
 
+  app.get<{ Params: { dokumentId: string } }>(
+    "/protokolle/by-dokument/:dokumentId",
+    { preHandler: requireAuth },
+    async (req, reply) => {
+      const p = getProtokollByDokumentId(req.params.dokumentId);
+      if (!p) { reply.status(404).send({ error: "not found" }); return; }
+      return p;
+    },
+  );
+
   app.get<{ Params: { id: string } }>(
     "/protokolle/:id",
     { preHandler: requireAuth },
