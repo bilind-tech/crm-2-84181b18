@@ -79,6 +79,24 @@ async function main(): Promise<void> {
   const keyStatus = ensureMasterKey(config.keyPath);
   openDatabase(config.dbPath);
 
+  // DB-Integritäts-Check direkt nach Open. Wenn die Datei korrupt ist,
+  // bricht der Boot ab — der User soll lieber das letzte Backup zurückspielen
+  // als auf eine kaputte DB schreiben.
+  try {
+    const { getDatabase } = await import("./db/index.js");
+    const integ = getDatabase()
+      .prepare("PRAGMA integrity_check")
+      .get() as { integrity_check: string } | undefined;
+    if (!integ || integ.integrity_check !== "ok") {
+      console.error("FATAL: SQLite integrity_check fehlgeschlagen:", integ);
+      console.error("Bitte das letzte Backup unter /var/lib/mycleancenter/backups/daily/ wiederherstellen.");
+      process.exit(3);
+    }
+  } catch (e) {
+    console.error("FATAL: integrity_check konnte nicht ausgeführt werden:", e);
+    process.exit(3);
+  }
+
   // Wartungsmodus von der Platte laden (z. B. nach abgebrochenem Restore)
   loadMaintenanceFlagFromDisk();
 
