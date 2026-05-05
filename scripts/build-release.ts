@@ -167,6 +167,35 @@ function copyTree(src: string, dest: string): void {
   }
 }
 
+function createSpaIndex(frontendOutDir: string): void {
+  const assetsDir = path.join(frontendOutDir, "assets");
+  if (!existsSync(assetsDir)) fail(`Assets fehlen: ${assetsDir}`);
+  const assets = readdirSync(assetsDir);
+  const mainScript = assets.find((f) => /^main-[A-Za-z0-9_-]+\.js$/.test(f));
+  if (!mainScript) fail("Frontend-Client-Entry main-*.js fehlt");
+  const styleLinks = assets
+    .filter((f) => /^styles-[A-Za-z0-9_-]+\.css$/.test(f))
+    .map((f) => `    <link rel="stylesheet" href="/assets/${f}">`)
+    .join("\n");
+  writeFileSync(
+    path.join(frontendOutDir, "index.html"),
+    `<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>MCC Reinigungs-CRM</title>
+    <meta name="description" content="Lokales CRM- und Rechnungssystem für den Reinigungsbetrieb.">
+${styleLinks}
+  </head>
+  <body>
+    <script type="module" src="/assets/${mainScript}"></script>
+  </body>
+</html>
+`,
+  );
+}
+
 async function zipDir(srcDir: string, outZip: string): Promise<void> {
   const JSZipMod = (await import("jszip")).default;
   const zip = new JSZipMod();
@@ -226,7 +255,9 @@ async function main(): Promise<void> {
     const frontendDist = path.join(ROOT, "dist");
     const frontendClientDist = path.join(frontendDist, "client");
     if (!existsSync(frontendDist)) fail("Frontend-Build hat dist/ nicht erzeugt");
-    copyTree(existsSync(frontendClientDist) ? frontendClientDist : frontendDist, path.join(stagingRoot, "dist"));
+    const stagedFrontend = path.join(stagingRoot, "dist");
+    copyTree(existsSync(frontendClientDist) ? frontendClientDist : frontendDist, stagedFrontend);
+    createSpaIndex(stagedFrontend);
     ok("Frontend kopiert");
   } else {
     log("Frontend übersprungen (--skip-frontend)");
