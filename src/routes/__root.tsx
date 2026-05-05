@@ -5,6 +5,11 @@ import {
   Scripts,
   useRouterState,
 } from "@tanstack/react-router";
+
+// Im SPA-Build (Pi) liefert pi-spa/index.html bereits <html>/<body>.
+// Dann darf der Router-Shell KEIN zweites <html> rendern → sonst weißer Screen.
+declare const __MCC_SPA__: boolean | undefined;
+const IS_SPA = typeof __MCC_SPA__ !== "undefined" && __MCC_SPA__ === true;
 import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 
@@ -68,6 +73,9 @@ export const Route = createRootRoute({
 });
 
 function RootShell({ children }: { children: React.ReactNode }) {
+  if (IS_SPA) {
+    return <>{children}</>;
+  }
   return (
     <html lang="de">
       <head>

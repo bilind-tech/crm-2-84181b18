@@ -19,6 +19,9 @@ import path from "node:path";
 export default defineConfig({
   root: path.resolve(__dirname, "pi-spa"),
   publicDir: path.resolve(__dirname, "public"),
+  define: {
+    __MCC_SPA__: "true",
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "src"),
