@@ -123,7 +123,7 @@ ensure_build_tools() {
     return
   fi
   apt-get update
-  apt-get install -y git curl ca-certificates unzip python3 make g++ build-essential
+  apt-get install -y git curl ca-certificates unzip python3 make g++ build-essential libsqlite3-dev
   ok "Systempakete vorhanden"
 }
 
@@ -193,34 +193,66 @@ bootstrap_release() {
     err "Bootstrap-ZIP nicht gefunden: $BOOTSTRAP_ZIP"
     exit 3
   fi
-  local target="$APP_DIR/releases/initial"
-  if [[ -d "$target" ]]; then
-    ok "Release 'initial' bereits vorhanden — überspringe Bootstrap"
-  else
-    log "Entpacke $BOOTSTRAP_ZIP nach $target"
-    if [[ $CHECK_ONLY -eq 1 ]]; then
-      warn "[--check] Bootstrap würde entpackt"
-      return
+  # SICHERHEITS-BACKUP der Daten BEVOR irgendetwas am Code passiert.
+  # Niemals an /var/lib/mycleancenter anfassen außer in diesem kontrollierten
+  # Pfad — das ist die oberste Regel.
+  if [[ -d "$DATA_DIR/db" ]] && compgen -G "$DATA_DIR/db/*.db" >/dev/null 2>&1; then
+    local safety_dir="$DATA_DIR/backups/safety"
+    local ts="$(date +%Y%m%d-%H%M%S)"
+    local safety_file="$safety_dir/pre-install-$ts.tgz"
+    log "Erzeuge Sicherheits-Backup vor Code-Wechsel: $safety_file"
+    if [[ $CHECK_ONLY -eq 0 ]]; then
+      mkdir -p "$safety_dir"
+      # NUR lesen aus DATA_DIR, NUR schreiben in safety_dir.
+      tar --warning=no-file-changed -czf "$safety_file" -C "$DATA_DIR" db keys 2>/dev/null || \
+        warn "Sicherheits-Backup nicht vollständig (DB evtl. in Benutzung) — fortfahren auf eigene Gefahr"
+      chown "$APP_USER:$APP_GROUP" "$safety_file" 2>/dev/null || true
+      chmod 0600 "$safety_file" 2>/dev/null || true
     fi
-    command -v unzip >/dev/null || apt-get install -y unzip
-    mkdir -p "$target"
-    unzip -q "$BOOTSTRAP_ZIP" -d "$target"
-    chown -R "$APP_USER:$APP_GROUP" "$target"
-    ok "Release entpackt"
   fi
-  if [[ ! -L "$APP_DIR/current" ]]; then
-    [[ $CHECK_ONLY -eq 0 ]] && ln -sfn "$target" "$APP_DIR/current"
-    ok "Symlink current → $target gesetzt"
+
+  # Atomarer Release-Wechsel via Timestamp-Ordner + Symlink-Switch.
+  local ts="$(date +%Y%m%d-%H%M%S)"
+  local target="$APP_DIR/releases/$ts"
+  log "Entpacke $BOOTSTRAP_ZIP nach $target"
+  if [[ $CHECK_ONLY -eq 1 ]]; then
+    warn "[--check] Bootstrap würde entpackt"
+    return
   fi
+  command -v unzip >/dev/null || apt-get install -y unzip
+  mkdir -p "$target"
+  unzip -q "$BOOTSTRAP_ZIP" -d "$target"
+  chown -R "$APP_USER:$APP_GROUP" "$target"
+  ok "Release entpackt"
+
+  # Vorgänger merken (für Rollback), ältere Releases entfernen.
+  if [[ -L "$APP_DIR/current" ]]; then
+    local prev
+    prev="$(readlink -f "$APP_DIR/current")"
+    if [[ -d "$prev" && "$prev" != "$target" ]]; then
+      ln -sfn "$prev" "$APP_DIR/previous"
+      ok "Rollback-Pfad: $APP_DIR/previous → $prev"
+    fi
+  fi
+  ln -sfn "$target" "$APP_DIR/current.new"
+  mv -Tf "$APP_DIR/current.new" "$APP_DIR/current"
+  ok "Symlink current → $target (atomar)"
+
+  # Alte Releases aufräumen — nur current und previous bleiben.
+  local keep1 keep2
+  keep1="$(readlink -f "$APP_DIR/current" 2>/dev/null || true)"
+  keep2="$(readlink -f "$APP_DIR/previous" 2>/dev/null || true)"
+  for r in "$APP_DIR/releases"/*/; do
+    r="${r%/}"
+    [[ "$r" == "$keep1" || "$r" == "$keep2" ]] && continue
+    log "Entferne alten Release: $r"
+    rm -rf "$r"
+  done
 }
 
 install_backend_deps() {
   local be_dir="$APP_DIR/current/backend"
   [[ ! -f "$be_dir/package.json" ]] && return
-  if [[ -d "$be_dir/node_modules" ]]; then
-    ok "Backend-Dependencies vorhanden"
-    return
-  fi
   log "Installiere Backend-Dependencies (npm ci --omit=dev)"
   if [[ $CHECK_ONLY -eq 1 ]]; then
     warn "[--check] npm ci würde laufen"
@@ -231,6 +263,15 @@ install_backend_deps() {
   else
     sudo -u "$APP_USER" bash -c "cd '$be_dir' && npm install --omit=dev --no-audit --no-fund"
   fi
+  # Native Module für ARM64 sicherstellen (Pi 5 = aarch64).
+  # Wenn Prebuilt fehlt oder beschädigt ist, wird from-source gebaut.
+  log "Native Module prüfen (better-sqlite3, @node-rs/argon2)"
+  sudo -u "$APP_USER" bash -c "cd '$be_dir' && node -e 'require(\"better-sqlite3\")' 2>/dev/null" || {
+    warn "better-sqlite3 nicht ladbar — rebuild from source"
+    sudo -u "$APP_USER" bash -c "cd '$be_dir' && npm rebuild better-sqlite3 --build-from-source"
+  }
+  sudo -u "$APP_USER" bash -c "cd '$be_dir' && node -e 'require(\"@node-rs/argon2\")' 2>/dev/null" || \
+    warn "@node-rs/argon2 nicht ladbar — bitte Pi-Architektur prüfen (aarch64 erwartet)"
   ok "Backend-Dependencies installiert"
 }
 
