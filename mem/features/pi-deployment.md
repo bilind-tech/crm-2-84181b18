@@ -10,7 +10,7 @@ type: feature
 
 - `systemd/mycleancenter.service` — systemd-Unit. Läuft als unprivilegierter User `mycleancenter`. Hardening: `ProtectSystem=strict`, `ReadWritePaths=/var/lib/mycleancenter`, `NoNewPrivileges`. ENV: `NODE_ENV=production`, `DATA_DIR=/var/lib/mycleancenter`, `PORT=8787`, `CORS_ORIGINS` muss explizit gesetzt sein.
 - `install.sh` — idempotentes Setup-Skript. Legt User+Verzeichnisse an, installiert Node 20 LTS, kopiert systemd-Unit/sudoers/logrotate, startet den Service. `--check` für Dry-Run.
-- `systemd/mycleancenter-mdns-aliases.service` — veröffentlicht mDNS-Aliase für `mycleancenter.local` und `timekeeper.local`; Gerät selbst heißt `mycleancenter-pi.local` / „My Clean Center Pi".
+- `systemd/mycleancenter-mdns-aliases.service` — veröffentlicht den mDNS-Alias `mycleancenter.local`; Gerät selbst heißt `mycleancenter-pi.local` / „My Clean Center Pi". Timekeeper/Stundenzettel bekommt keinen `.local`-Alias durch das CRM-Setup.
 - `sudoers.d/mycleancenter` — erlaubt dem Service-User exakt `systemctl reload/restart/status mycleancenter` ohne Passwort. Wird vom System-Update-Runner via `sudo -n` aufgerufen.
 - `logrotate.conf` — `/var/lib/mycleancenter/logs/*.log` daily, 14 Tage, compress.
 - `README.md` — Schritt-für-Schritt Setup + Troubleshooting.
@@ -56,6 +56,6 @@ Tooltip mit Uptime (formatiert).
 ## Wichtig
 
 - `/health` ist bewusst ohne Auth (Monitoring + Update-Smoketest).
-- IP-Zugriff muss immer parallel zu `.local` funktionieren. `.local` wird per Avahi/mDNS eingerichtet: CRM unter `mycleancenter-pi.local:8787` und `mycleancenter.local:8787`, Timekeeper unter `timekeeper.local:<port>`.
+- IP-Zugriff muss immer parallel zu `.local` funktionieren. `.local` wird per Avahi/mDNS eingerichtet: CRM unter `mycleancenter-pi.local:8787` und `mycleancenter.local:8787`. Timekeeper/Stundenzettel wird nicht über dieses CRM-Setup als `.local` veröffentlicht.
 - Im Dev-Modus (`NODE_ENV !== "production"`) macht der Runner KEINEN systemctl-Call — Backend läuft direkt aus dem Repo.
 - Master-Key (`/var/lib/mycleancenter/keys/master.key`) gehört ZWINGEND ins Backup, sonst sind verschlüsselte Settings nach Restore unbrauchbar.
