@@ -141,6 +141,9 @@ async function main(): Promise<void> {
         "frame-ancestors": ["'none'"],
         "object-src": ["'none'"],
         "base-uri": ["'self'"],
+        // Lokaler Pi läuft bewusst per HTTP im LAN. Helmet setzt diesen Default
+        // sonst automatisch und Chrome lädt /assets/* fälschlich per HTTPS.
+        "upgrade-insecure-requests": null,
       },
     },
   });
