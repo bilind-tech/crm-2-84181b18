@@ -159,8 +159,10 @@ ensure_mdns() {
   if [[ -f "$MDNS_ALIASES_UNIT" ]]; then
     install -m 0644 "$MDNS_ALIASES_UNIT" /etc/systemd/system/mycleancenter-mdns-aliases.service
     systemctl daemon-reload
-    systemctl enable --now mycleancenter-mdns-aliases.service
-    ok "mDNS-Aliase aktiv: http://mycleancenter.local:8787 und http://timekeeper.local:<port>"
+    systemctl reset-failed mycleancenter-mdns-aliases.service 2>/dev/null || true
+    systemctl enable mycleancenter-mdns-aliases.service
+    systemctl restart mycleancenter-mdns-aliases.service
+    ok "mDNS-Alias aktiv: http://mycleancenter.local:8787"
   else
     warn "mDNS-Alias-Unit fehlt: $MDNS_ALIASES_UNIT"
   fi

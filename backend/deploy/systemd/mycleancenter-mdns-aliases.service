@@ -1,11 +1,11 @@
 [Unit]
-Description=MyCleanCenter mDNS aliases for CRM and Timekeeper
+Description=MyCleanCenter mDNS alias
 After=network-online.target avahi-daemon.service
 Wants=network-online.target avahi-daemon.service
 
 [Service]
 Type=simple
-ExecStart=/bin/sh -c 'IP="$(hostname -I | awk "{print \\$1}")"; test -n "$IP"; exec /usr/bin/avahi-publish-address -R mycleancenter.local timekeeper.local "$IP"'
+ExecStart=/bin/sh -c 'IP="$(hostname -I | awk "{print \\$1}")"; test -n "$IP"; exec /usr/bin/avahi-publish-address -R mycleancenter.local "$IP"'
 Restart=always
 RestartSec=10
 
