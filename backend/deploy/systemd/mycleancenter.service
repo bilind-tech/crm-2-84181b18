@@ -15,13 +15,16 @@ Environment=DATA_DIR=/var/lib/mycleancenter
 Environment=PORT=8787
 Environment=HOST=0.0.0.0
 Environment=FRONTEND_DIR=/opt/mycleancenter/current/dist
-# CORS muss in Production explizit gesetzt werden — kommagetrennte Liste der erlaubten Origins.
-# Frontend wird vom Backend auf Port 8787 ausgeliefert; bei Zugriff per LAN-IP ergänzen, z. B.:
-#   http://mycleancenter.local:8787,http://192.168.1.50:8787
-Environment=CORS_ORIGINS=http://mycleancenter.local:8787
-# Google-OAuth-Redirect wird hart gesetzt, damit Google-Whitelist (exact match) funktioniert,
-# egal ob Aufruf via mDNS oder LAN-IP erfolgt.
-Environment=GOOGLE_OAUTH_REDIRECT=http://mycleancenter.local:8787/einstellungen/google-drive/callback
+# CORS: Frontend und Backend laufen auf demselben Port → Same-Origin.
+# Damit Zugriff per LAN-IP, Hostname und mDNS gleichermaßen funktioniert,
+# erlauben wir hier alle Origins. Echte Sicherheit kommt aus Cookie-Auth +
+# Lockout, nicht aus CORS.
+Environment=CORS_ORIGINS=*
+# Cookies dürfen NICHT als Secure laufen, solange im LAN per HTTP zugegriffen
+# wird — sonst sendet der Browser sie nicht zurück und Logins wirken kaputt.
+Environment=COOKIE_SECURE=false
+# Google-OAuth-Redirect: bei Bedarf in der Google Cloud Console exakt eintragen.
+Environment=GOOGLE_OAUTH_REDIRECT=http://mycleancenter-pi.local:8787/einstellungen/google-drive/callback
 ExecStart=/usr/bin/node dist/server.js
 Restart=on-failure
 RestartSec=3

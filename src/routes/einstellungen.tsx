@@ -102,7 +102,7 @@ function Page() {
   const sichtbareTabs = tabs;
   const sichtbareGruppen = gruppen;
   const [tab, setTab] = useState<TabId>("firmendaten");
-  const { data: firma } = useFirmendaten();
+  const { data: firma, isLoading: firmaLoading, error: firmaError } = useFirmendaten();
   const update = useUpdateFirmendaten();
 
   // Falls aktiver Tab nicht existiert, zurück auf "firmendaten"
@@ -213,15 +213,31 @@ function Page() {
             <h2 className="text-base font-semibold">{aktiverTab.label}</h2>
           </div>
 
-          {tab === "firmendaten" && firma && (
-            <FirmendatenTab
-              initial={firma}
-              onSave={(data) =>
-                update.mutate(data, {
-                  onSuccess: () => toast.success("Firmendaten gespeichert"),
-                })
-              }
-            />
+          {tab === "firmendaten" && (
+            firma ? (
+              <FirmendatenTab
+                initial={firma}
+                onSave={(data) =>
+                  update.mutate(data, {
+                    onSuccess: () => toast.success("Firmendaten gespeichert"),
+                  })
+                }
+              />
+            ) : firmaLoading ? (
+              <div className="rounded-2xl border border-border bg-card p-6 text-sm text-muted-foreground shadow-sm">
+                Lade Firmendaten…
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-destructive/40 bg-card p-6 shadow-sm">
+                <h3 className="mb-1 text-sm font-semibold">Firmendaten konnten nicht geladen werden</h3>
+                <p className="text-sm text-muted-foreground">
+                  {firmaError instanceof Error ? firmaError.message : "Backend nicht erreichbar oder Anmeldung abgelaufen."}
+                </p>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Bitte Seite neu laden oder erneut anmelden.
+                </p>
+              </div>
+            )
           )}
           {tab === "email-vorlagen" && <EmailVorlagenTab />}
           {tab === "email-signaturen" && <EmailSignaturenTab />}

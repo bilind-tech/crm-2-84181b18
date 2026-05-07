@@ -105,14 +105,12 @@ async function main(): Promise<void> {
   const orphans = reconcileDiskState();
   const restoreTmpRemoved = cleanupOrphanRestoreTmp();
 
-  // CORS-Härtung: in Production darf "*" nicht stehen, sonst Bootabbruch.
-  if (config.nodeEnv === "production") {
-    if (config.corsOrigins.includes("*") || config.corsOrigins.length === 0) {
-      console.error(
-        "FATAL: In Production muss CORS_ORIGINS explizit gesetzt sein (kommagetrennte Liste). '*' ist mit Cookie-Auth nicht erlaubt.",
-      );
-      process.exit(2);
-    }
+  // CORS: Frontend wird vom Backend auf demselben Port ausgeliefert →
+  // same-origin ist Normalfall. Im LAN-Betrieb (Pi per IP/Hostname/mDNS)
+  // wäre eine harte Origin-Whitelist fehleranfällig. Daher kein Bootabbruch
+  // bei "*" — Schutz kommt aus Cookie-Auth + Lockout.
+  if (config.corsOrigins.length === 0) {
+    console.warn("CORS_ORIGINS leer — fallback auf '*'.");
   }
 
   const app = Fastify({
