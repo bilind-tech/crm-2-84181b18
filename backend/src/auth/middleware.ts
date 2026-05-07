@@ -2,7 +2,15 @@
 // Single-User-Modus: keine Rollen, kein RBAC.
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { resolveSession, SESSION_COOKIE, SLIDING_DAYS } from "./sessions.js";
-import { config } from "../config.js";
+
+// Secure-Cookies NUR aktivieren, wenn das Backend hinter HTTPS läuft.
+// Im normalen Pi-LAN-Betrieb wird per http://<ip>:8787 zugegriffen — dann
+// würden Browser ein `Secure`-Cookie nicht senden und der User wäre dauernd
+// "unauthenticated". Daher explizit über COOKIE_SECURE steuern, NICHT über
+// NODE_ENV. Standard im Production-Modus: aus.
+const COOKIE_SECURE =
+  String(process.env.COOKIE_SECURE ?? "").toLowerCase() === "true" ||
+  process.env.COOKIE_SECURE === "1";
 
 declare module "fastify" {
   interface FastifyRequest {
@@ -14,7 +22,7 @@ export function setSessionCookie(reply: FastifyReply, token: string): void {
   reply.setCookie(SESSION_COOKIE, token, {
     httpOnly: true,
     sameSite: "lax",
-    secure: config.nodeEnv === "production",
+    secure: COOKIE_SECURE,
     path: "/",
     maxAge: SLIDING_DAYS * 24 * 60 * 60,
   });
