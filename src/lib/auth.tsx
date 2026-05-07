@@ -8,7 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { piApi, PiApiError } from "@/lib/api/piClient";
+import { piApi, PiApiError, onUnauthenticated } from "@/lib/api/piClient";
 import { useBackendStatus } from "@/hooks/useBackendStatus";
 import { isBackendUrlExplicit } from "@/lib/api/backendUrl";
 
@@ -90,6 +90,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     void refreshMe();
   }, [refreshMe, backendStatus]);
+
+  // Globaler 401-Listener: beliebiger API-Aufruf → "unauthenticated"
+  // → Auth-Status neu prüfen, damit der LockScreen erscheint statt
+  // dass einzelne Tabs leer/„nicht öffnen" wirken.
+  useEffect(() => {
+    return onUnauthenticated(() => {
+      void refreshMe();
+    });
+  }, [refreshMe]);
 
   const setup = useCallback(
     async (input: { password: string; setupToken: string }): Promise<SetupResult> => {

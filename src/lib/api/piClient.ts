@@ -13,6 +13,21 @@ export class PiApiError extends Error {
   }
 }
 
+// Globaler Listener für 401-Antworten. Auth-Provider hängt sich hier ein,
+// um beim "unauthenticated" zurück auf den LockScreen zu fallen, statt
+// einzelne UI-Bereiche leer stehen zu lassen.
+type UnauthListener = () => void;
+const unauthListeners = new Set<UnauthListener>();
+export function onUnauthenticated(cb: UnauthListener): () => void {
+  unauthListeners.add(cb);
+  return () => unauthListeners.delete(cb);
+}
+function notifyUnauth(): void {
+  for (const cb of unauthListeners) {
+    try { cb(); } catch { /* ignore */ }
+  }
+}
+
 type FetchInit = Omit<RequestInit, "body"> & { body?: unknown };
 
 async function request<T>(method: string, path: string, init: FetchInit = {}): Promise<T> {
@@ -53,6 +68,9 @@ async function request<T>(method: string, path: string, init: FetchInit = {}): P
         : ((data as { error?: string; message?: string })?.error ??
           (data as { message?: string })?.message ??
           res.statusText);
+    if (res.status === 401 && !path.startsWith("/auth/")) {
+      notifyUnauth();
+    }
     throw new PiApiError(msg, res.status, data);
   }
   return data as T;
