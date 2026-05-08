@@ -6,7 +6,7 @@ import rateLimit from "@fastify/rate-limit";
 import multipart from "@fastify/multipart";
 import { existsSync, mkdirSync } from "node:fs";
 import path from "node:path";
-import { config } from "./config.js";
+import { config, inspectDataDir } from "./config.js";
 import { openDatabase, closeDatabase, getSchemaVersion } from "./db/index.js";
 import { ensureMasterKey } from "./crypto/masterkey.js";
 import { healthRoutes } from "./routes/health.js";
@@ -77,6 +77,18 @@ async function main(): Promise<void> {
   // DATEN-SCHUTZ-WALL: erste Aktion nach Verzeichnis-Setup.
   // Bricht den Boot ab, wenn Code- und Daten-Verzeichnis sich überschneiden.
   assertCodeAndDataSeparated();
+
+  // SSD-Check: warnt deutlich, wenn DATA_DIR auf der SD-Karte liegt.
+  const ddInfo = inspectDataDir();
+  if (ddInfo.warning) {
+    app.log.warn({ dataDir: ddInfo.resolved }, ddInfo.warning);
+  } else {
+    const gb = ddInfo.freeBytes ? Math.round(ddInfo.freeBytes / 1e9) : null;
+    app.log.info(
+      { dataDir: ddInfo.resolved, freeGB: gb },
+      `Datenverzeichnis OK${gb ? ` (${gb} GB frei)` : ""}`,
+    );
+  }
 
   const keyStatus = ensureMasterKey(config.keyPath);
   openDatabase(config.dbPath);
