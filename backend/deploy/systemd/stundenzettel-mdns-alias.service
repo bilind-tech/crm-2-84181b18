@@ -1,0 +1,21 @@
+[Unit]
+Description=Veröffentlicht den mDNS-Alias stundenzettel.local
+Documentation=man:avahi-publish-address(1)
+After=avahi-daemon.service network-online.target
+Wants=avahi-daemon.service network-online.target
+StartLimitIntervalSec=300
+StartLimitBurst=3
+
+[Service]
+Type=simple
+ExecStartPre=/bin/sh -c 'IP="$(hostname -I 2>/dev/null | awk "{print \$1}")"; test -n "$IP" || { echo "Keine IP gefunden — Alias nicht möglich"; exit 1; }'
+ExecStart=/bin/sh -c 'IP="$(hostname -I | awk "{print \$1}")"; exec /usr/bin/avahi-publish-address -R stundenzettel.local "$IP"'
+Restart=on-failure
+RestartSec=60
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
