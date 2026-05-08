@@ -1187,6 +1187,7 @@ export const qkDriveUploads = ["drive", "uploads"] as const;
 export const useDriveUploads = (filter?: {
   status?: DriveUploadStatus;
   belegArt?: DriveBelegArt;
+  belegId?: string;
   limit?: number;
 }) =>
   useQuery({
@@ -1195,6 +1196,7 @@ export const useDriveUploads = (filter?: {
       const qs = new URLSearchParams();
       if (filter?.status) qs.set("status", filter.status);
       if (filter?.belegArt) qs.set("beleg_art", filter.belegArt);
+      if (filter?.belegId) qs.set("beleg_id", filter.belegId);
       if (filter?.limit) qs.set("limit", String(filter.limit));
       const suffix = qs.toString() ? `?${qs.toString()}` : "";
       return api.get<DriveUpload[]>(`/drive/uploads${suffix}`);

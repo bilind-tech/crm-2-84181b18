@@ -66,3 +66,73 @@ export const config = {
 } as const;
 
 export type AppConfig = typeof config;
+
+/**
+ * Prüft beim Backend-Start, dass `DATA_DIR` auf einem echten externen
+ * Datenträger liegt (USB-SSD), nicht auf der SD-Karte. Schreibt im Fehlerfall
+ * eine deutliche Warnung — startet aber trotzdem, damit das System bei Defekt
+ * der SSD nicht komplett offline ist.
+ *
+ * Rückgabe: { ok, mountInfo, warning } für Diagnose & Doctor.
+ */
+export function inspectDataDir(): {
+  ok: boolean;
+  resolved: string;
+  warning: string | null;
+  freeBytes: number | null;
+} {
+  // Lazy require für Edge-Bundles ohne node:fs
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const fs = require("node:fs") as typeof import("node:fs");
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const child = require("node:child_process") as typeof import("node:child_process");
+
+  let resolved = config.dataDir;
+  try {
+    resolved = fs.realpathSync(config.dataDir);
+  } catch {
+    // Verzeichnis existiert noch nicht → wird gleich angelegt, kein Fehler.
+  }
+
+  let freeBytes: number | null = null;
+  try {
+    const out = child.execSync(`df -PB1 "${resolved}" | tail -1 | awk '{print $4}'`, {
+      encoding: "utf8",
+      timeout: 2000,
+    });
+    freeBytes = Number(out.trim()) || null;
+  } catch {
+    /* ignore */
+  }
+
+  // Nur in Production prüfen — im Dev ist alles auf der lokalen Disk OK.
+  if (config.nodeEnv !== "production") {
+    return { ok: true, resolved, warning: null, freeBytes };
+  }
+
+  // Heuristik: SD-Karte unter Raspberry Pi heißt typischerweise mmcblk0p2 und
+  // ist als `/`-Root gemountet. Wenn unser DATA_DIR auf demselben Mountpoint
+  // wie `/` liegt, ist es höchstwahrscheinlich die SD-Karte.
+  try {
+    const dataMount = child
+      .execSync(`df -P "${resolved}" | tail -1 | awk '{print $1}'`, { encoding: "utf8", timeout: 2000 })
+      .trim();
+    const rootMount = child
+      .execSync(`df -P / | tail -1 | awk '{print $1}'`, { encoding: "utf8", timeout: 2000 })
+      .trim();
+    if (dataMount === rootMount) {
+      return {
+        ok: false,
+        resolved,
+        freeBytes,
+        warning:
+          `DATA_DIR (${resolved}) liegt auf demselben Datenträger wie /. ` +
+          `Vermutlich SD-Karte. Empfohlen: USB-SSD mounten und Installer mit ` +
+          `--use-ssd=/mnt/data neu ausführen.`,
+      };
+    }
+  } catch {
+    /* ignore */
+  }
+  return { ok: true, resolved, warning: null, freeBytes };
+}

@@ -85,6 +85,51 @@ export const piApi = {
 };
 
 /**
+ * Mappt API-Fehler in nutzerfreundliche Texte. Statt nackte „unauthenticated" /
+ * „drive-not-connected" / Stack-Traces zeigen wir Klartext mit Lösungshinweis.
+ * In Toasts immer `errorToMessage(err)` nutzen, nie `err.message` direkt.
+ */
+export function errorToMessage(err: unknown, fallback = "Aktion fehlgeschlagen"): string {
+  if (!(err instanceof PiApiError)) {
+    if (err instanceof Error) return err.message;
+    return fallback;
+  }
+  // Backend liefert oft `{ error: "code", message: "Klartext" }`. Beides nutzen.
+  const body = err.body as { error?: string; message?: string } | undefined;
+  const code = body?.error ?? err.message;
+  switch (code) {
+    case "drive-not-connected":
+      return (
+        body?.message ??
+        "Google Drive ist nicht verbunden. Der Beleg liegt sicher lokal auf dem Pi — verbinde Drive in Einstellungen → Google Drive."
+      );
+    case "drive-token-expired":
+    case "invalid_grant":
+      return "Google-Drive-Verbindung abgelaufen. Bitte in Einstellungen → Google Drive neu verbinden.";
+    case "drive-credentials-missing":
+      return (
+        body?.message ??
+        "OAuth-Client-ID oder Secret fehlen. Bitte zuerst im Verbinden-Dialog ausfüllen."
+      );
+    case "drive-connect-failed":
+      return body?.message ?? "Verbindung zu Google fehlgeschlagen.";
+    case "unauthenticated":
+      return "Sitzung abgelaufen — bitte erneut anmelden.";
+    case "needs-setup":
+      return "Bitte zuerst die Ersteinrichtung abschließen.";
+    case "validation":
+      return body?.message ?? "Eingabe ungültig — bitte Felder prüfen.";
+  }
+  if (err.status === 0) return "Backend nicht erreichbar. Läuft der Pi und ist er im selben Netzwerk?";
+  if (err.status === 401) return "Nicht angemeldet — bitte erneut einloggen.";
+  if (err.status === 403) return "Keine Berechtigung für diese Aktion.";
+  if (err.status === 404) return "Nicht gefunden.";
+  if (err.status === 409) return body?.message ?? code ?? fallback;
+  if (err.status >= 500) return body?.message ?? "Server-Fehler. Bitte später erneut versuchen.";
+  return body?.message ?? code ?? fallback;
+}
+
+/**
  * Multipart-POST mit Upload-Progress (XHR statt fetch).
  * `onProgress` bekommt einen Wert zwischen 0 und 1.
  */

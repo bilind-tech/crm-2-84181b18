@@ -13,6 +13,7 @@ import {
 import { useAngebotPdf } from "@/hooks/useBelegPdf";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { DriveSyncBadge } from "@/components/DriveSyncBadge";
 import { FlowBar } from "@/components/flow/FlowBar";
 import { PdfViewButton } from "@/components/pdf/PdfViewButton";
 import { PdfPreviewCard } from "@/components/pdf/PdfPreviewCard";
@@ -152,6 +153,11 @@ function Page() {
 
       {/* Lebenszyklus-Balken */}
       <FlowBar steps={flow.steps} size="lg" />
+
+      {/* Drive-Sync-Status: zeigt klar an, ob das Angebot-PDF in Google Drive ist */}
+      <div className="flex items-center justify-end">
+        <DriveSyncBadge belegArt="angebot" belegId={a.id} />
+      </div>
 
       {/* Annahme-Banner: Angebot wurde angenommen, aber noch keine Rechnung */}
       {a.status === "angenommen" && !folgeRechnung && (

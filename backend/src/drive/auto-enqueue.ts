@@ -17,7 +17,10 @@ export function wireDriveAutoEnqueue(): void {
     try {
       const settings = loadDriveSettings();
       if (settings.autoUpload === false) return;
-      if (!settings.refreshTokenIsSet || !settings.clientSecretIsSet) return;
+      // WICHTIG: Wir enqueuen IMMER, auch wenn Drive (noch) nicht verbunden ist.
+      // Der Worker pausiert solange `refreshTokenIsSet === false` ist und arbeitet
+      // alle wartenden Belege automatisch ab, sobald der User Drive verbindet.
+      // So funktioniert „Beleg jetzt erstellen, Drive später verbinden" out of the box.
 
       const beleg = art === "angebot" ? getAngebot(id) : getRechnung(id);
       if (!beleg) return;

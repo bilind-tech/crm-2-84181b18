@@ -8,6 +8,7 @@ import { useConfirm } from "@/hooks/useConfirm";
 import { useRechnungPdf } from "@/hooks/useBelegPdf";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { DriveSyncBadge } from "@/components/DriveSyncBadge";
 import { FlowBar } from "@/components/flow/FlowBar";
 import { rechnungFlow } from "@/lib/flow/flows";
 import { ZahlungErfassenDialog } from "@/components/forms/ZahlungErfassenDialog";
@@ -120,6 +121,11 @@ function Page() {
 
       {/* Lebenszyklus-Balken */}
       <FlowBar steps={flow.steps} size="lg" />
+
+      {/* Drive-Sync-Status: zeigt klar an, ob das Beleg-PDF in Google Drive ist */}
+      <div className="flex items-center justify-end">
+        <DriveSyncBadge belegArt="rechnung" belegId={r.id} />
+      </div>
 
       {/* Quell-Angebot-Hinweis */}
       {quellAngebot && (

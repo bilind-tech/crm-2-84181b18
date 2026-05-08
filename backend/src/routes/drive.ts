@@ -185,11 +185,23 @@ export async function driveRoutes(app: FastifyInstance): Promise<void> {
 
     scoped.post("/einstellungen/google-drive/connect", async (req, reply) => {
       try {
+        const s = loadDriveSettings();
+        if (!s.clientId || !s.clientSecretIsSet) {
+          reply.status(400);
+          return {
+            error: "drive-credentials-missing",
+            message:
+              "OAuth-Client-ID oder Secret fehlen. Bitte Felder im Verbinden-Dialog ausfüllen.",
+          };
+        }
         const { url } = buildAuthUrl({ protocol: req.protocol, hostname: req.hostname });
         return { authorizeUrl: url };
       } catch (e) {
         reply.status(400);
-        return { error: e instanceof Error ? e.message : String(e) };
+        return {
+          error: "drive-connect-failed",
+          message: e instanceof Error ? e.message : String(e),
+        };
       }
     });
 
@@ -202,6 +214,16 @@ export async function driveRoutes(app: FastifyInstance): Promise<void> {
 
     scoped.post("/einstellungen/google-drive/test", async (_req, reply) => {
       try {
+        const s = loadDriveSettings();
+        if (!s.refreshTokenIsSet) {
+          reply.status(400);
+          return {
+            erfolg: false,
+            error: "drive-not-connected",
+            nachricht:
+              "Google Drive ist nicht verbunden. Bitte zuerst auf 'Mit Google verbinden' klicken.",
+          };
+        }
         const root = await ensureRootFolder();
         const out = await createTextFile({
           parentFolderId: root,
@@ -238,6 +260,15 @@ export async function driveRoutes(app: FastifyInstance): Promise<void> {
       });
     });
     scoped.post<{ Params: { id: string } }>("/drive/uploads/:id/retry", async (req, reply) => {
+      const s = loadDriveSettings();
+      if (!s.refreshTokenIsSet) {
+        reply.status(409);
+        return {
+          error: "drive-not-connected",
+          message:
+            "Google Drive ist nicht verbunden. Beleg liegt sicher lokal — bitte Drive in Einstellungen verbinden.",
+        };
+      }
       if (!retry(req.params.id)) { reply.status(404); return { error: "not-found" }; }
       void tickDriveQueue(1).catch(() => undefined);
       return { ok: true };
