@@ -34,7 +34,7 @@
 set -euo pipefail
 
 # ---- Defaults ---------------------------------------------------------------
-CRM_REPO="${CRM_REPO:-https://github.com/bilind-tech/mycleancenter.git}"   # ggf. anpassen
+CRM_REPO="${CRM_REPO:-https://github.com/bilind-tech/remix-of-crm.git}"
 ZETTEL_REPO="https://github.com/bilind-tech/timekeeper-hub.git"
 BRANCH="main"
 SSD_DEV=""
