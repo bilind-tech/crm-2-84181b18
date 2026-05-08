@@ -61,6 +61,59 @@ require_root() {
   fi
 }
 
+# --- USB-SSD-Setup ---------------------------------------------------------
+# Wir verschieben /var/lib/mycleancenter NICHT, sondern legen es als Symlink
+# auf <mp>/mycleancenter an. Existierende Daten werden vorher per rsync
+# kopiert. Der bisherige Ordner wird in /var/lib/mycleancenter.sd-backup
+# umbenannt (nicht gelöscht — strikte Daten-Garantie).
+ensure_ssd() {
+  [[ -z "$USE_SSD" ]] && return 0
+  local mp="$USE_SSD"
+  if ! mountpoint -q "$mp"; then
+    err "USB-SSD-Mount nicht aktiv: $mp ist kein Mountpunkt."
+    err "Bitte zuerst mounten, z. B.: sudo mount /dev/sda1 $mp"
+    exit 1
+  fi
+  # Stelle sicher, dass mp NICHT auf der SD-Karte liegt (Root-Device).
+  local root_dev mp_dev
+  root_dev="$(findmnt -no SOURCE / 2>/dev/null || true)"
+  mp_dev="$(findmnt -no SOURCE "$mp" 2>/dev/null || true)"
+  if [[ -n "$root_dev" && "$root_dev" == "$mp_dev" ]]; then
+    err "USB-SSD-Mount $mp liegt auf demselben Gerät wie / ($root_dev)."
+    err "Bitte echte USB-SSD verwenden, sonst landen Daten auf der SD-Karte."
+    exit 1
+  fi
+  local target="$mp/mycleancenter"
+  log "USB-SSD aktiv: $mp ($mp_dev) → Datenziel $target"
+  if [[ $CHECK_ONLY -eq 1 ]]; then
+    warn "[--check] SSD-Symlink würde gesetzt"
+    return 0
+  fi
+  mkdir -p "$target"
+  # Wenn DATA_DIR existiert und KEIN Symlink ist und Inhalte hat → migrieren.
+  if [[ -e "$DATA_DIR" && ! -L "$DATA_DIR" ]]; then
+    if [[ -n "$(ls -A "$DATA_DIR" 2>/dev/null)" ]]; then
+      log "Migriere bestehende Daten von $DATA_DIR nach $target (rsync, NICHT löschen)"
+      command -v rsync >/dev/null || apt-get install -y rsync
+      rsync -aHAX --info=stats1 "$DATA_DIR/" "$target/"
+    fi
+    mv "$DATA_DIR" "${DATA_DIR}.sd-backup-$(date +%Y%m%d-%H%M%S)"
+    ok "Original /var/lib/mycleancenter gesichert (NICHT gelöscht)"
+  fi
+  if [[ -L "$DATA_DIR" ]]; then
+    local cur
+    cur="$(readlink -f "$DATA_DIR")"
+    if [[ "$cur" != "$target" ]]; then
+      rm -f "$DATA_DIR"
+      ln -s "$target" "$DATA_DIR"
+    fi
+  else
+    ln -s "$target" "$DATA_DIR"
+  fi
+  chown -h "$APP_USER:$APP_GROUP" "$DATA_DIR" 2>/dev/null || true
+  ok "/var/lib/mycleancenter → $target (USB-SSD)"
+}
+
 ensure_user() {
   if id "$APP_USER" &>/dev/null; then
     ok "User $APP_USER existiert"
