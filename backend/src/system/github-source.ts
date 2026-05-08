@@ -156,37 +156,11 @@ export async function buildStatus(opts: { refresh?: boolean } = {}): Promise<Git
     updateVerfuegbar: false,
   };
 
-  if (opts.refresh && status.tokenIsSet && settings.repo) {
-    const token = readEncryptedSecret(SENSITIVE_KEYS.githubToken);
-    if (token !== null) {
-      // hat Token
-    }
-    {
-      const tk = token;
-      try {
-        const c = await fetchLatestCommit(settings.repo, settings.branch, tk);
-        writeStatusExtra({
-          remoteCommit: c.sha,
-          remoteCommitDate: c.date,
-          remoteCommitMessage: c.message,
-          letzteSynchronisation: new Date().toISOString(),
-          letzterFehler: null,
-        });
-        status.remoteCommit = c.sha;
-        status.remoteCommitDate = c.date;
-        status.remoteCommitMessage = c.message;
-        status.letzteSynchronisation = new Date().toISOString();
-        status.letzterFehler = null;
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        setGithubError(msg);
-        status.letzterFehler = msg;
-      }
-    }
-  } else if (opts.refresh && settings.repo) {
-    // Kein Token gespeichert → versuche public read.
+  if (opts.refresh && settings.repo) {
+    // Token ist optional — public Repos funktionieren ohne PAT.
+    const token = status.tokenIsSet ? readEncryptedSecret(SENSITIVE_KEYS.githubToken) : null;
     try {
-      const c = await fetchLatestCommit(settings.repo, settings.branch, null);
+      const c = await fetchLatestCommit(settings.repo, settings.branch, token);
       writeStatusExtra({
         remoteCommit: c.sha,
         remoteCommitDate: c.date,
