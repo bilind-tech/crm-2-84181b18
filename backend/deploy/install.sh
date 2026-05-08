@@ -436,6 +436,96 @@ start_service() {
   warn "Service antwortet nicht auf /health — prüfe: journalctl -u $SERVICE_NAME -n 80"
 }
 
+# --- Doctor: rein lesende Diagnose -----------------------------------------
+run_doctor() {
+  log "MyCleanCenter Doctor — Diagnose (keine Änderungen)"
+
+  # 1) USB-SSD / Datenpfad
+  if [[ -L "$DATA_DIR" ]]; then
+    local target dev
+    target="$(readlink -f "$DATA_DIR")"
+    dev="$(findmnt -no SOURCE "$target" 2>/dev/null || true)"
+    ok "Datenpfad: $DATA_DIR → $target  (Gerät: ${dev:-?})"
+  elif [[ -d "$DATA_DIR" ]]; then
+    local dev root_dev
+    dev="$(findmnt -no SOURCE "$DATA_DIR" 2>/dev/null || true)"
+    root_dev="$(findmnt -no SOURCE / 2>/dev/null || true)"
+    if [[ -n "$dev" && "$dev" == "$root_dev" ]]; then
+      warn "Datenpfad liegt auf der SD-Karte ($dev). Empfehlung: --use-ssd=/mnt/data"
+    else
+      ok "Datenpfad: $DATA_DIR (Gerät: ${dev:-?})"
+    fi
+  else
+    warn "Datenpfad fehlt: $DATA_DIR"
+  fi
+
+  # 2) Service-Status
+  if systemctl is-active --quiet "$SERVICE_NAME"; then
+    ok "Service $SERVICE_NAME läuft"
+  else
+    err "Service $SERVICE_NAME läuft NICHT (sudo journalctl -u $SERVICE_NAME -n 50)"
+  fi
+
+  # 3) Healthcheck
+  if curl -fsS "http://localhost:8787/health" >/dev/null 2>&1; then
+    ok "Healthcheck localhost:8787 ok"
+  else
+    err "Healthcheck localhost:8787 fehlgeschlagen"
+  fi
+
+  # 4) mDNS
+  if systemctl is-active --quiet avahi-daemon; then
+    ok "avahi-daemon läuft"
+  else
+    warn "avahi-daemon läuft nicht — .local-Auflösung deaktiviert"
+  fi
+  if systemctl is-active --quiet mycleancenter-mdns-alias.service 2>/dev/null; then
+    ok "mDNS-Alias mycleancenter.local aktiv"
+  else
+    warn "mDNS-Alias mycleancenter.local nicht aktiv (IP-Zugriff bleibt möglich)"
+  fi
+  # Restart-Loop-Check
+  local restarts
+  restarts="$(systemctl show mycleancenter-mdns-alias.service -p NRestarts --value 2>/dev/null || echo 0)"
+  if [[ "${restarts:-0}" =~ ^[0-9]+$ && "${restarts:-0}" -gt 5 ]]; then
+    err "mDNS-Alias-Restart-Counter: $restarts — vermutlich Loop. Bitte 'systemctl status mycleancenter-mdns-alias' prüfen"
+  fi
+
+  # 5) Ports
+  if ss -ltn 2>/dev/null | grep -q ':8787 '; then
+    ok "Port 8787 belegt (CRM)"
+  else
+    warn "Port 8787 ist frei — CRM antwortet nicht"
+  fi
+  if ss -ltn 2>/dev/null | grep -q ':8080 '; then
+    ok "Port 8080 belegt (vermutlich Stundenzettel)"
+  else
+    warn "Port 8080 ist frei — Stundenzettel-App noch nicht gestartet"
+  fi
+
+  # 6) System-Last
+  log "System-Last (uptime): $(uptime)"
+
+  # 7) IP / Hostname
+  local ip
+  ip="$(hostname -I 2>/dev/null | awk '{print $1}')"
+  log "Erreichbar voraussichtlich unter:"
+  [[ -n "$ip" ]] && log "  http://${ip}:8787"
+  log "  http://${STATIC_HOSTNAME}.local:8787"
+  log "  http://mycleancenter.local:8787"
+
+  # 8) Backup-Verzeichnis schreibbar?
+  if [[ -d "$DATA_DIR/backups/safety" ]]; then
+    if sudo -u "$APP_USER" test -w "$DATA_DIR/backups/safety" 2>/dev/null; then
+      ok "Backup-Verzeichnis ist beschreibbar"
+    else
+      err "Backup-Verzeichnis NICHT beschreibbar für $APP_USER"
+    fi
+  fi
+
+  log "Doctor fertig."
+}
+
 main() {
   require_root
   log "MyCleanCenter Setup startet (CHECK_ONLY=$CHECK_ONLY${BOOTSTRAP_ZIP:+, BOOTSTRAP=$BOOTSTRAP_ZIP})"
