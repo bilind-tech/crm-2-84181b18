@@ -480,7 +480,11 @@ function ConnectDialog({ open, onClose }: { open: boolean; onClose: () => void }
     }
   }, [open, data]);
 
-  const redirectUri = `${getBackendUrl()}/einstellungen/google-drive/callback`;
+  // WICHTIG: Redirect-URI MUSS vom Backend kommen, nicht vom aktuellen Browser-Host.
+  // Sonst zeigt das Handy eine andere URL an als der PC und Google lehnt OAuth ab.
+  // So reicht ein einmaliger Eintrag in der Cloud Console — gilt für alle Geräte.
+  const redirectUri =
+    data?.redirectUri ?? `${getBackendUrl()}/einstellungen/google-drive/callback`;
   const secretSchonHinterlegt = data?.clientSecretIsSet ?? false;
   const canSubmit =
     clientId.trim().length > 8 &&

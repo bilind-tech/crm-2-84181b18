@@ -664,6 +664,10 @@ export interface GoogleDriveEinstellungen {
   refreshTokenIsSet?: boolean;
   /** True, wenn Client-ID gesetzt ist. */
   clientIdIsSet?: boolean;
+  /** Kanonische OAuth-Redirect-URI, die in der Google Cloud Console eingetragen werden muss.
+   *  Wird vom Backend aus `GOOGLE_OAUTH_REDIRECT` (oder Request-Host als Fallback) berechnet
+   *  und ist auf allen Geräten identisch — so reicht ein einmaliger Eintrag in Google. */
+  redirectUri?: string;
 }
 
 export type BackupKategorie =

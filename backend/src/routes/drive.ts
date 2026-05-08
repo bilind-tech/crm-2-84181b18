@@ -10,6 +10,8 @@ import { listUploads, retry, type DriveUploadStatus, type BelegArt } from "../dr
 import { tickDriveQueue } from "../drive/upload-worker.js";
 import { getSetting, setSetting } from "../settings/store.js";
 import { GoogleDriveSchema, SENSITIVE_KEYS, type GoogleDriveSettings } from "../settings/schemas.js";
+import { emit } from "../events/bus.js";
+import { config } from "../config.js";
 
 interface DriveResponse {
   // Form, die das Frontend (GoogleDriveEinstellungen) erwartet
@@ -34,6 +36,7 @@ interface DriveResponse {
   clientIdIsSet: boolean;
   clientSecretIsSet: boolean;
   refreshTokenIsSet: boolean;
+  redirectUri: string;
 }
 
 const DEFAULT_FOLDERS = {
@@ -49,7 +52,15 @@ const DEFAULT_FILES = {
   protokoll: "{nummer} {kunde} {leistung} {DD}-{MM}-{YYYY}",
 };
 
-function buildResponse(): DriveResponse {
+function defaultRedirectUri(req?: { protocol?: string; hostname?: string }): string {
+  const fromCfg = process.env.GOOGLE_OAUTH_REDIRECT;
+  if (fromCfg) return fromCfg;
+  const proto = req?.protocol ?? "http";
+  const host = req?.hostname ?? `localhost:${config.port}`;
+  return `${proto}://${host}/einstellungen/google-drive/callback`;
+}
+
+function buildResponse(req?: { protocol?: string; hostname?: string }): DriveResponse {
   const s = loadDriveSettings();
   return {
     verbunden: s.refreshTokenIsSet,
@@ -66,6 +77,7 @@ function buildResponse(): DriveResponse {
     clientIdIsSet: !!s.clientId,
     clientSecretIsSet: s.clientSecretIsSet,
     refreshTokenIsSet: s.refreshTokenIsSet,
+    redirectUri: defaultRedirectUri(req),
   };
 }
 
@@ -111,10 +123,14 @@ export async function driveRoutes(app: FastifyInstance): Promise<void> {
     try {
       await exchangeCode(q.code, { protocol: req.protocol, hostname: req.hostname });
       resetDriveClient();
+      // Geräteübergreifende Live-Aktualisierung: alle verbundenen Clients
+      // invalidieren ihren Drive-Status sofort via SSE.
+      emit("einstellung:geaendert", { key: "googleDrive", userId: null });
       return reply.redirect(redirect("ok"));
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       setStatusError(msg);
+      emit("einstellung:geaendert", { key: "googleDrive", userId: null });
       return reply.redirect(redirect("err", msg));
     }
   });
@@ -122,7 +138,9 @@ export async function driveRoutes(app: FastifyInstance): Promise<void> {
   app.register(async (scoped) => {
     scoped.addHook("preHandler", requireAuth);
 
-    scoped.get("/einstellungen/google-drive", async () => buildResponse());
+    scoped.get("/einstellungen/google-drive", async (req) =>
+      buildResponse({ protocol: req.protocol, hostname: req.hostname }),
+    );
 
     scoped.patch("/einstellungen/google-drive", async (req, reply) => {
       const parsed = PatchBodySchema.safeParse(req.body ?? {});
@@ -161,7 +179,8 @@ export async function driveRoutes(app: FastifyInstance): Promise<void> {
       setSetting("googleDrive", v.data);
       // Settings-Cache des Drive-Clients invalidieren
       resetDriveClient();
-      return buildResponse();
+      emit("einstellung:geaendert", { key: "googleDrive", userId: req.user?.id ?? null });
+      return buildResponse({ protocol: req.protocol, hostname: req.hostname });
     });
 
     scoped.post("/einstellungen/google-drive/connect", async (req, reply) => {
@@ -174,10 +193,11 @@ export async function driveRoutes(app: FastifyInstance): Promise<void> {
       }
     });
 
-    scoped.post("/einstellungen/google-drive/disconnect", async () => {
+    scoped.post("/einstellungen/google-drive/disconnect", async (req) => {
       disconnect();
       resetDriveClient();
-      return buildResponse();
+      emit("einstellung:geaendert", { key: "googleDrive", userId: req.user?.id ?? null });
+      return buildResponse({ protocol: req.protocol, hostname: req.hostname });
     });
 
     scoped.post("/einstellungen/google-drive/test", async (_req, reply) => {
