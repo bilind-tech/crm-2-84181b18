@@ -24,15 +24,25 @@ readonly LOGROTATE_FILE="$SCRIPT_DIR/logrotate.conf"
 
 CHECK_ONLY=0
 BOOTSTRAP_ZIP=""
+DOCTOR=0
+USE_SSD=""
 for arg in "$@"; do
   case "$arg" in
     --check) CHECK_ONLY=1 ;;
+    --doctor) DOCTOR=1 ;;
+    --use-ssd=*) USE_SSD="${arg#--use-ssd=}" ;;
     --bootstrap=*) BOOTSTRAP_ZIP="${arg#--bootstrap=}" ;;
     -h|--help)
       cat <<EOF
-Usage: sudo $0 [--check] [--bootstrap=<release.zip>]
-  --check                  prüft Setup, ohne etwas zu ändern
-  --bootstrap=<release.zip> entpackt das Release-ZIP nach releases/initial/
+Usage: sudo $0 [--check] [--doctor] [--use-ssd=<mountpoint>] [--bootstrap=<release.zip>]
+  --check                   prüft Setup, ohne etwas zu ändern
+  --doctor                  führt nur die Diagnose aus (System, mDNS, SSD,
+                            Healthcheck, Ports, Backup) — ohne Änderungen
+  --use-ssd=<mountpoint>    legt /var/lib/mycleancenter als Symlink auf
+                            <mountpoint>/mycleancenter an (USB-SSD-Modus).
+                            Existierende Daten werden nach <mountpoint>
+                            verschoben (atomar via rsync + Symlink-Swap).
+  --bootstrap=<release.zip> entpackt das Release-ZIP nach releases/<stamp>/
                             und setzt den 'current'-Symlink
 EOF
       exit 0 ;;
