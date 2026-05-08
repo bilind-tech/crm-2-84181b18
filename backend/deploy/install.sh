@@ -439,7 +439,12 @@ start_service() {
 main() {
   require_root
   log "MyCleanCenter Setup startet (CHECK_ONLY=$CHECK_ONLY${BOOTSTRAP_ZIP:+, BOOTSTRAP=$BOOTSTRAP_ZIP})"
+  if [[ $DOCTOR -eq 1 ]]; then
+    run_doctor
+    exit 0
+  fi
   ensure_user
+  ensure_ssd
   ensure_dirs
   ensure_build_tools
   ensure_mdns
