@@ -12,7 +12,7 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { requireAuth } from "../auth/middleware.js";
 import { audit } from "../auth/audit.js";
-import { setSetting, getSettingMeta } from "../settings/store.js";
+import { setSetting } from "../settings/store.js";
 import {
   GithubUpdateSchema,
   GithubTokenSchema,
