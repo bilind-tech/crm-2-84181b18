@@ -384,19 +384,23 @@ install_backend_deps() {
     warn "[--check] npm ci würde laufen"
     return
   fi
+  local npm_cache="$DATA_DIR/.npm"
+  mkdir -p "$npm_cache"
+  chown -R "$APP_USER:$APP_GROUP" "$npm_cache" "$be_dir"
+  chmod 0750 "$npm_cache"
   if [[ -f "$be_dir/package-lock.json" ]]; then
-    sudo -u "$APP_USER" bash -c "cd '$be_dir' && npm ci --omit=dev"
+    sudo -u "$APP_USER" env npm_config_cache="$npm_cache" bash -c "cd '$be_dir' && npm ci --omit=dev --no-audit --no-fund || npm install --omit=dev --no-audit --no-fund"
   else
-    sudo -u "$APP_USER" bash -c "cd '$be_dir' && npm install --omit=dev --no-audit --no-fund"
+    sudo -u "$APP_USER" env npm_config_cache="$npm_cache" bash -c "cd '$be_dir' && npm install --omit=dev --no-audit --no-fund"
   fi
   # Native Module für ARM64 sicherstellen (Pi 5 = aarch64).
   # Wenn Prebuilt fehlt oder beschädigt ist, wird from-source gebaut.
   log "Native Module prüfen (better-sqlite3, @node-rs/argon2)"
-  sudo -u "$APP_USER" bash -c "cd '$be_dir' && node -e 'require(\"better-sqlite3\")' 2>/dev/null" || {
+  sudo -u "$APP_USER" env npm_config_cache="$npm_cache" bash -c "cd '$be_dir' && node -e 'require(\"better-sqlite3\")' 2>/dev/null" || {
     warn "better-sqlite3 nicht ladbar — rebuild from source"
-    sudo -u "$APP_USER" bash -c "cd '$be_dir' && npm rebuild better-sqlite3 --build-from-source"
+    sudo -u "$APP_USER" env npm_config_cache="$npm_cache" bash -c "cd '$be_dir' && npm rebuild better-sqlite3 --build-from-source"
   }
-  sudo -u "$APP_USER" bash -c "cd '$be_dir' && node -e 'require(\"@node-rs/argon2\")' 2>/dev/null" || \
+  sudo -u "$APP_USER" env npm_config_cache="$npm_cache" bash -c "cd '$be_dir' && node -e 'require(\"@node-rs/argon2\")' 2>/dev/null" || \
     warn "@node-rs/argon2 nicht ladbar — bitte Pi-Architektur prüfen (aarch64 erwartet)"
   ok "Backend-Dependencies installiert"
 }
