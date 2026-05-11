@@ -150,9 +150,15 @@ ensure_dirs() {
     fi
   done
   if [[ $CHECK_ONLY -eq 0 ]]; then
-    chown -R "$APP_USER:$APP_GROUP" "$APP_DIR" "$DATA_DIR"
+    local data_target="$DATA_DIR"
+    if [[ -L "$DATA_DIR" ]]; then
+      data_target="$(readlink -f "$DATA_DIR")"
+    fi
+    chown -R "$APP_USER:$APP_GROUP" "$APP_DIR"
+    chown -R "$APP_USER:$APP_GROUP" "$data_target"
+    chown -h "$APP_USER:$APP_GROUP" "$DATA_DIR" 2>/dev/null || true
     chmod 0700 "$DATA_DIR/keys"
-    chmod 0750 "$DATA_DIR"
+    chmod 0750 "$data_target"
     ok "Rechte gesetzt (keys/=0700, data/=0750)"
   fi
 }
@@ -162,22 +168,22 @@ ensure_node() {
     local v
     v="$(node --version)"
     ok "Node vorhanden: $v"
-    if [[ ! "$v" =~ ^v(20|22|24) ]]; then
-      warn "Node-Version ist $v — installiere Node.js 20 LTS."
+    if [[ ! "$v" =~ ^v(22|24) ]]; then
+      warn "Node-Version ist $v — installiere Node.js 22 LTS."
       if [[ $CHECK_ONLY -eq 1 ]]; then
         return
       fi
-      curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+      curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
       apt-get install -y nodejs
       ok "Node.js aktualisiert: $(node --version)"
     fi
   else
-    log "Installiere Node.js 20 LTS via NodeSource"
+    log "Installiere Node.js 22 LTS via NodeSource"
     if [[ $CHECK_ONLY -eq 1 ]]; then
       warn "[--check] Node fehlt"
       return
     fi
-    curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+    curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
     apt-get install -y nodejs
     ok "Node.js installiert: $(node --version)"
   fi
@@ -378,19 +384,23 @@ install_backend_deps() {
     warn "[--check] npm ci würde laufen"
     return
   fi
+  local npm_cache="$DATA_DIR/.npm"
+  mkdir -p "$npm_cache"
+  chown -R "$APP_USER:$APP_GROUP" "$npm_cache" "$be_dir"
+  chmod 0750 "$npm_cache"
   if [[ -f "$be_dir/package-lock.json" ]]; then
-    sudo -u "$APP_USER" bash -c "cd '$be_dir' && npm ci --omit=dev"
+    sudo -u "$APP_USER" env npm_config_cache="$npm_cache" bash -c "cd '$be_dir' && npm ci --omit=dev --no-audit --no-fund || npm install --omit=dev --no-audit --no-fund"
   else
-    sudo -u "$APP_USER" bash -c "cd '$be_dir' && npm install --omit=dev --no-audit --no-fund"
+    sudo -u "$APP_USER" env npm_config_cache="$npm_cache" bash -c "cd '$be_dir' && npm install --omit=dev --no-audit --no-fund"
   fi
   # Native Module für ARM64 sicherstellen (Pi 5 = aarch64).
   # Wenn Prebuilt fehlt oder beschädigt ist, wird from-source gebaut.
   log "Native Module prüfen (better-sqlite3, @node-rs/argon2)"
-  sudo -u "$APP_USER" bash -c "cd '$be_dir' && node -e 'require(\"better-sqlite3\")' 2>/dev/null" || {
+  sudo -u "$APP_USER" env npm_config_cache="$npm_cache" bash -c "cd '$be_dir' && node -e 'require(\"better-sqlite3\")' 2>/dev/null" || {
     warn "better-sqlite3 nicht ladbar — rebuild from source"
-    sudo -u "$APP_USER" bash -c "cd '$be_dir' && npm rebuild better-sqlite3 --build-from-source"
+    sudo -u "$APP_USER" env npm_config_cache="$npm_cache" bash -c "cd '$be_dir' && npm rebuild better-sqlite3 --build-from-source"
   }
-  sudo -u "$APP_USER" bash -c "cd '$be_dir' && node -e 'require(\"@node-rs/argon2\")' 2>/dev/null" || \
+  sudo -u "$APP_USER" env npm_config_cache="$npm_cache" bash -c "cd '$be_dir' && node -e 'require(\"@node-rs/argon2\")' 2>/dev/null" || \
     warn "@node-rs/argon2 nicht ladbar — bitte Pi-Architektur prüfen (aarch64 erwartet)"
   ok "Backend-Dependencies installiert"
 }
