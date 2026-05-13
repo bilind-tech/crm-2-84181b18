@@ -172,8 +172,22 @@ async function main(): Promise<void> {
     app.log.warn("CORS = '*' (DEV-Modus). In Production explizit setzen.");
   }
   await app.register(rateLimit, {
-    max: 200,
+    // 600/min pro IP — Detailseiten der App feuern leicht 8-15 Requests parallel
+    // (Kunde + Objekte + Angebote + Rechnungen + Zahlungen + Dokumente …).
+    // Auth-/Recovery-Routen bringen ihre eigenen, härteren Limits in den Routen mit.
+    max: 600,
     timeWindow: "1 minute",
+    // Diese Pfade dürfen NIE ins globale Bucket zählen, sonst killt sich
+    // das UI mit seinem eigenen Polling/SSE selbst.
+    allowList: (req) => {
+      const url = req.url.split("?")[0];
+      return (
+        url === "/health" ||
+        url === "/health/detail" ||
+        url === "/events/stream" ||
+        url.startsWith("/aktivitaet/stream")
+      );
+    },
   });
   await app.register(multipart, {
     limits: {
