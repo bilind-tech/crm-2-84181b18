@@ -3,7 +3,7 @@
 // der Dialog automatisch und der Status-Cache ist aktualisiert.
 import { useState } from "react";
 import { toast } from "sonner";
-import { Loader2, Github, ExternalLink, Eye, EyeOff } from "lucide-react";
+import { Loader2, Github, ExternalLink, Eye, EyeOff, Unplug } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { useGithubVerbinden } from "@/hooks/useApi";
+import { useGithubVerbinden, useGithubTrennen } from "@/hooks/useApi";
 import type { GithubUpdateStatus } from "@/lib/api/types";
 
 interface Props {
@@ -27,13 +27,15 @@ interface Props {
 
 export function GitHubVerbindenDialog({ current, open, onClose }: Props) {
   const verbinden = useGithubVerbinden();
+  const trennen = useGithubTrennen();
   const [repo, setRepo] = useState(current?.repo ?? "");
   const [branch, setBranch] = useState(current?.branch ?? "main");
   const [autoCheck, setAutoCheck] = useState(current?.autoCheck ?? true);
   const [token, setToken] = useState("");
   const [showToken, setShowToken] = useState(false);
+  const [trennConfirm, setTrennConfirm] = useState(false);
 
-  const isEditingExisting = !!current?.tokenIsSet;
+  const isEditingExisting = !!current?.repo;
 
   function submit() {
     if (!/^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/.test(repo.trim())) {
@@ -62,10 +64,27 @@ export function GitHubVerbindenDialog({ current, open, onClose }: Props) {
         },
         onError: (e) => {
           const err = e as { status?: number; message?: string };
-          toast.error(`Verbindung fehlgeschlagen: ${err.message ?? "Unbekannter Fehler"}`);
+          const msg = err.message ?? "Unbekannter Fehler";
+          if (err.status === 404) {
+            toast.error("Repository oder Branch nicht gefunden — Schreibweise prüfen.");
+          } else if (err.status === 401) {
+            toast.error("Token ungültig oder Repo privat — bitte Token prüfen.");
+          } else {
+            toast.error(`Verbindung fehlgeschlagen: ${msg}`);
+          }
         },
       },
     );
+  }
+
+  function handleTrennen() {
+    trennen.mutate(undefined, {
+      onSuccess: () => {
+        toast.success("GitHub-Verbindung getrennt");
+        setTrennConfirm(false);
+        onClose();
+      },
+    });
   }
 
   return (
@@ -186,14 +205,59 @@ export function GitHubVerbindenDialog({ current, open, onClose }: Props) {
           </div>
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={verbinden.isPending}>
-            Abbrechen
-          </Button>
-          <Button onClick={submit} disabled={verbinden.isPending || !repo.trim()}>
-            {verbinden.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : null}
-            {isEditingExisting ? "Speichern & testen" : "Verbinden & testen"}
-          </Button>
+        <DialogFooter className="flex flex-row items-center justify-between gap-2 sm:justify-between">
+          {isEditingExisting ? (
+            !trennConfirm ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setTrennConfirm(true)}
+                disabled={verbinden.isPending || trennen.isPending}
+                className="gap-1.5 text-muted-foreground hover:text-destructive"
+              >
+                <Unplug className="h-3.5 w-3.5" />
+                Trennen
+              </Button>
+            ) : (
+              <div className="flex items-center gap-1.5 text-xs">
+                <span className="text-muted-foreground">Sicher?</span>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="sm"
+                  onClick={handleTrennen}
+                  disabled={trennen.isPending}
+                  className="h-7"
+                >
+                  {trennen.isPending ? (
+                    <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                  ) : null}
+                  Ja, trennen
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setTrennConfirm(false)}
+                  className="h-7"
+                >
+                  Nein
+                </Button>
+              </div>
+            )
+          ) : (
+            <span />
+          )}
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={onClose} disabled={verbinden.isPending}>
+              Abbrechen
+            </Button>
+            <Button onClick={submit} disabled={verbinden.isPending || !repo.trim()}>
+              {verbinden.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : null}
+              {isEditingExisting ? "Speichern & testen" : "Verbinden & testen"}
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>

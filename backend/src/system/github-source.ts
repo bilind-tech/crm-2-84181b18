@@ -338,6 +338,9 @@ export function markInstalledCommit(sha: string): void {
 export function disconnectGithub(): void {
   deleteSetting(SENSITIVE_KEYS.githubToken);
   deleteSetting("githubUpdate.status");
+  // Repo-Settings ebenfalls leeren, damit die UI sauber in Zustand A
+  // (nicht verbunden) zurückfällt.
+  deleteSetting("githubUpdate");
 }
 
 // --- Helpers ---

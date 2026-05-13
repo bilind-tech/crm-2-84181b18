@@ -1501,6 +1501,8 @@ export const useGithubStatus = (autoPoll = true) =>
     queryFn: () => piApi.get<GithubUpdateStatus>("/system/github/status"),
     refetchInterval: autoPoll ? 30 * 60_000 : false,
     refetchOnWindowFocus: false,
+    staleTime: 15_000,
+    refetchOnMount: "always",
   });
 
 export const useGithubVerbinden = () => {

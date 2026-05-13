@@ -13,15 +13,15 @@ import {
   AlertTriangle,
   Settings as SettingsIcon,
   Download,
-  Unplug,
   Clock,
+  XCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   useGithubStatus,
   useGithubPruefen,
   useGithubInstall,
-  useGithubTrennen,
+  useUpdateLauf,
 } from "@/hooks/useApi";
 import { GitHubVerbindenDialog } from "./GitHubVerbindenDialog";
 import type { GithubUpdateStatus } from "@/lib/api/types";
@@ -55,9 +55,11 @@ export function GitHubUpdateCard({ onLaufGestartet, updateLaeuft }: Props) {
   const { data: status, isLoading } = useGithubStatus();
   const pruefen = useGithubPruefen();
   const install = useGithubInstall();
-  const trennen = useGithubTrennen();
   const [verbindenOffen, setVerbindenOffen] = useState(false);
-  const [trennConfirm, setTrennConfirm] = useState(false);
+  // Letzter via GitHub gestarteter Lauf — für Erfolg/Fehler-Banner.
+  const [lastLaufId, setLastLaufId] = useState<string | null>(null);
+  const [bannerDismissed, setBannerDismissed] = useState(false);
+  const { data: lastLauf } = useUpdateLauf(lastLaufId);
 
   if (isLoading) {
     return (
@@ -69,7 +71,8 @@ export function GitHubUpdateCard({ onLaufGestartet, updateLaeuft }: Props) {
   }
 
   const s: GithubUpdateStatus | null = status ?? null;
-  const verbunden = !!s?.tokenIsSet && !!s?.repo;
+  // Verbunden, sobald ein Repo gespeichert ist (Token ist optional bei public Repos).
+  const verbunden = !!s?.repo;
 
   function handlePruefen() {
     pruefen.mutate(undefined, {
@@ -86,6 +89,8 @@ export function GitHubUpdateCard({ onLaufGestartet, updateLaeuft }: Props) {
       onSuccess: (res) => {
         if (res.lauf?.id) {
           onLaufGestartet(res.lauf.id);
+          setLastLaufId(res.lauf.id);
+          setBannerDismissed(false);
           toast.success("Update gestartet");
         } else {
           toast.success("Update vorbereitet");
@@ -95,15 +100,6 @@ export function GitHubUpdateCard({ onLaufGestartet, updateLaeuft }: Props) {
         const err = e as { status?: number; message?: string };
         if (err.status === 409) toast.error("Es läuft bereits ein Update.");
         else toast.error(`Update konnte nicht starten: ${err.message ?? "Fehler"}`);
-      },
-    });
-  }
-
-  function handleTrennen() {
-    trennen.mutate(undefined, {
-      onSuccess: () => {
-        toast.success("GitHub-Verbindung getrennt");
-        setTrennConfirm(false);
       },
     });
   }
@@ -140,9 +136,23 @@ export function GitHubUpdateCard({ onLaufGestartet, updateLaeuft }: Props) {
 
   // Verbunden
   const updateVerfuegbar = !!s?.updateVerfuegbar;
+  const laufErfolg = lastLauf?.status === "erfolg";
+  const laufFehler = lastLauf?.status === "fehler";
+  const showBanner = !bannerDismissed && (laufErfolg || laufFehler);
   return (
     <>
       <div className="rounded-xl border border-border bg-card p-5">
+        {/* Verbunden-Pille */}
+        <div className="mb-3 flex items-center gap-2 text-xs">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2 py-0.5 font-medium text-emerald-600">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+            Verbunden
+          </span>
+          {!s?.tokenIsSet && (
+            <span className="text-muted-foreground">· öffentliches Repo (kein Token)</span>
+          )}
+        </div>
+
         {/* Header */}
         <div className="flex items-start gap-3">
           <div
@@ -178,13 +188,15 @@ export function GitHubUpdateCard({ onLaufGestartet, updateLaeuft }: Props) {
             </p>
           </div>
           <Button
-            variant="ghost"
-            size="icon"
+            variant="outline"
+            size="sm"
             onClick={() => setVerbindenOffen(true)}
-            title="Verbindung anpassen"
+            title="Repository, Branch oder Token bearbeiten"
             disabled={updateLaeuft}
+            className="gap-1.5"
           >
-            <SettingsIcon className="h-4 w-4" />
+            <SettingsIcon className="h-3.5 w-3.5" />
+            Bearbeiten
           </Button>
         </div>
 
@@ -224,38 +236,64 @@ export function GitHubUpdateCard({ onLaufGestartet, updateLaeuft }: Props) {
         {s?.letzterFehler && (
           <div className="mt-3 flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-xs text-destructive">
             <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-            <span>{s.letzterFehler}</span>
+            <span>Letzte Prüfung fehlgeschlagen: {s.letzterFehler}</span>
+          </div>
+        )}
+
+        {/* Erfolg/Fehler-Banner nach beendetem Lauf */}
+        {showBanner && laufErfolg && (
+          <div className="mt-3 flex items-start gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3 text-xs">
+            <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+            <div className="min-w-0 flex-1">
+              <p className="font-medium text-emerald-700 dark:text-emerald-400">
+                Update erfolgreich installiert.
+              </p>
+              <p className="mt-0.5 text-emerald-700/80 dark:text-emerald-400/80">
+                Lade die Seite neu, um die neue Version zu sehen.
+              </p>
+            </div>
+            <Button size="sm" onClick={() => window.location.reload()} className="h-7">
+              Neu laden
+            </Button>
+          </div>
+        )}
+        {showBanner && laufFehler && (
+          <div className="mt-3 flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-xs text-destructive">
+            <XCircle className="mt-0.5 h-4 w-4 shrink-0" />
+            <div className="min-w-0 flex-1">
+              <p className="font-medium">Update fehlgeschlagen.</p>
+              <p className="mt-0.5 opacity-80">
+                {lastLauf?.steps?.find((st) => st.status === "fehler")?.fehlerGrund ??
+                  "Es wurde automatisch zurückgerollt. Bitte später erneut versuchen."}
+              </p>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7"
+              onClick={() => setBannerDismissed(true)}
+            >
+              OK
+            </Button>
           </div>
         )}
 
         {/* Actions */}
         <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handlePruefen}
-              disabled={pruefen.isPending || install.isPending || updateLaeuft}
-              className="gap-1.5"
-            >
-              {pruefen.isPending ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <RefreshCw className="h-3.5 w-3.5" />
-              )}
-              Prüfen
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setTrennConfirm(true)}
-              disabled={trennen.isPending || install.isPending || updateLaeuft}
-              className="gap-1.5 text-muted-foreground"
-            >
-              <Unplug className="h-3.5 w-3.5" />
-              Trennen
-            </Button>
-          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handlePruefen}
+            disabled={pruefen.isPending || install.isPending || updateLaeuft}
+            className="gap-1.5"
+          >
+            {pruefen.isPending ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <RefreshCw className="h-3.5 w-3.5" />
+            )}
+            Auf Updates prüfen
+          </Button>
 
           <Button
             onClick={handleInstall}
@@ -277,51 +315,6 @@ export function GitHubUpdateCard({ onLaufGestartet, updateLaeuft }: Props) {
       {verbindenOffen && (
         <GitHubVerbindenDialog current={s} open onClose={() => setVerbindenOffen(false)} />
       )}
-
-      {trennConfirm && (
-        <TrennenConfirm
-          repo={s?.repo ?? ""}
-          onCancel={() => setTrennConfirm(false)}
-          onConfirm={handleTrennen}
-          loading={trennen.isPending}
-        />
-      )}
     </>
-  );
-}
-
-function TrennenConfirm({
-  repo,
-  onCancel,
-  onConfirm,
-  loading,
-}: {
-  repo: string;
-  onCancel: () => void;
-  onConfirm: () => void;
-  loading: boolean;
-}) {
-  return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4" onClick={onCancel}>
-      <div
-        className="w-full max-w-sm rounded-xl border border-border bg-background p-5 shadow-lg"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <p className="text-sm font-semibold">GitHub-Verbindung trennen?</p>
-        <p className="mt-1 text-xs text-muted-foreground">
-          Der gespeicherte Token für <span className="font-mono">{repo}</span> wird gelöscht. Du
-          kannst jederzeit neu verbinden. Daten bleiben unberührt.
-        </p>
-        <div className="mt-4 flex justify-end gap-2">
-          <Button variant="outline" size="sm" onClick={onCancel} disabled={loading}>
-            Abbrechen
-          </Button>
-          <Button variant="destructive" size="sm" onClick={onConfirm} disabled={loading}>
-            {loading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
-            Trennen
-          </Button>
-        </div>
-      </div>
-    </div>
   );
 }
