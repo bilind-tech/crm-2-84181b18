@@ -3,15 +3,18 @@ import type {
   DashboardKennzahlen,
   Firmendaten,
   Kunde,
+  Nummernkreise,
   Rechnung,
   UmsatzPunkt,
 } from "@/lib/api/types";
+import { vorschauBelegnummer } from "@/lib/belegNummer";
 
 const now = new Date();
 const isoNow = now.toISOString();
 const today = isoNow.slice(0, 10);
 const due = new Date(now.getTime() + 14 * 86400000).toISOString().slice(0, 10);
 const month = today.slice(0, 7);
+const STORAGE_KEY = "mcc.localPreview.belege.v1";
 
 const optionen = {
   materialBereitgestellt: true,
@@ -126,6 +129,61 @@ export const previewRechnungen: Rechnung[] = [
     geaendertAm: isoNow,
   },
 ];
+
+const previewNummernkreise: Nummernkreise = {
+  rechnungFormat: "{KUERZEL}{MM}{YY}/{NN}",
+  angebotFormat: "A-{KUERZEL}{MM}{YY}/{NN}",
+  startNummer: 1,
+};
+
+interface PreviewStore {
+  angebote: Angebot[];
+  rechnungen: Rechnung[];
+}
+
+function clone<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
+}
+
+function readStore(): PreviewStore {
+  if (typeof window === "undefined") return { angebote: [], rechnungen: [] };
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (!raw) return { angebote: [], rechnungen: [] };
+    const parsed = JSON.parse(raw) as Partial<PreviewStore>;
+    return {
+      angebote: Array.isArray(parsed.angebote) ? parsed.angebote : [],
+      rechnungen: Array.isArray(parsed.rechnungen) ? parsed.rechnungen : [],
+    };
+  } catch {
+    return { angebote: [], rechnungen: [] };
+  }
+}
+
+function writeStore(store: PreviewStore): void {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+}
+
+function allAngebote(): Angebot[] {
+  return [...previewAngebote, ...readStore().angebote];
+}
+
+function allRechnungen(): Rechnung[] {
+  return [...previewRechnungen, ...readStore().rechnungen];
+}
+
+function nextBelegnummer(kind: "angebot" | "rechnung", kundeId: string): string {
+  const kunde = previewKunden.find((k) => k.id === kundeId);
+  const count = kind === "angebot"
+    ? allAngebote().filter((a) => a.kundeId === kundeId).length
+    : allRechnungen().filter((r) => r.kundeId === kundeId).length;
+  return vorschauBelegnummer(
+    kunde?.kuerzel,
+    kind === "angebot" ? previewNummernkreise.angebotFormat : previewNummernkreise.rechnungFormat,
+    count + 1,
+  );
+}
 
 export const previewGoogleDrive = {
   verbunden: false,
