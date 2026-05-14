@@ -48,11 +48,11 @@ Das Skript:
 Nach Erfolg:
 
 ```bash
-curl http://mycleancenter-pi.local:8080/health
+curl http://mycleancenter-pi.local:8787/health
 # → {"status":"ok",...}
 ```
 
-Im Browser dann `http://mycleancenter-pi.local:8080` oder `http://mycleancenter.local:8080` öffnen → Setup-Wizard. Die IP-Adresse bleibt weiterhin parallel erreichbar.
+Im Browser dann `http://mycleancenter-pi.local:8787` oder `http://mycleancenter.local:8787` öffnen → Setup-Wizard. Die IP-Adresse bleibt weiterhin parallel erreichbar.
 
 Der Stundenzettel/Timekeeper bekommt bewusst keinen `.local`-Alias durch dieses CRM-Setup. Er kann später separat auf dem Pi laufen und im CRM über seine normale Adresse hinterlegt werden.
 

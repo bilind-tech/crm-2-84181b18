@@ -12,7 +12,7 @@ WorkingDirectory=/opt/mycleancenter/current/backend
 Environment=NODE_ENV=production
 Environment=TZ=Europe/Berlin
 Environment=DATA_DIR=/var/lib/mycleancenter
-Environment=PORT=8080
+Environment=PORT=8787
 Environment=HOST=0.0.0.0
 Environment=FRONTEND_DIR=/opt/mycleancenter/current/dist
 # CORS: Frontend und Backend laufen auf demselben Port → Same-Origin.
@@ -24,7 +24,7 @@ Environment=CORS_ORIGINS=*
 # wird — sonst sendet der Browser sie nicht zurück und Logins wirken kaputt.
 Environment=COOKIE_SECURE=false
 # Google-OAuth-Redirect: bei Bedarf in der Google Cloud Console exakt eintragen.
-Environment=GOOGLE_OAUTH_REDIRECT=http://mycleancenter-pi.local:8080/einstellungen/google-drive/callback
+Environment=GOOGLE_OAUTH_REDIRECT=http://mycleancenter-pi.local:8787/einstellungen/google-drive/callback
 ExecStart=/usr/bin/node dist/server.js
 Restart=on-failure
 RestartSec=3

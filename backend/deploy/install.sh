@@ -226,7 +226,7 @@ ensure_mdns() {
   fi
 
   systemctl enable --now avahi-daemon
-  ok "mDNS aktiv: http://${STATIC_HOSTNAME}.local:8080"
+  ok "mDNS aktiv: http://${STATIC_HOSTNAME}.local:8787"
 
   # Der zusätzliche Alias-Dienst war fehleranfällig und konnte in eine
   # systemd-Restart-Schleife geraten. Er ist nicht nötig, weil der Pi über
@@ -425,9 +425,9 @@ start_service() {
   log "Healthcheck (max. 30s)"
   local i
   for i in $(seq 1 15); do
-    if curl -fsS "http://localhost:8080/health" >/dev/null 2>&1; then
+    if curl -fsS "http://localhost:8787/health" >/dev/null 2>&1; then
       local hostn="$(hostname).local"
-      ok "Service läuft — http://${hostn}:8080"
+      ok "Service läuft — http://${hostn}:8787"
       # Setup-URL ausgeben, falls Setup-Token noch existiert (Erstinstallation)
       local token_file="$DATA_DIR/keys/setup.token"
       if [[ -f "$token_file" ]]; then
@@ -438,7 +438,7 @@ start_service() {
           echo "  ════════════════════════════════════════════════════════════"
           echo "  ERSTEINRICHTUNG — diesen Link im Browser öffnen:"
           echo ""
-          echo "    http://${hostn}:8080/setup?token=${token}"
+          echo "    http://${hostn}:8787/setup?token=${token}"
           echo ""
           echo "  Token-Datei: $token_file"
           echo "  ════════════════════════════════════════════════════════════"
@@ -488,10 +488,10 @@ run_doctor() {
   fi
 
   # 3) Healthcheck
-  if curl -fsS "http://localhost:8080/health" >/dev/null 2>&1; then
-    ok "Healthcheck localhost:8080 ok"
+  if curl -fsS "http://localhost:8787/health" >/dev/null 2>&1; then
+    ok "Healthcheck localhost:8787 ok"
   else
-    err "Healthcheck localhost:8080 fehlgeschlagen"
+    err "Healthcheck localhost:8787 fehlgeschlagen"
   fi
 
   # 4) mDNS
@@ -513,15 +513,15 @@ run_doctor() {
   fi
 
   # 5) Ports
-  if ss -ltn 2>/dev/null | grep -q ':8080 '; then
-    ok "Port 8080 belegt (CRM)"
+  if ss -ltn 2>/dev/null | grep -q ':8787 '; then
+    ok "Port 8787 belegt (CRM)"
   else
-    warn "Port 8080 ist frei — CRM antwortet nicht"
+    warn "Port 8787 ist frei — CRM antwortet nicht"
   fi
-  if ss -ltn 2>/dev/null | grep -q ':8080 '; then
-    ok "Port 8080 belegt (vermutlich Stundenzettel)"
+  if ss -ltn 2>/dev/null | grep -q ':8787 '; then
+    ok "Port 8787 belegt (vermutlich Stundenzettel)"
   else
-    warn "Port 8080 ist frei — Stundenzettel-App noch nicht gestartet"
+    warn "Port 8787 ist frei — Stundenzettel-App noch nicht gestartet"
   fi
 
   # 6) System-Last
@@ -531,9 +531,9 @@ run_doctor() {
   local ip
   ip="$(hostname -I 2>/dev/null | awk '{print $1}')"
   log "Erreichbar voraussichtlich unter:"
-  [[ -n "$ip" ]] && log "  http://${ip}:8080"
-  log "  http://${STATIC_HOSTNAME}.local:8080"
-  log "  http://mycleancenter.local:8080"
+  [[ -n "$ip" ]] && log "  http://${ip}:8787"
+  log "  http://${STATIC_HOSTNAME}.local:8787"
+  log "  http://mycleancenter.local:8787"
 
   # 8) Backup-Verzeichnis schreibbar?
   if [[ -d "$DATA_DIR/backups/safety" ]]; then

@@ -4,7 +4,7 @@ import type { FastifyReply, FastifyRequest } from "fastify";
 import { resolveSession, SESSION_COOKIE, SLIDING_DAYS } from "./sessions.js";
 
 // Secure-Cookies NUR aktivieren, wenn das Backend hinter HTTPS läuft.
-// Im normalen Pi-LAN-Betrieb wird per http://<ip>:8080 zugegriffen — dann
+// Im normalen Pi-LAN-Betrieb wird per http://<ip>:8787 zugegriffen — dann
 // würden Browser ein `Secure`-Cookie nicht senden und der User wäre dauernd
 // "unauthenticated". Daher explizit über COOKIE_SECURE steuern, NICHT über
 // NODE_ENV. Standard im Production-Modus: aus.

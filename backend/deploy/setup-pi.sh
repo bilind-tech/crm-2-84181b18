@@ -5,9 +5,9 @@
 # Frisch geflashter Raspberry Pi 5 (Pi-OS-Lite Bookworm 64-bit) → komplett
 # eingerichtet inkl.:
 #   • USB-SSD als Datenpfad (/var/lib/mycleancenter → /mnt/data/mycleancenter)
-#   • CRM-Backend von GitHub gepullt, gebaut, als systemd-Service auf Port 8080
+#   • CRM-Backend von GitHub gepullt, gebaut, als systemd-Service auf Port 8787
 #   • Stundenzettel-Frontend von GitHub gepullt, gebaut, als systemd-Service
-#     auf Port 8080
+#     auf Port 8787
 #   • mDNS-Aliase mycleancenter.local + stundenzettel.local
 #   • Reboot-fest (alle Dienste enabled)
 #
@@ -252,8 +252,8 @@ if [[ $SKIP_ZETTEL -eq 0 ]]; then
 
   log "Healthcheck Stundenzettel (max. 30s)"
   for i in $(seq 1 15); do
-    if curl -fsS http://localhost:8080/ >/dev/null 2>&1; then
-      ok "Stundenzettel läuft → http://stundenzettel.local:8080"
+    if curl -fsS http://localhost:8787/ >/dev/null 2>&1; then
+      ok "Stundenzettel läuft → http://stundenzettel.local:8787"
       break
     fi
     sleep 2
@@ -271,14 +271,14 @@ cat <<EOF
 ════════════════════════════════════════════════════════════════════════════
 
  CRM (MyCleanCenter):
-   http://mycleancenter.local:8080
-   http://mycleancenter-pi.local:8080
-   http://${IP}:8080
+   http://mycleancenter.local:8787
+   http://mycleancenter-pi.local:8787
+   http://${IP}:8787
 
  Stundenzettel:
-   http://stundenzettel.local:8080
-   http://mycleancenter-pi.local:8080
-   http://${IP}:8080
+   http://stundenzettel.local:8787
+   http://mycleancenter-pi.local:8787
+   http://${IP}:8787
 
  Datenpfad:  $(readlink -f /var/lib/mycleancenter 2>/dev/null || echo /var/lib/mycleancenter)
  Services:   systemctl status mycleancenter stundenzettel

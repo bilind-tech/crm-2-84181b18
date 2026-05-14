@@ -13,7 +13,7 @@ const DEFAULT_DATA_DIR =
 
 export const config = {
   version: "0.2.0",
-  port: Number(process.env.PORT ?? 8080),
+  port: Number(process.env.PORT ?? 8787),
   host: process.env.HOST ?? "0.0.0.0",
   nodeEnv: process.env.NODE_ENV ?? "development",
   dataDir: process.env.DATA_DIR ?? DEFAULT_DATA_DIR,

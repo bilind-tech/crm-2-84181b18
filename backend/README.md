@@ -12,12 +12,12 @@ npm install
 npm run dev
 ```
 
-Standard-Port: **8080**. Daten landen in `./data/` (überschreibbar via `DATA_DIR`).
+Standard-Port: **8787**. Daten landen in `./data/` (überschreibbar via `DATA_DIR`).
 
 ## Auf dem Pi starten (später)
 
 ```bash
-DATA_DIR=/var/lib/mycleancenter PORT=8080 NODE_ENV=production node dist/server.js
+DATA_DIR=/var/lib/mycleancenter PORT=8787 NODE_ENV=production node dist/server.js
 ```
 
 ## Endpoints (Step 0)
