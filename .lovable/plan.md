@@ -1,46 +1,44 @@
-## Ziel
-Angebot und Rechnung sollen beim Klick auf „Neues Angebot“ / „Neue Rechnung“ nicht mehr in den globalen Fehlerbildschirm laufen. Kunden-Detailseiten bleiben unverändert, weil sie aktuell funktionieren.
+## Bug
+`backend/src/email/transport.ts` → `readSmtpPassword()` gibt das gespeicherte Passwort **mit umschließenden JSON-Anführungszeichen** an nodemailer weiter. Folge: Strato lehnt die Anmeldung ab („Benutzername oder Passwort falsch"), obwohl das Passwort korrekt eingegeben wurde.
 
-## Was ich ändern werde
+Ursache: `setSetting()` macht immer `JSON.stringify(value)`. Beim Speichern eines Strings `geheim!` landet `"geheim!"` (inkl. Quotes) verschlüsselt in der DB. Die Decode-Logik prüft auf `{password: ...}`-Objekt, fällt bei String-Werten aber auf das **rohe JSON** mit Quotes zurück, statt es als String zu unwrappen.
 
-1. **Absturz beim Öffnen der Erstellen-Form isolieren**
-   - Die betroffenen Stellen sind:
-     - `src/routes/angebote.tsx`
-     - `src/routes/rechnungen.tsx`
-     - `src/components/forms/AngebotForm.tsx`
-     - `src/components/forms/RechnungForm.tsx`
-     - `src/components/forms/PositionenEditor.tsx`
-   - Ich baue für Angebot/Rechnung eine eigene kleine Fehlergrenze ein, damit ein Form-Fehler nicht mehr die ganze App auf „Something went wrong“ wirft.
+## Fix (eine Datei)
 
-2. **Form-Initialisierung härten**
-   - Die erste Position wird nicht mehr direkt während jedes Renderns erzeugt, sondern sauber über eine Lazy-Initialisierung.
-   - Dadurch werden ID-/Browser-API-Probleme beim sofortigen Öffnen der Form vermieden.
-   - `createClientId()` bleibt als sichere Lösung für lokale HTTP-/Pi-Umgebungen erhalten.
+`backend/src/email/transport.ts` — `readSmtpPassword()`:
 
-3. **Speichern von Angebot/Rechnung absichern**
-   - `mutateAsync()` wird in `try/catch` gepackt.
-   - Backend-Fehler zeigen dann einen normalen Toast statt die komplette App abstürzen zu lassen.
-   - Dafür wird die vorhandene Fehlerübersetzung aus `piClient.ts` verwendet.
-
-4. **Route-/Dialog-Variante vereinheitlichen**
-   - Die Buttons oben rechts bleiben als schneller SlideOver-Dialog erhalten.
-   - Die direkten Routen `/angebote/neu` und `/rechnungen/neu` bleiben ebenfalls funktionsfähig.
-   - Beide nutzen dieselbe stabile Form-Logik.
-
-5. **Prüfung nach Umsetzung**
-   - Ich prüfe danach gezielt, dass keine Browser-`crypto.randomUUID()`-Nutzung im Frontend übrig ist.
-   - Ich prüfe außerdem die betroffenen Dateien auf Build-/Syntax-Probleme.
-
-6. **Pi-Update-Befehl korrigieren**
-   - Der Pi muss den SPA-Build `npm run build:spa` ausliefern.
-   - Das gebaute `dist-spa/` muss im Release als `/opt/mycleancenter/current/dist/` landen.
-   - Ein normales `npm run build` erzeugt den falschen TanStack-Start-Build für den Pi und aktualisiert die sichtbare App nicht zuverlässig.
-
-## Was du nach Freigabe bekommst
-Nach Umsetzung gebe ich dir wieder den fertigen Pi-Update-Befehl mit deinem gemerkten öffentlichen Repo:
-
-```bash
-https://github.com/bilind-tech/remix-of-crm.git
+```ts
+function readSmtpPassword(): string | null {
+  const row = getDatabase()
+    .prepare(`SELECT value, encrypted FROM setting WHERE key = ?`)
+    .get(SENSITIVE_KEYS.smtpPassword) as { value: string; encrypted: number } | undefined;
+  if (!row) return null;
+  const raw = row.encrypted ? decryptString(row.value) : row.value;
+  try {
+    const parsed = JSON.parse(raw);
+    if (typeof parsed === "string") return parsed;          // ← neuer Fall
+    if (parsed && typeof parsed.password === "string") return parsed.password;
+    return raw;
+  } catch {
+    return raw;
+  }
+}
 ```
 
-Der Befehl wird wieder so aufgebaut, dass Code in `/opt/mycleancenter/current/` aktualisiert wird und deine Daten unter `/var/lib/mycleancenter/` nicht angefasst werden.
+Damit wird ein als String gespeichertes Passwort sauber unwrapped, ein historisch evtl. als Objekt gespeichertes weiter unterstützt, und unverschlüsselte/Plain-Werte funktionieren wie bisher.
+
+## Was du danach machen musst
+
+1. Update auf Pi installieren (gleicher Update-Befehl wie zuletzt — keine Daten betroffen, nur Backend-Code).
+2. **Passwort in Einstellungen → E-Mail einmal neu eingeben und speichern** (das alte Passwort ist mit dem Fehler gespeichert worden — es wird nach dem Fix zwar korrekt gelesen, ist aber inhaltlich identisch zur Eingabe; ein erneutes Speichern ist nicht zwingend nötig, schadet aber nicht).
+3. „Verbindung prüfen" → muss jetzt grün werden.
+
+## Was NICHT geändert wird
+
+- Kein Daten-Migrations-Skript (nicht nötig — Lese-Pfad ist defensiv).
+- Keine Frontend-Änderung.
+- Keine anderen Settings-Bereiche (Google Drive Tokens, GitHub Token) — die haben dasselbe Schema, sind aber tatsächlich Objekte und betroffen nur, falls jemand einen reinen String reinspeichert.
+
+## Test (ich führe nach Implementierung selbst aus)
+
+`backend/test` enthält schon Vitest-Setup. Ich ergänze einen Mini-Test, der `setSetting` + `readSmtpPassword` Round-trip durchspielt mit einem Passwort, das Sonderzeichen enthält (`Ä!"§$%&/()=?`), und sicherstellt, dass keine Quotes übrig bleiben.
