@@ -342,9 +342,14 @@ async function stepRun(
   }
 }
 
-async function runRollbackToPrevious(laufId: string, userId: string | null): Promise<void> {
-  const prev = readPreviousTarget();
+async function runRollbackToPrevious(
+  laufId: string,
+  userId: string | null,
+  preferredPrevious?: string | null,
+): Promise<void> {
+  const prev = preferredPrevious ?? readPreviousTarget();
   if (!prev) throw new Error("Keine vorherige Version vorhanden");
+  assertUsableRuntime(prev, "Rollback-Ziel");
 
   // Step "rollback" markieren
   setStepStatus(laufId, "rollback", "laeuft");
@@ -420,6 +425,7 @@ export async function manualRollback(
 
         await stepRun(laufId, "rollback", async () => {
           // Defekte aktive Version (sofern abweichend) in broken-* sichern
+          assertUsableRuntime(target, "Rollback-Ziel");
           const cur = readCurrentTarget();
           if (cur && cur !== target) {
             const broken = brokenDir(nowStamp());
@@ -435,10 +441,8 @@ export async function manualRollback(
 
         await stepRun(laufId, "neustart", async () => {
           if (config.nodeEnv !== "production") return "dev-mode: kein systemctl";
-          try {
-            await execFileP("sudo", ["-n", "/bin/systemctl", "restart", "mycleancenter"], { timeout: 30_000 });
-            return "sudo systemctl restart mycleancenter";
-          } catch { return "restart nicht möglich — manueller Eingriff nötig"; }
+          await restartServiceOrThrow();
+          return "sudo systemctl restart mycleancenter";
         });
 
         await stepRun(laufId, "smoketest", async () => {
