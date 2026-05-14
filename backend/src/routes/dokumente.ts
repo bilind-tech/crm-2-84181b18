@@ -284,7 +284,7 @@ export async function dokumenteRoutes(app: FastifyInstance): Promise<void> {
 
   app.post<{ Params: { token: string } }>(
     "/upload-sessions/:token/dokumente",
-    { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } },
+    { config: { rateLimit: { max: 60, timeWindow: "1 minute" } } },
     async (req, reply) => {
       const sess = getSessionByToken(req.params.token);
       if (!sess) return reply.code(404).send({ error: "session-not-found" });

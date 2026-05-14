@@ -124,11 +124,15 @@ export function HandyScanDialog({ open, onOpenChange }: Props) {
                 {dateien.length > 0 && (
                   <div className="mt-3 grid grid-cols-4 gap-2 sm:grid-cols-6">
                     {dateien.map((d) => (
-                      <DokumentThumb
+                      <div
                         key={d.id}
-                        dokument={d}
-                        className="aspect-square h-auto w-full"
-                      />
+                        className="animate-in fade-in zoom-in-95 duration-300"
+                      >
+                        <DokumentThumb
+                          dokument={d}
+                          className="aspect-square h-auto w-full"
+                        />
+                      </div>
                     ))}
                   </div>
                 )}

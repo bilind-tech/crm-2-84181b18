@@ -560,7 +560,7 @@ export const useUploadSessionLive = (token: string | undefined) =>
     queryKey: ["upload-session", token ?? "none"],
     enabled: !!token,
     queryFn: () => api.get<UploadSessionMitDateien>(`/upload-sessions/${token}`),
-    refetchInterval: 1500,
+    refetchInterval: 1000,
     staleTime: 0,
   });
 

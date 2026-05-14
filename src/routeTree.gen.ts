@@ -37,6 +37,7 @@ import { Route as RechnungenIdBearbeitenRouteImport } from './routes/rechnungen.
 import { Route as ProtokolleIdBearbeitenRouteImport } from './routes/protokolle.$id.bearbeiten'
 import { Route as MUploadSessionRouteImport } from './routes/m.upload.$session'
 import { Route as AngeboteIdBearbeitenRouteImport } from './routes/angebote.$id.bearbeiten'
+import { Route as MUploadRouteImport } from './routes/m.upload.'
 
 const WerkzeugeRoute = WerkzeugeRouteImport.update({
   id: '/werkzeuge',
@@ -180,6 +181,11 @@ const AngeboteIdBearbeitenRoute = AngeboteIdBearbeitenRouteImport.update({
   path: '/bearbeiten',
   getParentRoute: () => AngeboteIdRoute,
 } as any)
+const MUploadRoute = MUploadRouteImport.update({
+  id: '/m/upload/',
+  path: '/m/upload/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -206,6 +212,7 @@ export interface FileRoutesByFullPath {
   '/werkzeuge/schluesseluebergabe': typeof WerkzeugeSchluesseluebergabeRoute
   '/werkzeuge/uebergabeprotokoll': typeof WerkzeugeUebergabeprotokollRoute
   '/werkzeuge/': typeof WerkzeugeIndexRoute
+  '/m/upload/': typeof MUploadRoute
   '/angebote/$id/bearbeiten': typeof AngeboteIdBearbeitenRoute
   '/m/upload/$session': typeof MUploadSessionRoute
   '/protokolle/$id/bearbeiten': typeof ProtokolleIdBearbeitenRoute
@@ -235,6 +242,7 @@ export interface FileRoutesByTo {
   '/werkzeuge/schluesseluebergabe': typeof WerkzeugeSchluesseluebergabeRoute
   '/werkzeuge/uebergabeprotokoll': typeof WerkzeugeUebergabeprotokollRoute
   '/werkzeuge': typeof WerkzeugeIndexRoute
+  '/m/upload': typeof MUploadRoute
   '/angebote/$id/bearbeiten': typeof AngeboteIdBearbeitenRoute
   '/m/upload/$session': typeof MUploadSessionRoute
   '/protokolle/$id/bearbeiten': typeof ProtokolleIdBearbeitenRoute
@@ -266,6 +274,7 @@ export interface FileRoutesById {
   '/werkzeuge/schluesseluebergabe': typeof WerkzeugeSchluesseluebergabeRoute
   '/werkzeuge/uebergabeprotokoll': typeof WerkzeugeUebergabeprotokollRoute
   '/werkzeuge/': typeof WerkzeugeIndexRoute
+  '/m/upload/': typeof MUploadRoute
   '/angebote/$id/bearbeiten': typeof AngeboteIdBearbeitenRoute
   '/m/upload/$session': typeof MUploadSessionRoute
   '/protokolle/$id/bearbeiten': typeof ProtokolleIdBearbeitenRoute
@@ -298,6 +307,7 @@ export interface FileRouteTypes {
     | '/werkzeuge/schluesseluebergabe'
     | '/werkzeuge/uebergabeprotokoll'
     | '/werkzeuge/'
+    | '/m/upload/'
     | '/angebote/$id/bearbeiten'
     | '/m/upload/$session'
     | '/protokolle/$id/bearbeiten'
@@ -327,6 +337,7 @@ export interface FileRouteTypes {
     | '/werkzeuge/schluesseluebergabe'
     | '/werkzeuge/uebergabeprotokoll'
     | '/werkzeuge'
+    | '/m/upload'
     | '/angebote/$id/bearbeiten'
     | '/m/upload/$session'
     | '/protokolle/$id/bearbeiten'
@@ -357,6 +368,7 @@ export interface FileRouteTypes {
     | '/werkzeuge/schluesseluebergabe'
     | '/werkzeuge/uebergabeprotokoll'
     | '/werkzeuge/'
+    | '/m/upload/'
     | '/angebote/$id/bearbeiten'
     | '/m/upload/$session'
     | '/protokolle/$id/bearbeiten'
@@ -376,6 +388,7 @@ export interface RootRouteChildren {
   SteuernRoute: typeof SteuernRoute
   StundenzettelRoute: typeof StundenzettelRoute
   WerkzeugeRoute: typeof WerkzeugeRouteWithChildren
+  MUploadRoute: typeof MUploadRoute
   MUploadSessionRoute: typeof MUploadSessionRoute
 }
 
@@ -577,6 +590,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AngeboteIdBearbeitenRouteImport
       parentRoute: typeof AngeboteIdRoute
     }
+    '/m/upload/': {
+      id: '/m/upload/'
+      path: '/m/upload'
+      fullPath: '/m/upload/'
+      preLoaderRoute: typeof MUploadRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -711,6 +731,7 @@ const rootRouteChildren: RootRouteChildren = {
   SteuernRoute: SteuernRoute,
   StundenzettelRoute: StundenzettelRoute,
   WerkzeugeRoute: WerkzeugeRouteWithChildren,
+  MUploadRoute: MUploadRoute,
   MUploadSessionRoute: MUploadSessionRoute,
 }
 export const routeTree = rootRouteImport

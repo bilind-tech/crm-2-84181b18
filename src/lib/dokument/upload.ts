@@ -139,3 +139,20 @@ export async function uploadDokumentToSession(
     buildFormData(prep.blob, prep.filename, prep.meta),
   );
 }
+
+/** Lädt Datei in eine Upload-Session – mit Progress-Callback. */
+export async function uploadDokumentToSessionMitProgress(
+  token: string,
+  file: File,
+  meta: DokumentMeta = {},
+  onProgress?: (ratio: number) => void,
+  signal?: AbortSignal,
+): Promise<Dokument> {
+  const prep = await prepareUpload(file, meta);
+  return postWithProgress<Dokument>(
+    `/upload-sessions/${token}/dokumente`,
+    buildFormData(prep.blob, prep.filename, prep.meta),
+    onProgress,
+    signal,
+  );
+}
