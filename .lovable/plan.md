@@ -1,39 +1,53 @@
-## Ziel
+## Befund
 
-Die Seite `/rechnungen` (und analog `/angebote`) lässt sich nach den letzten PDF-Stabilitäts-Änderungen nicht mehr öffnen. Der genaue Fehlertext ist unbekannt, daher gehe ich in zwei Schritten vor: erst Ursache eindeutig sichtbar machen, dann gezielt reparieren — ohne weitere Funktionalität anzufassen.
+Das Problem ist kein einzelner PDF-Fehler mehr, sondern zwei gekoppelte Ursachen:
 
-## Vorgehen
+1. **Aktueller harter Crash in der Preview:** In `src/routes/rechnungen.$id.tsx` gibt es durch einen vorherigen Fix eine doppelte Variable `r` (`const { data: r ... }` und später `const r = safeRechnung`). TanStack/Vite meldet deshalb `BABEL_PARSER_SYNTAX_ERROR: VarRedeclaration`. Genau das erzeugt die generische Seite „Something went wrong“.
+2. **PDF-Änderungen haben die Seiten anfälliger gemacht:** Die Detailseiten, PDF-Erzeugung und Vorschau greifen an mehreren Stellen direkt auf Felder wie `positionen`, `zahlungen`, `rabatt`, `menge`, `beschreibung`, `kunde`, `firma` zu. Wenn ein neu erstellter Beleg aus der lokalen Preview-Fallback-Logik oder vom Pi unvollständige Daten bekommt, darf die ganze Detailseite nicht abstürzen — die PDF-Vorschau muss stattdessen kontrolliert „wird erstellt“, „nicht möglich“ oder den genauen Fehler zeigen.
 
-### 1. Ursache reproduzieren und festnageln
-- Preview öffnen, in die Browser-Konsole und ins Network-Panel schauen, was beim Laden von `/rechnungen` und `/angebote` genau wirft (Stacktrace, Datei, Zeile).
-- Vite-/Build-Logs prüfen, ob ein Syntax-/Import-Fehler in einer der zuletzt geänderten Dateien auftritt:
-  - `src/hooks/useBelegPdf.ts`
-  - `src/lib/pdf/backendPdf.ts`
-  - `src/components/pdf/PdfCanvasViewer.tsx`
-  - `src/components/pdf-editor/LivePdfPreview.tsx`
-  - `src/components/protokoll-editor/ProtokollLivePreview.tsx`
-  - `src/hooks/useProtokollPdf.ts`
-- Verdachtspunkte, die ich gezielt prüfe:
-  1. `fetchBackendPdf` wirft jetzt bei 5xx einen Fehler. Falls irgendwo (z. B. Listen-Hover, Prefetch, Editor-Mount) der Hook ohne Try/Catch erwartet wird, kann ein Fehler im Render-Tree hochbubblen.
-  2. Backend ist offline (Health-Check schlägt fehl). `isBackendUrlExplicit()` sollte `false` liefern und sauber auf den Browser-Generator zurückfallen — falls in einer Umgebung doch `true`, würde jeder Aufruf jetzt hart fehlschlagen statt still zurückzufallen.
-  3. Geänderter `PdfCanvasViewer` (neuer `attempt`-State, neuer `RefreshCw`-Import, geänderter `key`) — Tippfehler oder doppelter Import könnte den Modul-Import sprengen und damit jede Seite mitreißen, die `PdfViewButton` importiert (Listen!).
+## Plan
 
-### 2. Reparatur
-- Den konkret gefundenen Fehler beheben (Import, Syntax, Hook-Reihenfolge, Null-Check).
-- `fetchBackendPdf` wieder defensiver machen: Bei 5xx **nicht mehr werfen**, sondern null zurückgeben und den Fehler nur im Konsolenlog vermerken. Die echte Fehlermeldung kommt dann sauber aus dem Client-Generator bzw. dem Hook-`error`-State, ohne die Listen-Seite zu sprengen.
-- Sicherstellen, dass Listen-Seiten (`/rechnungen`, `/angebote`) keine PDF-Hooks beim reinen Listen-Render auslösen — `PdfViewButton` öffnet den Hook erst beim Klick auf das Auge. Falls doch irgendwo direkt gemountet, mit Error-Boundary umschließen.
-- `PdfCanvasViewer`: prüfen, dass `attempt`/`RefreshCw` sauber genutzt werden und keine doppelten Imports/Closing-Tags entstanden sind.
-- Backend-Route `belege-pdf.ts`: 500er bleiben strukturiert, aber Frontend toleriert sie wieder; 404er weiterhin 404.
+1. **Sofort-Crash beseitigen**
+   - In `src/routes/rechnungen.$id.tsx` die doppelte Variable sauber auflösen.
+   - Dasselbe Muster in `src/routes/angebote.$id.tsx` prüfen und vereinheitlichen, damit TanStack Router keine Code-Splitting-/Syntaxfehler mehr erzeugt.
 
-### 3. Verifikation
-- Preview neu laden: `/rechnungen` und `/angebote` öffnen sich ohne Crash.
-- Auge-Icon auf einem Beleg → PDF wird gebaut/angezeigt; bei Fehler erscheint nur im Dialog die Meldung mit „Erneut versuchen", die Liste bleibt funktional.
-- „PDF bearbeiten" für Angebot, Rechnung und Schlüsselübergabe einmal öffnen — Live-Preview lädt, kein Render-Crash.
-- Konsole: keine roten Fehler mehr beim Listen-Render.
+2. **Detailseiten gegen kaputte/fehlende Belegdaten absichern**
+   - Eine kleine Normalisierung für Rechnung/Angebot einbauen: `positionen`, `zahlungen`, `rabattGesamt`, `steuersatz`, Titel/Nummer/Datum bekommen sichere Defaults.
+   - In den Positionslisten keine direkten unsicheren Zugriffe mehr wie `p.beschreibung.split(...)`, `p.menge * p.einzelpreisNetto`, `z.betrag` ohne Fallback.
+   - `rechnungFlow`, `angebotFlow`, Zahlungssumme und Betragssumme nur noch mit normalisierten Daten aufrufen.
 
-## Was nicht angefasst wird
-- E-Mail-Versand, Drive-Upload, Backend-Renderpfad, Datenmodell, Auth, Mobil-Upload — alles bleibt wie zuletzt.
-- Kein Refactor der Hooks, nur die minimal nötige Defensiv-Logik.
+3. **PDF-Generator robust machen**
+   - `src/lib/pdf/belegPdf.ts` absichern:
+     - `summe()` und `totals()` mit `?? 0` statt direkter Multiplikation.
+     - `positionen ?? []`, `rabattGesamt ?? 0`, `steuersatz ?? 19` verwenden.
+     - Beschreibung, Menge, Einzelpreis, Rabatt, Pauschalpreis defensiv behandeln.
+   - Ergebnis: PDF-Erzeugung darf bei unvollständigen Belegen nicht mehr die Route crashen.
 
-## Bitte vorab
-Falls du den genauen Fehlertext nochmal siehst (auch nur ein Screenshot oder Copy-Paste der ersten roten Zeile in der Konsole), wäre das Gold wert — dann spare ich mir den Reproduktionsschritt und gehe direkt zur Reparatur.
+4. **PDF-Hook darf nie die Seite blockieren**
+   - `src/hooks/useBelegPdf.ts` so anpassen, dass PDF-Fehler im PDF-Block landen, aber nicht die Detailseite in den Router-Error werfen.
+   - Wenn Kunde/Firma fehlen, klare PDF-Fehlermeldung liefern statt endlos „PDF wird erstellt …“.
+   - Backend-PDF bleibt optional: wenn Pi/offline/HTTP-Fehler, Browser-PDF als Fallback; wenn auch das scheitert, sichtbarer Fehler im PDF-Kasten.
+
+5. **Lokale Preview-Daten vervollständigen**
+   - `src/lib/api/localPreviewData.ts` weiter normalisieren, damit neu erstellte Angebote/Rechnungen immer gültige Positionen, Zahlungsarrays, Optionen, Status, Steuersatz und Nummer haben.
+   - Mutationen für die wichtigsten Detailseiten-Aktionen prüfen: mindestens Erstellen, Anzeigen, PDF-Vorschau; wenn nötig einfache lokale PATCH-Antworten ergänzen, damit Statusänderungen nicht wieder ins Backend-Offline laufen.
+
+6. **Bessere Fehleranzeige einbauen**
+   - `src/router.tsx` ersetzt die generische Anzeige durch eine deutschsprachige Diagnose:
+     - Titel: „Diese Seite konnte nicht geladen werden“
+     - sichtbare Fehlermeldung immer anzeigen, nicht nur in DEV
+     - technische Details einklappbar/kopierbar: Route, Fehlername, Message, Stack-Ausschnitt
+     - Buttons: „Erneut versuchen“, „Zur Startseite“
+   - Damit kannst du mir beim nächsten Mal direkt die echte Fehlermeldung schicken.
+
+7. **Validierung**
+   - Die Preview-Server-Logs erneut prüfen: kein `VarRedeclaration`, kein Router-Compile-Fehler.
+   - Browser-Test durchführen:
+     - `/rechnungen/preview-rechnung-1` öffnet ohne „Something went wrong“.
+     - `/angebote/preview-angebot-1` öffnet ohne „Something went wrong“.
+     - PDF-Vorschau wird sichtbar oder zeigt eine konkrete Fehlermeldung im PDF-Kasten, nicht als Seitencrash.
+   - Zusätzlich einen neu erstellten Beleg aus der lokalen Preview öffnen und prüfen.
+
+## Technische Notiz
+
+Ich werde **keinen großen Architektur-Umbau** wie Queue/Background-Jobs für die lokale Lovable-Preview bauen. Für den späteren Pi kann PDF-Caching/Backend-PDF weiter genutzt werden, aber der akute Fehler entsteht durch Syntax-/Datenrobustheit im Frontend und durch unvollständige Preview-Fallback-Daten.
