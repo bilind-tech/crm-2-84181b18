@@ -12,6 +12,7 @@ import { ObjektForm } from "@/components/forms/ObjektForm";
 import { AnsprechpartnerTab } from "@/components/kunden/AnsprechpartnerTab";
 import { AngebotForm } from "@/components/forms/AngebotForm";
 import { RechnungForm } from "@/components/forms/RechnungForm";
+import { FormErrorBoundary } from "@/components/layout/FormErrorBoundary";
 import { KundeBearbeitenDialog } from "@/components/forms/KundeBearbeitenDialog";
 import { KundeLoeschenDialog } from "@/components/forms/KundeLoeschenDialog";
 import { formatEUR, formatDate } from "@/lib/format";
@@ -469,7 +470,9 @@ function Page() {
         title="Neues Angebot"
         description={`Für ${fullName}`}
       >
-        <AngebotForm onClose={() => setOpenAngebot(false)} defaultKundeId={k.id} />
+        <FormErrorBoundary onReset={() => setOpenAngebot(false)}>
+          <AngebotForm onClose={() => setOpenAngebot(false)} defaultKundeId={k.id} />
+        </FormErrorBoundary>
       </SlideOver>
       <SlideOver
         open={openRechnung}
@@ -477,7 +480,9 @@ function Page() {
         title="Neue Rechnung"
         description={`Für ${fullName}`}
       >
-        <RechnungForm onClose={() => setOpenRechnung(false)} defaultKundeId={k.id} />
+        <FormErrorBoundary onReset={() => setOpenRechnung(false)}>
+          <RechnungForm onClose={() => setOpenRechnung(false)} defaultKundeId={k.id} />
+        </FormErrorBoundary>
       </SlideOver>
       <KundeBearbeitenDialog kunde={k} open={openEdit} onOpenChange={setOpenEdit} />
       <KundeLoeschenDialog kunde={kundeSafe} open={openDelete} onOpenChange={setOpenDelete} />
