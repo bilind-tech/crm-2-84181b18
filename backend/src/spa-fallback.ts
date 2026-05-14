@@ -12,6 +12,12 @@ function acceptsHtml(acceptHeader: string | string[] | undefined): boolean {
   return accept.toLowerCase().includes("text/html");
 }
 
+function isDocumentNavigation(headers: Record<string, unknown>): boolean {
+  const mode = String(headers["sec-fetch-mode"] ?? "").toLowerCase();
+  const dest = String(headers["sec-fetch-dest"] ?? "").toLowerCase();
+  return mode === "navigate" || dest === "document";
+}
+
 export function isSpaPageRoute(rawUrl: string): boolean {
   const p = normalizedPath(rawUrl);
   if (["/kunden", "/angebote", "/rechnungen", "/objekte", "/protokolle", "/dokumente"].includes(p)) {
@@ -32,11 +38,12 @@ export function shouldServeSpaIndex(args: {
   rawUrl: string;
   method: string;
   accept?: string | string[];
+  headers?: Record<string, unknown>;
   hasSpaIndex: boolean;
 }): boolean {
   if (!args.hasSpaIndex) return false;
   if (args.method !== "GET" && args.method !== "HEAD") return false;
-  if (!acceptsHtml(args.accept)) return false;
+  if (!acceptsHtml(args.accept) && !isDocumentNavigation(args.headers ?? {})) return false;
   return isSpaPageRoute(args.rawUrl);
 }
 
@@ -52,6 +59,7 @@ export function registerSpaPageFallback(
       rawUrl: req.raw.url ?? "/",
       method: req.method,
       accept: req.headers.accept,
+      headers: req.headers,
       hasSpaIndex,
     })) {
       return;
