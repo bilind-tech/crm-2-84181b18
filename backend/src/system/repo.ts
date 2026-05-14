@@ -284,7 +284,7 @@ export function listInstalledVersions(): {
     .prepare(`SELECT version, installed_at, ist_aktiv, rollback_verfuegbar
               FROM system_installed_version ORDER BY installed_at DESC`)
     .all()
-    .map((r) => {
+    .map((row: unknown) => {
       const row = r as { version: string; installed_at: string; ist_aktiv: number; rollback_verfuegbar: number };
       return {
         version: row.version,
