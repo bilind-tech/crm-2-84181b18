@@ -547,7 +547,12 @@ async function ensureBuiltRuntime(versionRoot: string): Promise<string[]> {
     details.push("Frontend frisch gebaut");
   }
   if (!existsSync(backendServer)) {
-    const be = await npmInstallTolerant(backendDir, [], "Backend-Dependencies");
+    const be = await npmInstallTolerant(
+      backendDir,
+      ["--include=dev"],
+      "Backend-Dependencies",
+      { NODE_ENV: "development" },
+    );
     details.push(be);
     await runNpm(backendDir, ["run", "build"], "Backend-Build");
     details.push("Backend gebaut");
