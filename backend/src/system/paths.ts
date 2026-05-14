@@ -15,7 +15,15 @@ export function appRoot(): string {
 
 export function ensureAppDirs(): void {
   for (const d of [appRoot(), versionsDir(), stagingRoot()]) {
-    if (!existsSync(d)) mkdirSync(d, { recursive: true, mode: 0o755 });
+    try {
+      mkdirSync(d, { recursive: true, mode: 0o755 });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      throw new Error(
+        `Update-Verzeichnis konnte nicht vorbereitet werden (${d}): ${msg}. ` +
+          `Bitte prüfen, ob ${appRoot()} existiert und für den Service-User beschreibbar ist.`,
+      );
+    }
   }
 }
 
