@@ -1,71 +1,106 @@
-# Fix: Kunden-Detailseite („Something went wrong" + roher JSON-Text)
+## Ziel
+Die Kunden-Detailseite muss zuverlässig funktionieren:
+- Klick auf einen Kunden öffnet die React-Detailseite, kein „Something went wrong“.
+- Browser-Neuladen auf `/kunden/<id>` zeigt weiterhin die App, nicht rohen JSON-Text.
+- Auch wenn das Backend noch eine ältere Antwort ohne `angebote`, `rechnungen`, `dokumente` liefert, darf die Seite nicht abstürzen.
 
-## Ursache (sicher diagnostiziert)
+## Sicher erkannte Hauptursache
+Es gibt zwei getrennte Probleme, die zusammen wie ein einziger Fehler wirken:
 
-Frontend `src/routes/kunden.$id.tsx` greift auf `k.angebote.length`, `k.rechnungen.length`, `k.dokumente.length` und `k.notizen.length` zu (Tab-Zähler & Tabs). Der zugehörige Hook `useKunde` deklariert diese Felder im Typ.
+1. **Routing-Konflikt auf dem Pi**
+   - Das Backend hat echte API-Routen wie `GET /kunden/:id`.
+   - Die React-App hat gleichzeitig eine Frontend-Seite `/kunden/$id`.
+   - Beim normalen Browser-Reload auf `/kunden/3b288...` fragt der Browser direkt das Backend nach HTML.
+   - Fastify findet aber zuerst die API-Route `/kunden/:id` und liefert JSON zurück.
+   - Deshalb siehst du oben links den rohen JSON-Text.
 
-Backend-Endpoint `GET /kunden/:id` (`backend/src/routes/stammdaten.ts:56-68`) liefert aber nur:
+2. **Detailseite war/ist zu fragil gegen alte Backend-Antworten**
+   - Die Kunden-Seite erwartet Listen wie `angebote`, `rechnungen`, `dokumente`.
+   - Deine aktuell sichtbare Antwort enthält nur `ansprechpartner` und `objekte`.
+   - Wenn eine noch nicht aktualisierte Frontend-Version darauf zugreift, crasht sie.
+
+## Plan zur endgültigen Reparatur
+
+### 1. Backend: direkte Seitenaufrufe von API-Antworten trennen
+Ich baue im Pi-Backend eine klare HTML-Erkennung ein:
+
+- Wenn ein Browser eine Seite direkt öffnet oder neu lädt, z. B.:
+  - `/kunden/3b288d39-2652-4556-a068-fe6045ee7f75`
+  - `/angebote/<id>`
+  - `/rechnungen/<id>`
+  - `/objekte/<id>`
+  - `/protokolle/<id>`
+- und der Request HTML erwartet (`Accept: text/html`), dann liefert das Backend **immer `index.html` der React-App** aus.
+- API-Aufrufe aus der App bekommen weiter JSON.
+
+Damit verschwindet der rohe JSON-Text beim Reload dauerhaft.
+
+### 2. Frontend-API-Client: JSON explizit anfordern
+Im zentralen API-Client setze ich für alle normalen API-Aufrufe:
+
+```text
+Accept: application/json
 ```
-{ ...kunde, ansprechpartner, objekte, notizen }
+
+Dadurch kann das Backend sicher unterscheiden:
+
+```text
+Browser-Seitenaufruf -> HTML-App
+App-API-Aufruf       -> JSON-Daten
 ```
-**`angebote`, `rechnungen`, `dokumente` fehlen komplett.**
 
-Folge:
-- Erster Render: `k.angebote.length` → `TypeError: Cannot read properties of undefined` → Root-`errorComponent` zeigt **„Something went wrong"**.
-- Bei Reload: gleiches Problem; der rohe JSON-Text oben links ist die Server-Antwort, die TanStack/React beim Crash teilweise als Fallback in das Error-UI durchreicht (bzw. der Error-Boundary-Output enthält den Query-State serialisiert).
+Das macht die Lösung stabiler als nur auf Zufall/Browser-Defaults zu vertrauen.
 
-Zusätzlich: `k.notizen` wird in `Stammdaten`-Card (Zeile 184–187) als **String** gerendert (`whitespace-pre-wrap`), an anderer Stelle als **Array** (`k.notizen.length`, `k.notizen.map`). Das ist ein latenter Bug, der zumindest aufgeräumt werden sollte.
+### 3. Kunden-Detailseite noch robuster machen
+Die Datei `src/routes/kunden.$id.tsx` ist bereits teilweise abgesichert, aber ich würde sie vollständig härten:
 
-## Plan
+- `tags` defensiv behandeln: `Array.isArray(k.tags) ? k.tags : []`
+- `ansprechpartner`, `objekte`, `angebote`, `rechnungen`, `dokumente`, `notizen` immer als Arrays normalisieren.
+- `notizen` korrekt gegen Backend-Feldnamen absichern:
+  - Backend liefert aktuell Notizen als `{ text, erstelltAm }`.
+  - Frontend-Typ erwartet teils `{ titel, inhalt }`.
+  - Anzeige soll daher nicht mehr mit `n.titel` / `n.inhalt` blind rendern, sondern robust `n.text` bzw. Fallbacks verwenden.
+- Bei fehlerhaften Einzeldaten in Listen soll die ganze Kundenseite nicht abstürzen.
 
-### 1. Backend: fehlende Listen mitliefern
-Datei: `backend/src/routes/stammdaten.ts`
+### 4. Backend-Kundenantwort vollständig machen
+`GET /kunden/:id` bleibt additiv erweitert und liefert vollständig:
 
-- Imports ergänzen:
-  - `listAngebote` aus `../belege/angebote-repo.js`
-  - `listRechnungen` aus `../belege/rechnungen-repo.js`
-  - `listDokumente` aus `../dokumente/repo.js`
-- Im Handler `GET /kunden/:id` Response erweitern:
-  ```ts
-  return {
-    ...k,
-    ansprechpartner: listAnsprechpartner(k.id),
-    objekte: listObjekte(k.id),
-    angebote: listAngebote({ kundeId: k.id }),
-    rechnungen: listRechnungen({ kundeId: k.id }),
-    dokumente: listDokumente({ kundeId: k.id }),
-    notizen: listNotizenForKunde(k.id),
-  };
-  ```
-- Filter-Signaturen vorab prüfen (`AngebotFilter`, `RechnungFilter`, `DokumentListFilter`) und ggf. `archiviert: false` setzen, falls Default das verlangt.
+```text
+kunde
+ansprechpartner[]
+objekte[]
+angebote[]
+rechnungen[]
+dokumente[]
+notizen[]
+```
 
-### 2. Frontend: defensiv absichern
-Datei: `src/routes/kunden.$id.tsx`
+Das ist die saubere Datenbasis für die Detailseite. Gleichzeitig bleibt das Frontend kompatibel mit alten Antworten, falls der Pi noch nicht aktualisiert ist.
 
-- Direkt nach `if (!k) return <NotFoundState … />` Defaults setzen, damit ältere Backend-Versionen (Pi noch nicht aktualisiert) nicht mehr crashen:
-  ```ts
-  const ansprechpartner = k.ansprechpartner ?? [];
-  const objekte = k.objekte ?? [];
-  const angebote = k.angebote ?? [];
-  const rechnungen = k.rechnungen ?? [];
-  const dokumente = k.dokumente ?? [];
-  const notizenListe = Array.isArray(k.notizen) ? k.notizen : [];
-  ```
-  und alle `k.angebote` / `k.rechnungen` / `k.dokumente` / `k.notizen.length|map` durch die lokalen Variablen ersetzen.
+### 5. Tests gegen genau diesen Fehler ergänzen
+Ich ergänze Backend-Tests, die den realen Fehler absichern:
 
-### 3. Notizen-Inkonsistenz aufräumen
-Im „Tags & Notizen"-Block (Zeile 184–187) wird `k.notizen` als String behandelt. Das ist falsch — `notizen` ist eine Liste von `Notiz`-Objekten. Block ersetzen durch:
-- Wenn `notizenListe.length === 0` → „Keine Notizen."
-- Sonst kurzer Hinweis „X Notiz(en) — siehe Tab Notizen" (Detail-Anzeige bleibt im Notizen-Tab).
+- `GET /kunden/<id>` mit `Accept: application/json` liefert JSON-Kundendaten.
+- `GET /kunden/<id>` mit `Accept: text/html` liefert HTML/`index.html`.
+- Nicht-HTML-API-Fehler bleiben weiterhin JSON und werden nicht fälschlich zur App umgeleitet.
 
-### 4. Verifikation
-- `bun run build` muss durchgehen (TS strict).
-- Manuell: Kunde Bayer öffnen → Tabs zeigen korrekte Zählerstände (0/0/0 wenn nichts vorhanden), keine Fehlermeldung mehr.
-- Auch im aktuellen Zustand (Backend auf Pi noch alt) zeigt die Seite jetzt etwas Sinnvolles, weil Frontend die Defaults greift.
+Damit kommt dieser konkrete Fehler nicht wieder zurück.
 
-### 5. Deploy-Hinweis (Pi)
-Die Backend-Änderung wirkt erst nach `Jetzt aktualisieren` in den Einstellungen (oder Service-Restart mit neuem Build). Bis dahin sorgt Punkt 2 dafür, dass die Seite trotzdem nicht crasht.
+### 6. Update-Prozess mit berücksichtigen
+Weil deine Pi-Installation zuletzt beim Update an `/opt/mycleancenter/staging/...` gescheitert ist, ist wichtig:
 
-## Out of Scope
-- Pagination/Limits für die mitgelieferten Listen — Kunden mit hunderten Rechnungen sind aktuell kein Thema; bei Bedarf später `limit` setzen.
-- Backend-Tests — bestehende Tests bleiben grün, neue Felder sind additiv.
+- Die Codeänderung behebt den Seiten-/Routingfehler dauerhaft.
+- Damit sie auf deinem Pi ankommt, muss der Update-Mechanismus einmal sauber laufen.
+- Falls der aktuelle Pi-Service noch keine Schreibrechte auf `/opt/mycleancenter/staging` hat, braucht es einmalig die Reparatur der Update-Verzeichnisse/Service-Rechte; danach soll „Jetzt aktualisieren“ wieder mit einem Klick funktionieren.
+
+## Ergebnis nach Umsetzung
+Nach der Umsetzung gilt:
+
+```text
+Kundenliste -> Kunde anklicken -> Detailseite öffnet
+Reload auf /kunden/<id> -> React-App bleibt sichtbar
+API /kunden/<id> -> liefert weiterhin JSON für die App
+Alte/teilweise Backend-Antwort -> kein Frontend-Crash
+```
+
+Das ist die richtige, dauerhafte Lösung, weil sie nicht nur den sichtbaren Crash kaschiert, sondern den grundlegenden Konflikt zwischen Backend-API-Pfaden und React-Seitenrouting behebt.
