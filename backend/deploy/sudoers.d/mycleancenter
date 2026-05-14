@@ -1,4 +1,4 @@
 # Erlaubt dem mycleancenter-Service, sich selbst per systemctl neu zu starten/zu reloaden.
 # Wird vom System-Update-Runner (in-process) verwendet.
 # Datei muss exakt so unter /etc/sudoers.d/mycleancenter liegen, Mode 0440.
-mycleancenter ALL=(root) NOPASSWD: /bin/systemctl reload mycleancenter, /bin/systemctl restart mycleancenter, /bin/systemctl status mycleancenter
+mycleancenter ALL=(root) NOPASSWD: /bin/systemctl reload mycleancenter, /bin/systemctl restart mycleancenter, /bin/systemctl restart --no-block mycleancenter, /bin/systemctl status mycleancenter

@@ -179,6 +179,7 @@ async function runInstall(laufId: string, opts: InstallOptions): Promise<void> {
   const targetVersionDir = versionDir(stamp);
   let safetyBackupId: string | null = null;
   let swapped = false;
+  let oldTarget: string | null = null;
 
   try {
     // 1. ENTPACKEN — wurde bereits in /validate gemacht. Hier nur prüfen.
@@ -210,6 +211,7 @@ async function runInstall(laufId: string, opts: InstallOptions): Promise<void> {
 
       // previous = aktuelles current-Ziel
       const old = readCurrentTarget();
+      oldTarget = old;
       // current.tmp -> versions/<stamp>
       const tmpLink = currentLink() + ".tmp";
       try { safeUnlink(tmpLink); } catch { /* ignore */ }
@@ -231,14 +233,9 @@ async function runInstall(laufId: string, opts: InstallOptions): Promise<void> {
 
     // 4. INSTALL — npm ci im neuen Ordner
     await stepRun(laufId, "install", async () => {
-      if (opts.testMode) return "test-mode: skipped npm ci";
-      const cwd = backendRuntimeDir(targetVersionDir);
-      const detail = await npmInstallWithFallback(
-        cwd,
-        ["--omit=dev"],
-        "Backend-Produktiv-Install",
-      );
-      return detail;
+      if (opts.testMode) return "test-mode: runtime check skipped";
+      assertUsableRuntime(targetVersionDir, "Neue Version");
+      return "Runtime vollständig vorbereitet (Frontend, Backend, Produktions-Dependencies)";
     });
 
     // 5. MIGRATIONS-Probelauf — Kopie der DB anlegen, Migrationen drauflaufen lassen
@@ -265,14 +262,8 @@ async function runInstall(laufId: string, opts: InstallOptions): Promise<void> {
     // 6. NEUSTART — sudo systemctl reload (sudoers erlaubt nur reload/restart/status)
     await stepRun(laufId, "neustart", async () => {
       if (opts.testMode || config.nodeEnv !== "production") return "dev-mode: kein systemctl";
-      try {
-        await execFileP("sudo", ["-n", "/bin/systemctl", "reload", "mycleancenter"], { timeout: 30_000 });
-        return "sudo systemctl reload mycleancenter";
-      } catch {
-        // Reload-Fail ist nicht zwingend Update-Fail — Service läuft mit altem Process,
-        // aber Code ist gewechselt. User muss restart triggern.
-        return "reload nicht möglich — manueller Restart nötig";
-      }
+      await restartServiceOrThrow();
+      return "sudo systemctl restart mycleancenter";
     });
 
     // 7. SMOKETEST — Healthcheck mehrfach gegen /health
@@ -296,7 +287,7 @@ async function runInstall(laufId: string, opts: InstallOptions): Promise<void> {
     // Auto-Rollback NUR wenn wir bereits geswapt haben
     if (swapped) {
       try {
-        await runRollbackToPrevious(laufId, opts.userId);
+        await runRollbackToPrevious(laufId, opts.userId, oldTarget);
       } catch (e) {
         audit({
           userId: opts.userId,
@@ -346,9 +337,14 @@ async function stepRun(
   }
 }
 
-async function runRollbackToPrevious(laufId: string, userId: string | null): Promise<void> {
-  const prev = readPreviousTarget();
+async function runRollbackToPrevious(
+  laufId: string,
+  userId: string | null,
+  preferredPrevious?: string | null,
+): Promise<void> {
+  const prev = preferredPrevious ?? readPreviousTarget();
   if (!prev) throw new Error("Keine vorherige Version vorhanden");
+  assertUsableRuntime(prev, "Rollback-Ziel");
 
   // Step "rollback" markieren
   setStepStatus(laufId, "rollback", "laeuft");
@@ -424,6 +420,7 @@ export async function manualRollback(
 
         await stepRun(laufId, "rollback", async () => {
           // Defekte aktive Version (sofern abweichend) in broken-* sichern
+          assertUsableRuntime(target, "Rollback-Ziel");
           const cur = readCurrentTarget();
           if (cur && cur !== target) {
             const broken = brokenDir(nowStamp());
@@ -439,10 +436,8 @@ export async function manualRollback(
 
         await stepRun(laufId, "neustart", async () => {
           if (config.nodeEnv !== "production") return "dev-mode: kein systemctl";
-          try {
-            await execFileP("sudo", ["-n", "/bin/systemctl", "restart", "mycleancenter"], { timeout: 30_000 });
-            return "sudo systemctl restart mycleancenter";
-          } catch { return "restart nicht möglich — manueller Eingriff nötig"; }
+          await restartServiceOrThrow();
+          return "sudo systemctl restart mycleancenter";
         });
 
         await stepRun(laufId, "smoketest", async () => {
@@ -487,13 +482,23 @@ function readPreviousTarget(): string | null {
   try {
     return readlinkSync(previousLink());
   } catch {
-    // Fallback: zweitneuestes versions/<stamp>
+    // Fallback: neuestes nutzbares Release außer `current`.
+    // Wichtig für ältere Installationen: erste Pi-Installer nutzten releases/*,
+    // der neue In-App-Updater nutzt versions/*. Wenn previous fehlt, darf ein
+    // Rollback deshalb beide Orte durchsuchen.
     try {
-      const dirs = readdirSync(versionsDir())
-        .filter((d) => !d.startsWith("broken-"))
-        .map((d) => path.join(versionsDir(), d))
-        .sort();
       const cur = readCurrentTarget();
+      const roots = [versionsDir(), path.join(appRoot(), "releases")];
+      const dirs = roots.flatMap((root) => {
+        try {
+          return readdirSync(root)
+            .filter((d) => !d.startsWith("broken-"))
+            .map((d) => path.join(root, d))
+            .filter((d) => existsSync(path.join(d, "backend", "dist", "server.js")));
+        } catch {
+          return [];
+        }
+      }).sort();
       const others = dirs.filter((d) => d !== cur);
       return others[others.length - 1] ?? null;
     } catch { return null; }
@@ -539,7 +544,43 @@ async function ensureBuiltRuntime(versionRoot: string): Promise<string[]> {
   }
   if (!existsSync(frontendIndex)) throw new Error(`Frontend-Build fehlt im Update-Paket: ${frontendIndex}`);
   if (!existsSync(backendServer)) throw new Error(`Backend-Build fehlt im Update-Paket: ${backendServer}`);
+  const prod = await npmInstallWithFallback(
+    backendDir,
+    ["--omit=dev"],
+    "Backend-Produktiv-Install",
+  );
+  details.push(prod);
+  assertUsableRuntime(versionRoot, "Neue Version");
   return details;
+}
+
+function assertUsableRuntime(versionRoot: string, label: string): void {
+  const backendDir = backendRuntimeDir(versionRoot);
+  const required = [
+    path.join(versionRoot, "dist", "index.html"),
+    path.join(backendDir, "dist", "server.js"),
+    path.join(backendDir, "package.json"),
+    path.join(backendDir, "node_modules"),
+  ];
+  const missing = required.filter((p) => !existsSync(p));
+  if (missing.length > 0) {
+    throw new Error(`${label} ist nicht startfähig. Fehlend: ${missing.join(", ")}`);
+  }
+}
+
+async function restartServiceOrThrow(): Promise<void> {
+  try {
+    await execFileP("sudo", ["-n", "/bin/systemctl", "restart", "--no-block", "mycleancenter"], {
+      timeout: 10_000,
+      maxBuffer: 256 * 1024,
+    });
+  } catch (e) {
+    const err = e as { stderr?: string; stdout?: string; message?: string };
+    throw new Error(
+      `Service-Neustart fehlgeschlagen: ${(err.stderr || err.stdout || err.message || String(e)).slice(0, 500)}. ` +
+        `Bitte einmal den Installer aus dem neuen Release ausführen, damit die Update-Rechte aktualisiert werden.`,
+    );
+  }
 }
 
 async function runNpm(cwd: string, args: string[], label: string): Promise<void> {
