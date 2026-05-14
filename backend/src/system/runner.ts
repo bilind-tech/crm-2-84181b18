@@ -535,7 +535,12 @@ async function ensureBuiltRuntime(versionRoot: string): Promise<string[]> {
     // daher ist Reproduzierbarkeit weniger wichtig als Robustheit gegenüber
     // einem leicht veralteten root-package-lock.json (typisch bei
     // GitHub-Update-Paketen, die direkt vom Repo gezogen werden).
-    const fe = await npmInstallTolerant(versionRoot, [], "Frontend-Dependencies");
+    const fe = await npmInstallTolerant(
+      versionRoot,
+      ["--include=dev"],
+      "Frontend-Dependencies",
+      { NODE_ENV: "development" },
+    );
     details.push(fe);
     await runNpm(versionRoot, ["run", "build:spa"], "Frontend-Build");
     prepareRuntimeLayout(versionRoot);
@@ -662,12 +667,18 @@ async function npmInstallTolerant(
   cwd: string,
   extraArgs: string[],
   label: string,
+  envOverride?: Record<string, string>,
 ): Promise<string> {
   try {
     await execFileP(
       "npm",
       ["install", "--no-audit", "--no-fund", ...extraArgs],
-      { cwd, timeout: 20 * 60_000, maxBuffer: 80 * 1024 * 1024 },
+      {
+        cwd,
+        timeout: 20 * 60_000,
+        maxBuffer: 80 * 1024 * 1024,
+        env: envOverride ? { ...process.env, ...envOverride } : process.env,
+      },
     );
     return `${label}: npm install ok`;
   } catch (e) {

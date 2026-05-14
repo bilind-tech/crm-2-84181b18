@@ -1,30 +1,45 @@
-## Diagnose
+## Ursache
 
-Der Fehler kommt nicht vom Backup oder vom Symlink, sondern vom Schritt **Frontend-Dependencies**:
+Der systemd-Service `mycleancenter` läuft mit `Environment=NODE_ENV=production`. Diese Variable wird an alle vom Backend gespawnten `npm`-Prozesse vererbt. npm interpretiert `NODE_ENV=production` standardmäßig als `--omit=dev` — auch bei `npm install`. Dadurch werden devDependencies wie `@vitejs/plugin-react`, `vite`, `@tailwindcss/vite`, `@tanstack/router-plugin` etc. **nicht** installiert. Der anschließende `npm run build:spa` bricht dann ab mit:
 
-`npm ci` bricht ab, weil `package.json` und `package-lock.json` nicht synchron sind. Konkret fehlen neue Abhängigkeiten im Lockfile und `@lovable.dev/vite-tanstack-config` steht im Lockfile noch auf einer älteren Version.
+```
+Cannot find package '@vitejs/plugin-react'
+```
 
-Zusätzlich sieht man: Der GitHub-Update-Pfad lädt offenbar den Repository-Quellstand und baut auf dem Pi. Dadurch ist der Pi auf ein korrektes Root-`package-lock.json` angewiesen.
+Das `npm install` selbst läuft erfolgreich durch (deshalb keine Fehlermeldung in „Abhängigkeiten installieren"), nur die devDeps fehlen still.
 
-## Plan
+## Fix
 
-1. **Root-Lockfile synchronisieren**
-   - `package-lock.json` passend zu `package.json` aktualisieren.
-   - Damit sind neue Pakete wie `pdfmake`, `react-pdf`, `pdfjs-dist`, `qrcode.react`, `jszip` und die Lovable/Vite-Pakete sauber im Lockfile enthalten.
+In `backend/src/system/runner.ts` für den **Frontend**-Install-Schritt explizit devDependencies erzwingen. Zwei kombinierte Maßnahmen (Gürtel + Hosenträger):
 
-2. **Update-Runner robuster machen**
-   - Die bestehende Fallback-Logik (`npm ci` → bei Lockfile-Drift `npm install`) prüfen und so anpassen, dass genau dieser EUSAGE-Fall zuverlässig abgefangen wird.
-   - Ziel: Ein leicht veraltetes Lockfile darf künftig nicht mehr den ganzen Update-Lauf abbrechen.
+1. `npmInstallTolerant()` um optionales Env-Override erweitern.
+2. Beim Frontend-Aufruf `--include=dev` **und** `NODE_ENV=development` setzen.
 
-3. **Release-/GitHub-Paket härten**
-   - Sicherstellen, dass bei GitHub-Updates die benötigten Root-Dateien (`package.json`, `package-lock.json`) konsistent mitkommen.
-   - Wenn ein fertiger Frontend-Build im Paket liegt, soll der Pi nicht unnötig das Frontend neu bauen.
+### Änderungen
 
-4. **Kurzvalidierung**
-   - Keine App-Daten anfassen.
-   - Nur Code/Lockfile ändern.
-   - Danach kann der nächste Update-Versuch über den Button laufen; das bereits erstellte Sicherheits-Backup bleibt unverändert erhalten.
+**`npmInstallTolerant()`** — neuer optionaler Parameter `env?: Record<string,string>`, wird an `execFileP` als `env: { ...process.env, ...env }` übergeben.
 
-## Sofort-Hinweis für dein aktuelles System
+**Frontend-Install (Zeile ~538):**
+```ts
+const fe = await npmInstallTolerant(
+  versionRoot,
+  ["--include=dev"],
+  "Frontend-Dependencies",
+  { NODE_ENV: "development" },
+);
+```
 
-Die Website läuft laut vorherigem Log wieder. Der aktuelle Fehler ist „nur“ der neue Update-Versuch. Bitte jetzt nicht manuell im Datenordner arbeiten und kein Restore starten — das Backup ist vorhanden und der Fix betrifft nur das Update-Paket bzw. die Installationslogik.
+Backend-Install (`npmInstallWithFallback` mit `--omit=dev`) bleibt unverändert — dort sollen devDeps ja gerade nicht rein.
+
+### Warum beides
+
+- `--include=dev` überschreibt `--omit=dev`-Default in den meisten npm-Versionen.
+- `NODE_ENV=development` ist der harte Fallback für ältere npm-Versionen, bei denen `--include=dev` ignoriert wird, wenn die Env-Variable gesetzt ist.
+
+## Test / Rollout
+
+1. Patch committen + pushen.
+2. Auf dem Pi den manuellen Update-Befehl von vorhin ausführen (holt neuen Runner-Code).
+3. Danach Update-Button in der App testen — Frontend-Build muss durchlaufen, `dist/index.html` entstehen, Healthcheck grün.
+
+Daten-Verzeichnis bleibt unangetastet, Sicherheits-Backup wird wie gewohnt vor jedem Versuch erstellt — kein Risiko für Bestandsdaten.
