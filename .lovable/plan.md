@@ -1,75 +1,30 @@
-## Ziel
-Der Button **Aus GitHub aktualisieren** soll zuverlässig funktionieren, auch wenn sich `package.json` geändert hat oder eine Lockfile nicht exakt synchron ist. Der gezeigte Fehler entsteht aktuell, weil der Pi beim GitHub-Update im neuen Code-Ordner `npm ci` ausführt und dabei abbricht, sobald `package-lock.json` nicht exakt zu `package.json` passt.
+## Diagnose
 
-## Problemursache
-- **Updates prüfen** funktioniert, weil dabei nur GitHub abgefragt wird.
-- **Aktualisieren** lädt den GitHub-Code und versucht auf dem Pi daraus Frontend/Backend zu bauen.
-- In der Phase **Quarantäne** läuft für das Frontend `npm ci`.
-- `npm ci` ist absichtlich streng und bricht ab, wenn `package.json` und `package-lock.json` nicht synchron sind.
-- Dadurch scheitert das Update, obwohl der Code an sich korrekt sein kann.
-- Gut: Der Fehler passiert vor dem finalen Symlink-Wechsel; das Sicherheits-Backup wurde erstellt und die Daten bleiben unangetastet.
+Der Fehler kommt nicht vom Backup oder vom Symlink, sondern vom Schritt **Frontend-Dependencies**:
+
+`npm ci` bricht ab, weil `package.json` und `package-lock.json` nicht synchron sind. Konkret fehlen neue Abhängigkeiten im Lockfile und `@lovable.dev/vite-tanstack-config` steht im Lockfile noch auf einer älteren Version.
+
+Zusätzlich sieht man: Der GitHub-Update-Pfad lädt offenbar den Repository-Quellstand und baut auf dem Pi. Dadurch ist der Pi auf ein korrektes Root-`package-lock.json` angewiesen.
 
 ## Plan
 
-### 1. Update-Installer robuster machen
-Ich ändere die Update-Pipeline so, dass sie nicht mehr hart an einem Lockfile-Mismatch scheitert:
+1. **Root-Lockfile synchronisieren**
+   - `package-lock.json` passend zu `package.json` aktualisieren.
+   - Damit sind neue Pakete wie `pdfmake`, `react-pdf`, `pdfjs-dist`, `qrcode.react`, `jszip` und die Lovable/Vite-Pakete sauber im Lockfile enthalten.
 
-- Zuerst weiterhin bevorzugt `npm ci` verwenden, wenn die Lockfile korrekt ist.
-- Wenn `npm ci` mit einem bekannten Lockfile-Sync-Fehler scheitert, automatisch auf `npm install --no-audit --no-fund` wechseln.
-- Das gilt für:
-  - Frontend-Dependencies vor `build:spa`
-  - Backend-Dependencies vor Backend-Build
-  - finalen produktiven Backend-Install mit `--omit=dev`
+2. **Update-Runner robuster machen**
+   - Die bestehende Fallback-Logik (`npm ci` → bei Lockfile-Drift `npm install`) prüfen und so anpassen, dass genau dieser EUSAGE-Fall zuverlässig abgefangen wird.
+   - Ziel: Ein leicht veraltetes Lockfile darf künftig nicht mehr den ganzen Update-Lauf abbrechen.
 
-Damit wird aus einem abbrechenden Update ein selbstheilender Update-Lauf.
+3. **Release-/GitHub-Paket härten**
+   - Sicherstellen, dass bei GitHub-Updates die benötigten Root-Dateien (`package.json`, `package-lock.json`) konsistent mitkommen.
+   - Wenn ein fertiger Frontend-Build im Paket liegt, soll der Pi nicht unnötig das Frontend neu bauen.
 
-### 2. Lockfile-Handling sauber trennen
-Ich verhindere, dass falsche Lockfiles in den falschen Ordner kopiert werden:
+4. **Kurzvalidierung**
+   - Keine App-Daten anfassen.
+   - Nur Code/Lockfile ändern.
+   - Danach kann der nächste Update-Versuch über den Button laufen; das bereits erstellte Sicherheits-Backup bleibt unverändert erhalten.
 
-- Root-`package-lock.json` bleibt nur für das Frontend/Root-Projekt relevant.
-- `backend/package-lock.json` bleibt nur für das Backend relevant.
-- Wenn im GitHub-Code eine Backend-Lockfile fehlt oder nicht passt, wird im Backend-Ordner sauber per `npm install` installiert statt mit einer fremden/falschen Lockfile zu scheitern.
+## Sofort-Hinweis für dein aktuelles System
 
-### 3. Fehlertexte verständlicher machen
-Falls ein Dependency-Install trotzdem fehlschlägt, soll die UI nicht mehr einen riesigen npm-Rohfehler anzeigen, sondern eine klare Meldung wie:
-
-```text
-Abhängigkeiten konnten nicht installiert werden.
-Ursache: package-lock.json war nicht synchron und der automatische npm-install-Fallback ist ebenfalls fehlgeschlagen.
-```
-
-Die technischen Details bleiben gekürzt im Lauf-Detail erhalten, aber nicht als unlesbarer Block.
-
-### 4. Update-Reihenfolge sicher beibehalten
-Die bestehenden Sicherheitsregeln bleiben erhalten:
-
-- Vor dem produktiven Code-Wechsel wird ein Sicherheits-Backup erstellt.
-- `/var/lib/mycleancenter/` wird nicht verändert oder gelöscht.
-- Der neue Code wird erst aktiv geschaltet, wenn Frontend und Backend gebaut bzw. geprüft sind.
-- Bei Fehler bleibt die bisherige Version aktiv.
-
-Ich werde dabei zusätzlich prüfen, dass der Build weiterhin **vor** dem finalen `current`-Symlink-Wechsel passiert.
-
-### 5. Tests ergänzen
-Ich ergänze Tests für genau diesen Fall:
-
-- GitHub-/Update-Paket mit absichtlich unsynchronem `package-lock.json`.
-- Erwartung: Der Installer versucht `npm ci`, erkennt den Lockfile-Fehler und fällt auf `npm install` zurück.
-- Zusätzlich Test für Backend-Install-Fallback.
-- Test, dass bei einem endgültigen Install-Fehler kein Datenverzeichnis angefasst wird und kein kaputter Code aktiv geschaltet wird.
-
-### 6. Sofortige Reparatur für den aktuellen Stand
-Zusätzlich zur Code-Härtung wird die aktuelle Repo-Situation bereinigt:
-
-- Root-`package-lock.json` mit `package.json` synchronisieren.
-- `backend/package-lock.json` mit `backend/package.json` synchron halten.
-- Damit verschwindet der konkrete Fehler aus dem Screenshot sofort, und die neue Fallback-Logik verhindert, dass er später wieder blockierend wird.
-
-## Ergebnis
-Nach Umsetzung gilt:
-
-- GitHub-Update funktioniert auch bei Versions- und Dependency-Änderungen zuverlässig.
-- Lockfile-Mismatch führt nicht mehr automatisch zum Update-Abbruch.
-- Alte Version und Daten bleiben geschützt.
-- Fehlermeldungen werden deutlich verständlicher.
-- Dieser konkrete Fehler soll dauerhaft nicht mehr auftauchen.
+Die Website läuft laut vorherigem Log wieder. Der aktuelle Fehler ist „nur“ der neue Update-Versuch. Bitte jetzt nicht manuell im Datenordner arbeiten und kein Restore starten — das Backup ist vorhanden und der Fix betrifft nur das Update-Paket bzw. die Installationslogik.
