@@ -1,101 +1,82 @@
+## Was du siehst
+
+Frontend zeigt nur `Versand fehlgeschlagen: internal server error`, weil das Backend bei diesem Fall mit HTTP 500 + generischer Fastify-Fehlerantwort antwortet. Die echte Ursache (vermutlich ein Fehler beim Erstellen der Rechnungs-PDF, die als Anhang an die Mail gehängt wird) wird **vor** der Antwort verschluckt — sowohl SMTP-Verbindungsprüfung als auch Test-Mail funktionieren, weil dort **kein PDF-Anhang** gerendert wird. Sobald eine Mail mit Beleg-PDF rausgeht, läuft der Pfad `sendNow → renderRechnungPdf → pdfmake → ...` — und wenn dort etwas wirft (z. B. bei einer Rechnung mit ungewöhnlichen Daten, fehlendem Feld, kaputtem Logo o. ä.), bubble der Fehler unvermittelt in den globalen `setErrorHandler` und wird zu „Internal Server Error".
+
+Konkret:
+
+1. `backend/src/email/worker.ts → sendNow` ruft `renderRechnungPdf(row.belegId)` **außerhalb** des `try/catch`. Wirft das Rendern, geht der Fehler raus aus der Route.
+2. `backend/src/server.ts:202-209` `setErrorHandler` ersetzt jeden 5xx-Fehler mit `{ error: "Internal Server Error" }`. Frontend zeigt diese generische Message an. Echter Stack landet nur in `journalctl -u mycleancenter`.
+3. Die Route `POST /email/versand` (`backend/src/routes/email.ts:127`) hat keinen umfassenden `try/catch` um `sendNow` und auch nicht um die SMTP-Settings/Enqueue-Schritte.
+
 ## Ziel
 
-Du scannst den QR. Auf dem Handy:
-- Foto aufnehmen oder Datei wählen → **erscheint sofort als Vorschau-Kachel**.
-- **Upload startet automatisch** (kein extra „Senden"-Knopf nötig). Pro Kachel siehst du einen Mini-Status: Hochladen → Fertig (grüner Haken) bzw. Fehler (mit „Erneut versuchen").
-- Du kannst direkt das nächste Foto knipsen, ohne zu warten.
-
-Am Laptop im Dialog „Vom Handy scannen":
-- Jede Datei ploppt **sofort** auf, sobald sie hochgeladen ist (kürzeres Polling + sanfte Animation).
-- Zähler + Live-Punkt („verbunden / wartet") bleiben.
-
-## Was vermutlich aktuell hakt
-
-Reproduktion im Mobile-Viewport ergibt zwei Probleme an derselben Datei `src/routes/m.upload.$session.tsx`:
-
-1. **`FileButton` ist innerhalb der Parent-Funktion definiert.** Bei jedem `setDateien` wird die Komponente als neuer Komponententyp behandelt → das echte `<input type="file">` wird unmounted/neu gemountet, was auf iOS Safari die `change`-Verarbeitung instabil macht (sichtbar: Datei „verschwindet" nach Auswahl, keine Vorschau, kein Upload-Button erscheint).
-2. **Zwei-Stufen-Flow** („erst sammeln, dann Senden-Knopf") fühlt sich nicht magisch an und ist eine zusätzliche Tap-Hürde, die der User explizit nicht will.
-
-Begleitend: Backend-Ratelimit auf `POST /upload-sessions/:token/dokumente` ist `10/min` — beim schnellen Foto-Stapel kommt 429. Laptop-Polling bei `1.5s` ist okay, aber Live-Push wäre hübscher; Polling auf `1s` reicht aber für „magisch".
+- Versand mit Beleg-PDF funktioniert.
+- Falls doch etwas knallt: Frontend zeigt **die echte Ursache** auf Deutsch an (z. B. „PDF konnte nicht erstellt werden — Logo ungültig"), nicht „internal server error".
+- Pi-Logs zeigen weiter den vollen Stack zum Nachschauen.
 
 ## Lösung — Schritt für Schritt
 
-### 1) Mobile-Seite umbauen (`src/routes/m.upload.$session.tsx`)
+### 1) PDF-Render-Fehler sauber abfangen (`backend/src/email/worker.ts`)
 
-- `FileButton` **aus** der Render-Funktion herausziehen (Top-Level-Komponente in derselben Datei). Stabiler Komponententyp → iOS verarbeitet `change` zuverlässig.
-- Datei-Eintrag um Status erweitern:
-  ```ts
-  type Status = "wartet" | "laeuft" | "fertig" | "fehler";
-  interface DateiEntry {
-    id: string; file: File; previewUrl: string; istBild: boolean;
-    status: Status; progress: number; fehler?: string;
-  }
-  ```
-- `verarbeite(files)` legt Einträge mit `status: "wartet"` an **und triggert sofort** `starteUpload(entry)` für jeden neuen Eintrag (parallel begrenzt auf max. 2 gleichzeitig — Queue, damit das Ratelimit nicht reißt).
-- `starteUpload`:
-  - setzt `status: "laeuft"`, ruft `uploadDokumentToSession(token, file, meta)`,
-  - bei Erfolg → `status: "fertig"`, kleines Häkchen-Overlay auf der Kachel,
-  - bei Fehler → `status: "fehler"`, kleiner „Erneut"-Button auf der Kachel; bei `429` automatisch nach 2s erneut versuchen (max. 3 Versuche).
-- Den großen Sticky-„Alle senden"-Button **entfernen**. Stattdessen ein dezenter Footer:
-  - `„X von Y gesendet"` + animierter Fortschrittsbalken über alle laufenden Uploads,
-  - bei `alle fertig`: grüner Streifen „Fertig — am PC sichtbar. Du kannst weitere Fotos machen.".
-- Zwei Primär-Buttons bleiben oben groß (Foto / Galerie). Tap-Größe 56 px, Safe-Area-Padding behalten.
-- Kachel-Overlay-Icons:
-  - `wartet` → kleines Uhrzeigersymbol,
-  - `laeuft` → Spinner + Prozent (sofern verfügbar — sonst indeterminate),
-  - `fertig` → grüner Haken,
-  - `fehler` → rotes Dreieck + Tap = Retry.
-- Object-URLs werden weiterhin sauber `revokeObjectURL`'t (nach erfolgreichem Upload).
-
-### 2) Per-Datei-Progress mitnehmen
-
-`uploadDokumentToSession` (in `src/lib/dokument/upload.ts`) gibt es schon, nutzt aber `piApi.post` ohne Progress. Variante mit Progress hinzufügen, die intern `postWithProgress` (existiert bereits für `/dokumente`) verwendet:
+`sendNow`: PDF-Erzeugung in eigenes `try/catch` packen. Bei Fehler → `markFehler(row.id, msg)` + `return { ok: false, error: "PDF konnte nicht erstellt werden: …", errorCode: "PDF_RENDER_FAILED" }`. Damit liefert der Route-Handler bereits jetzt 502 + strukturierte Message zurück (siehe Zeile 222 in `routes/email.ts`), das Frontend zeigt sie via `err.body.message` an.
 
 ```ts
-export async function uploadDokumentToSessionMitProgress(
-  token, file, meta, onProgress, signal,
-): Promise<Dokument> { … postWithProgress(`/upload-sessions/${token}/dokumente`, fd, onProgress, signal) }
+let pdf: RenderResult | null = null;
+if (row.belegArt && row.belegId) {
+  try {
+    pdf = row.belegArt === "angebot"
+      ? await renderAngebotPdf(row.belegId)
+      : await renderRechnungPdf(row.belegId);
+  } catch (e) {
+    const msg = `PDF konnte nicht erstellt werden: ${(e as Error).message ?? "Unbekannter Fehler"}`;
+    markFehler(row.id, msg);
+    return { ok: false, error: msg, errorCode: "PDF_RENDER_FAILED" };
+  }
+  if (pdf) { /* size check + push to attachments wie heute */ }
+}
 ```
 
-Nur diese neue Funktion auf der Handy-Seite verwenden.
+### 2) Route `POST /email/versand` mit Schutzschicht versehen (`backend/src/routes/email.ts`)
 
-### 3) Backend: Ratelimit etwas lockern
+Den gesamten Inhalt der Route in einen äußeren `try/catch` packen. Im `catch`:
 
-`backend/src/routes/dokumente.ts`, Route `POST /upload-sessions/:token/dokumente`:
-- `rateLimit: { max: 60, timeWindow: "1 minute" }` (60 Uploads/min reicht für realistische Foto-Sessions, ohne Tor für Missbrauch zu öffnen — Token läuft ohnehin ab und ist Einmal-Sitzung).
+```ts
+req.log.error({ err }, "Versand-Route Fehler");
+audit({ userId: req.user?.id, ip: req.ip, action: "email.send.fehler", detail: { error: (err as Error).message } });
+reply.status(500);
+return {
+  error: "versand-fehler",
+  message: (err as Error).message ?? "Unbekannter Fehler beim Versand",
+};
+```
 
-Alles andere (Token-Validierung, MIME-Whitelist, Größe, `isSessionUploadable`) bleibt unverändert.
+So überschreibt die Route die generische Fastify-500-Antwort und liefert die echte Message — auch wenn der Fehler nicht aus `sendNow` selbst kommt (z. B. aus `loadSmtpRuntime`).
 
-### 4) Laptop-Dialog (`src/components/dokumente/HandyScanDialog.tsx`)
+### 3) Globaler `setErrorHandler` (`backend/src/server.ts`) — kleines Refinement
 
-- Polling-Intervall in `useUploadSessionLive` von `1500ms` auf `1000ms` senken — fühlt sich „live" an, ohne den Pi zu stressen.
-- Sanfte Einblend-Animation (`animate-in fade-in zoom-in-95`) auf neuen Thumbnails: vergleicht vorherige `dateien.length` mit aktueller, neue Items bekommen Animation einmalig.
-- Statuszeile bleibt; Zähler aktualisiert sich live.
+Nicht-5xx weiter wie heute durchreichen. Bei 5xx zusätzlich die Original-Message **nur in den Pi-Logs** ausgeben (machen wir bereits via `req.log.error`), aber dem Client weiterhin die generische Antwort geben — das ist sicher. Diese Datei muss nicht geändert werden, solange die Route (Schritt 2) den 500-Fall vorher abfängt. Wir lassen sie unverändert.
+
+### 4) Defensive Verbesserungen im Renderer (`backend/src/pdf/belegPdf.server.ts`, `backend/src/pdf/render.ts`)
+
+- `renderPdf`: Fehler aus `printer.createPdfKitDocument(docDef)` (synchroner Wurf) und aus dem Stream sauber als `Error` mit aussagekräftiger Message weiterreichen — ggf. `err.message` mit „pdfmake: " präfixen. Verhindert „undefined"-Stack im Frontend.
+- `renderRechnungPdf` / `renderAngebotPdf`: wenn `getRechnung` / `getKunde` `null` liefert, statt stillem `return null` einen sprechenden `Error` werfen (z. B. „Rechnung nicht mehr vorhanden"), den Schritt 1 sauber als `PDF_RENDER_FAILED` ausgibt. Sonst würde `sendNow` einfach ohne Anhang weiterlaufen (heutiges Verhalten ist `attachments` bleibt leer).
 
 ### 5) Verifikation
 
-- Im Browser Mobile-Viewport (iPhone) `/m/upload/<token>` öffnen, Foto aus Galerie wählen → Kachel erscheint sofort, Spinner → grüner Haken in <2s.
-- Am Laptop parallel den Dialog offen halten → Thumbnail erscheint binnen 1s nach „fertig".
-- Mehrfach-Auswahl (3–5 Bilder) → alle queuen sich, max. 2 parallel, alle landen ohne 429.
-- Flugmodus an während Upload → Kachel zeigt „Erneut versuchen", Tap funktioniert.
+- Echte Mail aus einer Rechnungsdetailseite → Senden. Erwartung: entweder erfolgreich (wenn Render jetzt durchläuft) oder strukturierter Fehler-Toast wie „PDF konnte nicht erstellt werden: <konkreter Grund>".
+- `sudo journalctl -u mycleancenter -n 50 --no-pager` zeigt den vollen Stack — damit lässt sich die Wurzelursache direkt benennen, sobald wir einen echten Render-Fehler sehen. Sollte der Render-Fehler ein triviales Datenproblem sein (fehlendes Feld auf der Rechnung, kaputtes Logo etc.), patchen wir das in einem Folgeschritt direkt.
+- SMTP-Test-Mail (ohne Anhang) muss weiter funktionieren — am Code dieses Pfads ändern wir nichts.
 
 ## Was *nicht* angefasst wird
 
-- Datenmodell `dokumente` / `upload_sessions` (Schema bleibt identisch).
-- Auth, Lockscreen, Daten in `/var/lib/mycleancenter`.
-- Andere Upload-Pfade (Drag-Drop am Laptop, normale `/dokumente`-Route).
-
-## Technische Details (für später beim Bauen)
-
-- Parallel-Limit: einfache `runningCount` State + `useEffect`, der wartende Einträge startet, sobald `runningCount < 2`.
-- Retry bei 429: `error.status === 429` → `setTimeout(() => starteUpload(entry), 2000)`, Versuchszähler im Entry.
-- `previewUrl` für PDFs leer → Fallback-Kachel mit `FileText` bleibt wie heute.
-- Komprimierung (`compressImage`) bleibt in `prepareUpload`, läuft jetzt automatisch beim Auto-Start.
-- Keine neuen Dependencies.
+- Manual-Only-Garantie (`enqueueVersand` weiterhin nur `quelle: "manuell"`).
+- SMTP-Transport / Strato-Konfiguration.
+- Daten in `/var/lib/mycleancenter`.
+- Frontend `EmailVersandDialog` — Toast-Logik liest `err.body.message` bereits korrekt aus.
 
 ## Dateien, die geändert werden
 
-- `src/routes/m.upload.$session.tsx` — Hauptumbau (Auto-Upload, Per-Kachel-Status, FileButton extrahiert).
-- `src/lib/dokument/upload.ts` — neue Funktion `uploadDokumentToSessionMitProgress`.
-- `src/components/dokumente/HandyScanDialog.tsx` — Polling 1s + Einblend-Animation.
-- `backend/src/routes/dokumente.ts` — Ratelimit `10 → 60` für Token-Upload.
+- `backend/src/email/worker.ts` — PDF-Render in eigenes try/catch (`PDF_RENDER_FAILED`).
+- `backend/src/routes/email.ts` — äußerer try/catch um die Versand-Route, strukturierte 500-Antwort.
+- `backend/src/pdf/belegPdf.server.ts` — sprechende Errors statt stiller Null-Returns.
+- `backend/src/pdf/render.ts` — pdfmake-Fehler mit Präfix versehen.

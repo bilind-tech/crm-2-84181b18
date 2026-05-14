@@ -7,7 +7,7 @@
 
 import { getTransport, getFromAddress } from "./transport.js";
 import { markErfolg, markFehler, type EmailVersand } from "./versand-repo.js";
-import { renderAngebotPdf, renderRechnungPdf } from "../pdf/belegPdf.server.js";
+import { renderAngebotPdf, renderRechnungPdf, type RenderResult } from "../pdf/belegPdf.server.js";
 
 const SEND_TIMEOUT_MS = 30_000;
 
@@ -34,9 +34,16 @@ function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
 export async function sendNow(row: EmailVersand): Promise<SendResult> {
   const attachments: Array<{ filename: string; content: Buffer; contentType: string }> = [];
   if (row.belegArt && row.belegId) {
-    const pdf = row.belegArt === "angebot"
-      ? await renderAngebotPdf(row.belegId)
-      : await renderRechnungPdf(row.belegId);
+    let pdf: RenderResult | null = null;
+    try {
+      pdf = row.belegArt === "angebot"
+        ? await renderAngebotPdf(row.belegId)
+        : await renderRechnungPdf(row.belegId);
+    } catch (e) {
+      const msg = `PDF konnte nicht erstellt werden: ${(e as Error).message ?? "Unbekannter Fehler"}`;
+      markFehler(row.id, msg);
+      return { ok: false, error: msg, errorCode: "PDF_RENDER_FAILED" };
+    }
     if (pdf) {
       if (pdf.buffer.byteLength > 15 * 1024 * 1024) {
         const msg = "PDF-Anhang größer als 15 MB";

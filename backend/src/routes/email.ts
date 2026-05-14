@@ -125,6 +125,7 @@ export async function emailRoutes(app: FastifyInstance): Promise<void> {
       return r;
     });
     scoped.post("/email/versand", async (req, reply) => {
+      try {
       const p = VersandSchema.safeParse(req.body);
       if (!p.success) { reply.status(422); return { error: "validation", issues: p.error.issues }; }
 
@@ -226,6 +227,20 @@ export async function emailRoutes(app: FastifyInstance): Promise<void> {
         sendError: result.ok ? undefined : result.error,
         sendErrorCode: result.ok ? undefined : result.errorCode,
       };
+      } catch (err) {
+        req.log.error({ err }, "Versand-Route Fehler");
+        audit({
+          userId: req.user?.id,
+          ip: req.ip,
+          action: "email.send.fehler",
+          detail: { error: (err as Error).message },
+        });
+        reply.status(500);
+        return {
+          error: "versand-fehler",
+          message: (err as Error).message ?? "Unbekannter Fehler beim Versand",
+        };
+      }
     });
     scoped.post<{ Params: { id: string } }>("/email/versand/:id/retry", async (req, reply) => {
       const existing = getById(req.params.id);
