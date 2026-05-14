@@ -179,6 +179,7 @@ async function runInstall(laufId: string, opts: InstallOptions): Promise<void> {
   const targetVersionDir = versionDir(stamp);
   let safetyBackupId: string | null = null;
   let swapped = false;
+  let oldTarget: string | null = null;
 
   try {
     // 1. ENTPACKEN — wurde bereits in /validate gemacht. Hier nur prüfen.
@@ -210,6 +211,7 @@ async function runInstall(laufId: string, opts: InstallOptions): Promise<void> {
 
       // previous = aktuelles current-Ziel
       const old = readCurrentTarget();
+      oldTarget = old;
       // current.tmp -> versions/<stamp>
       const tmpLink = currentLink() + ".tmp";
       try { safeUnlink(tmpLink); } catch { /* ignore */ }
@@ -265,14 +267,8 @@ async function runInstall(laufId: string, opts: InstallOptions): Promise<void> {
     // 6. NEUSTART — sudo systemctl reload (sudoers erlaubt nur reload/restart/status)
     await stepRun(laufId, "neustart", async () => {
       if (opts.testMode || config.nodeEnv !== "production") return "dev-mode: kein systemctl";
-      try {
-        await execFileP("sudo", ["-n", "/bin/systemctl", "reload", "mycleancenter"], { timeout: 30_000 });
-        return "sudo systemctl reload mycleancenter";
-      } catch {
-        // Reload-Fail ist nicht zwingend Update-Fail — Service läuft mit altem Process,
-        // aber Code ist gewechselt. User muss restart triggern.
-        return "reload nicht möglich — manueller Restart nötig";
-      }
+      await restartServiceOrThrow();
+      return "sudo systemctl restart mycleancenter";
     });
 
     // 7. SMOKETEST — Healthcheck mehrfach gegen /health
@@ -296,7 +292,7 @@ async function runInstall(laufId: string, opts: InstallOptions): Promise<void> {
     // Auto-Rollback NUR wenn wir bereits geswapt haben
     if (swapped) {
       try {
-        await runRollbackToPrevious(laufId, opts.userId);
+        await runRollbackToPrevious(laufId, opts.userId, oldTarget);
       } catch (e) {
         audit({
           userId: opts.userId,
