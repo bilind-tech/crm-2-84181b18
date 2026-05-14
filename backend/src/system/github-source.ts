@@ -363,6 +363,29 @@ function deriveAppVersion(extractDir: string, sha: string): string {
   return `${config.version}-gh.${sha.slice(0, 7)}`;
 }
 
+function prepareCleanDir(dir: string): void {
+  rmSync(dir, { recursive: true, force: true });
+  mkdirSync(dir, { recursive: true, mode: 0o755 });
+}
+
+function normalizeGithubPackageLayout(extractDir: string): void {
+  const frontend = path.join(extractDir, "dist-spa");
+  const target = path.join(extractDir, "dist");
+  if (existsSync(frontend) && !existsSync(path.join(target, "index.html"))) {
+    rmSync(target, { recursive: true, force: true });
+    renameSync(frontend, target);
+  }
+
+  const backendDist = path.join(extractDir, "backend", "dist");
+  const backendPkg = path.join(extractDir, "backend", "package.json");
+  if (!existsSync(backendDist) && existsSync(backendPkg)) {
+    writeFileSync(
+      path.join(extractDir, "UPDATE_BUILD_REQUIRED.txt"),
+      "Dieses GitHub-Paket enthält keinen gebauten Backend-Ordner backend/dist. Bitte Release/CI-Build vor dem Pi-Update ausführen.\n",
+    );
+  }
+}
+
 function directorySize(dir: string): number {
   let total = 0;
   const stack = [dir];
