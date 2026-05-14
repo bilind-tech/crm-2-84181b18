@@ -31,6 +31,11 @@ Angebot und Rechnung sollen beim Klick auf „Neues Angebot“ / „Neue Rechnun
    - Ich prüfe danach gezielt, dass keine Browser-`crypto.randomUUID()`-Nutzung im Frontend übrig ist.
    - Ich prüfe außerdem die betroffenen Dateien auf Build-/Syntax-Probleme.
 
+6. **Pi-Update-Befehl korrigieren**
+   - Der Pi muss den SPA-Build `npm run build:spa` ausliefern.
+   - Das gebaute `dist-spa/` muss im Release als `/opt/mycleancenter/current/dist/` landen.
+   - Ein normales `npm run build` erzeugt den falschen TanStack-Start-Build für den Pi und aktualisiert die sichtbare App nicht zuverlässig.
+
 ## Was du nach Freigabe bekommst
 Nach Umsetzung gebe ich dir wieder den fertigen Pi-Update-Befehl mit deinem gemerkten öffentlichen Repo:
 
