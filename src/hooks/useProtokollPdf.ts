@@ -32,6 +32,9 @@ export function useProtokollPdf(
       try {
         const b = await generateProtokollPdf(protokoll, kunde, objekt, firma);
         if (cancelled) return;
+        if (!(b instanceof Blob) || b.size === 0) {
+          throw new Error("PDF konnte nicht erzeugt werden (leerer Blob).");
+        }
         createdUrl = URL.createObjectURL(b);
         setBlob(b);
         setUrl((prev) => {
@@ -41,6 +44,8 @@ export function useProtokollPdf(
         setStatus("ready");
       } catch (e) {
         if (cancelled) return;
+        // eslint-disable-next-line no-console
+        console.error("[useProtokollPdf]", e);
         setError(e instanceof Error ? e.message : "PDF-Fehler");
         setStatus("error");
       }
