@@ -23,6 +23,9 @@ import {
   updateObjekt,
 } from "../kunden/repo.js";
 import { findKuerzelOwner, isKuerzelFormatOk, normalizeKuerzel } from "../kunden/kuerzel.js";
+import { listAngebote } from "../belege/angebote-repo.js";
+import { listRechnungen } from "../belege/rechnungen-repo.js";
+import { listDokumente } from "../dokumente/repo.js";
 import { peekBelegNummer, periodeMMYY } from "../kunden/nummern.js";
 import { suche } from "../kunden/search.js";
 
@@ -63,6 +66,9 @@ export async function stammdatenRoutes(app: FastifyInstance): Promise<void> {
         ...k,
         ansprechpartner: listAnsprechpartner(k.id),
         objekte: listObjekte(k.id),
+        angebote: listAngebote({ kundeId: k.id }),
+        rechnungen: listRechnungen({ kundeId: k.id }),
+        dokumente: listDokumente({ kundeId: k.id }),
         notizen: listNotizenForKunde(k.id),
       };
     });
