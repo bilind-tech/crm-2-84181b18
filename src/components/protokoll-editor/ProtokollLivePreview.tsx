@@ -65,6 +65,9 @@ export function ProtokollLivePreview({ draft, kunde, objekt, firma }: Props) {
       try {
         const blob = await generateProtokollPdf(draft, kunde, objekt, firma);
         if (cancelled) return;
+        if (!(blob instanceof Blob) || blob.size === 0) {
+          throw new Error("PDF konnte nicht erzeugt werden (leerer Blob).");
+        }
         const url = URL.createObjectURL(blob);
         setPendingUrl((prev) => {
           if (prev) URL.revokeObjectURL(prev);

@@ -97,6 +97,9 @@ export function LivePdfPreview(props: Props) {
             ? await generateAngebotPdf(draft as Angebot, kunde, firma, ansprechpartner)
             : await generateRechnungPdf(draft as Rechnung, kunde, firma, ansprechpartner);
         if (cancelled) return;
+        if (!(result.blob instanceof Blob) || result.blob.size === 0) {
+          throw new Error("PDF konnte nicht erzeugt werden (leerer Blob).");
+        }
         const newUrl = URL.createObjectURL(result.blob);
         setHotspots(result.hotspots);
         setPendingUrl((prev) => {
