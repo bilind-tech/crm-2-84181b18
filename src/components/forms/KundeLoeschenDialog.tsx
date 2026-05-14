@@ -39,7 +39,7 @@ type KundeDetail = Omit<Kunde, "notizen"> & {
   angebote?: Angebot[];
   rechnungen?: Rechnung[];
   dokumente?: Dokument[];
-  notizen?: Notiz[] | string;
+  notizen?: unknown[] | string;
 };
 
 interface Props {
