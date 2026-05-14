@@ -25,6 +25,7 @@ import type {
   Position,
 } from "@/lib/api/types";
 import { cn } from "@/lib/utils";
+import { createClientId } from "@/lib/clientId";
 
 const PHONE_PREFIX = "+49 ";
 const WEB_PREFIX = "https://";
@@ -267,7 +268,7 @@ export function KundeForm({ onClose, onCreated }: Props) {
       const positionen: Position[] = [];
       if (f.daPosBezeichnung.trim()) {
         positionen.push({
-          id: crypto.randomUUID(),
+          id: createClientId("pos"),
           beschreibung: f.daPosBezeichnung.trim(),
           menge: f.daPosMenge || 1,
           einheit: "monat",

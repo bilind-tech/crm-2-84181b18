@@ -61,6 +61,7 @@ import {
 } from "@/lib/email/placeholders";
 import type { Angebot, EmailKontext, EmailVorlage, Kunde, Rechnung } from "@/lib/api/types";
 import { cn } from "@/lib/utils";
+import { createClientId } from "@/lib/clientId";
 
 interface Props {
   open: boolean;
@@ -254,10 +255,7 @@ export function EmailVersandDialog({
     setPhase("sending");
 
     // Idempotenz-Key pro Klick — Backend erkennt Doppelklicks und sendet nicht zweimal.
-    const idempotenzKey =
-      typeof crypto !== "undefined" && "randomUUID" in crypto
-        ? crypto.randomUUID()
-        : `mail-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const idempotenzKey = createClientId("mail");
 
     send.mutate(
       {

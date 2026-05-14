@@ -9,6 +9,7 @@ import type {
   Position,
   Rechnung,
 } from "@/lib/api/types";
+import { createClientId } from "@/lib/clientId";
 import { isoDate, periodeBezeichnung, periodeBereich } from "./termine";
 
 export interface RechnungEntwurfInput {
@@ -34,8 +35,7 @@ function fillTokens(template: string, da: Dauerauftrag, stichtag: Date): string 
 }
 
 function uuidShort(): string {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();
-  return Math.random().toString(36).slice(2);
+  return createClientId("pos");
 }
 
 export function erzeugeRechnungAusLauf(input: RechnungEntwurfInput): Rechnung {

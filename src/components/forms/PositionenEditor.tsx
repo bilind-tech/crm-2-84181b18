@@ -12,6 +12,7 @@ import { formatEUR } from "@/lib/format";
 import type { Position, Einheit, PositionModus } from "@/lib/api/types";
 import { LeistungsBeschreibung } from "./LeistungsBeschreibung";
 import { cn } from "@/lib/utils";
+import { createClientId } from "@/lib/clientId";
 
 export interface PositionDraft {
   id: string;
@@ -45,7 +46,7 @@ const EINHEITEN: { value: Einheit; label: string }[] = [
 
 export function emptyPosition(steuersatz = 19, modus: PositionModus = "pauschal"): PositionDraft {
   return {
-    id: crypto.randomUUID(),
+    id: createClientId("pos"),
     modus,
     beschreibung: "",
     menge: 1,
