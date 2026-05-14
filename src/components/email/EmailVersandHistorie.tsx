@@ -36,14 +36,14 @@ export function EmailVersandHistorie({ belegId, belegTyp }: Props) {
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">{v.betreff}</p>
                   <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                    An: {v.empfaenger.join(", ")}
+                    An: {(v.empfaenger ?? []).join(", ") || "—"}
                   </p>
                   <div className="mt-1 flex items-center gap-3 text-[11px] text-muted-foreground">
                     <span>{v.versendetAm ? formatDateTime(v.versendetAm) : "—"}</span>
-                    {v.anhaenge.length > 0 && (
+                    {(v.anhaenge?.length ?? 0) > 0 && (
                       <span className="inline-flex items-center gap-1">
                         <Paperclip className="h-3 w-3" />
-                        {v.anhaenge.length}
+                        {v.anhaenge!.length}
                       </span>
                     )}
                   </div>
