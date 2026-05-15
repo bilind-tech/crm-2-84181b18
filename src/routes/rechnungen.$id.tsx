@@ -299,6 +299,7 @@ function Page() {
           errorMessage={pdf.error}
           drive={r.drive}
           pdfUrl={pdf.url}
+          pdfBlob={pdf.blob}
           viewButton={
             <PdfViewButton kind="rechnung" beleg={r} variant="icon-text" label="PDF ansehen" />
           }
