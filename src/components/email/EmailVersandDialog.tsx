@@ -50,6 +50,7 @@ import {
   useEmailSignaturen,
   useEmailVorlagen,
   useFirmendaten,
+  useKunde,
   useMahnEinstellungen,
   useSendEmail,
   useSmtp,
@@ -107,6 +108,22 @@ export function EmailVersandDialog({
   const { data: mahnEinstellungen } = useMahnEinstellungen();
   const { data: smtp } = useSmtp();
   const send = useSendEmail();
+  // Ansprechpartner des Kunden laden, um die Empfänger-Mail
+  // (falls auf Beleg ein Ansprechpartner ausgewählt ist) zu ermitteln.
+  const { data: kundeDetail } = useKunde(kunde?.id ?? "");
+  const ansprechpartnerListe = kundeDetail?.ansprechpartner ?? [];
+
+  const ansprechpartnerId = angebot?.ansprechpartnerId ?? rechnung?.ansprechpartnerId;
+
+  const empfaengerVorbelegt = useMemo(() => {
+    if (ansprechpartnerId) {
+      const ap = ansprechpartnerListe.find((a) => a.id === ansprechpartnerId);
+      if (ap?.email) return ap.email;
+    }
+    const primaer = ansprechpartnerListe.find((a) => a.primaer && a.email);
+    if (primaer?.email) return primaer.email;
+    return kunde?.email ?? "";
+  }, [ansprechpartnerId, ansprechpartnerListe, kunde?.email]);
 
   // Harte Voraussetzung: ohne SMTP kein Versand. UI muss das klar zeigen
   // und den Senden-Button sperren — sonst entsteht ein falsches Erfolgs-Signal.
@@ -149,7 +166,7 @@ export function EmailVersandDialog({
   // Vorbelegen beim Öffnen
   useEffect(() => {
     if (!open) return;
-    setAn(kunde?.email ?? "");
+    setAn(empfaengerVorbelegt);
     setCc("");
     setBcc("");
     setZeigeCcBcc(false);

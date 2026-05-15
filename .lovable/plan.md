@@ -1,65 +1,46 @@
 ## Problem
 
-Beim Klick auf „Drucken" auf Angebot-, Rechnung- oder Protokoll-Detail erscheint im Druck-Dialog **nicht das echte PDF**, sondern ein nahezu leeres A4-Blatt mit kleinen Texten in den Ecken (das sind die Browser-Druck-Header: URL, Datum, Seitenzahl).
-
-## Ursache
-
-`src/lib/pdf/printBlob.ts` legt für den nicht-iOS-Pfad ein Iframe an mit
-```css
-width: 0; height: 0;
-```
-und ruft danach `iframe.contentWindow.print()`. Chromium-basierte Browser **rendern den eingebetteten PDF-Viewer in einem 0×0-Iframe nicht** — `print()` druckt dann eine leere Page mit den Standard-Browser-Headern (das sind die kleinen Texte oben/unten rechts, die der User sieht). Mit echter Iframe-Größe rendert das PDF-Plugin normal und der Druck-Dialog enthält alle Seiten.
-
-Multi-Page funktioniert sobald der PDF-Viewer richtig lädt — das PDF selbst hat ja schon korrekte Seitenumbrüche aus `printer.ts`/`pdf-lib`. Es gibt nichts, was wir am Inhalt ändern müssen, nur an der iframe-Sichtbarkeit.
+Beim Öffnen des `EmailVersandDialog` (auf Angebot- / Rechnung-Detail) wird das Feld „An" derzeit nur mit `kunde.email` vorbelegt — also der allgemeinen Kunden-Mail. Wenn auf dem Beleg ein **Ansprechpartner** ausgewählt ist (`angebot.ansprechpartnerId` / `rechnung.ansprechpartnerId`), wird dessen E-Mail ignoriert. Der User muss die Adresse jedes Mal manuell eintippen.
 
 ## Fix
 
-Eine Datei: `src/lib/pdf/printBlob.ts`.
+Eine Datei: `src/components/email/EmailVersandDialog.tsx`.
 
-### 1. Iframe sichtbar (für den PDF-Viewer) aber für den User unsichtbar machen
+### 1. Ansprechpartner laden
 
-Statt `width: 0; height: 0` neue Styles:
+Zusätzlich zu den bestehenden Hooks `useKunde(kunde.id)` ziehen — der Endpoint liefert ohnehin `ansprechpartner: Ansprechpartner[]` mit. Hook bedingt aktivieren (`enabled: !!kunde?.id`).
+
+### 2. Empfänger-Resolver
+
+Neue lokale Funktion `resolveEmpfaenger()`:
+
+1. Wenn `angebot?.ansprechpartnerId` oder `rechnung?.ansprechpartnerId` gesetzt → in der geladenen Ansprechpartner-Liste suchen, dessen `.email` (falls vorhanden) verwenden.
+2. Sonst: `primaer === true && email`-Ansprechpartner verwenden, falls vorhanden.
+3. Sonst: Fallback auf `kunde?.email` (heutiges Verhalten).
+4. Sonst: leerer String.
+
+### 3. Vorbelegen-Effekt aktualisieren
+
+Im bestehenden `useEffect`, der bei `open` triggert, Zeile 152 ersetzen:
 ```ts
-iframe.style.position = "fixed";
-iframe.style.inset = "0";
-iframe.style.width = "100vw";
-iframe.style.height = "100vh";
-iframe.style.border = "0";
-iframe.style.opacity = "0";
-iframe.style.pointerEvents = "none";
-iframe.style.zIndex = "-1";
+setAn(resolveEmpfaenger());
 ```
-Damit lädt der eingebettete PDF-Viewer den vollständigen Inhalt, der User sieht aber weiterhin nichts vom Iframe. Druck-Dialog zeigt das echte PDF inklusive aller Seiten.
+Dependencies um die geladenen Ansprechpartner und `angebot?.ansprechpartnerId` / `rechnung?.ansprechpartnerId` erweitern.
 
-### 2. Etwas mehr Wartezeit vor `print()`
+### 4. Kein Eingriff für „allgemein"-Kontext
 
-Die aktuellen 50 ms reichen für PDFs nicht immer (insbesondere mehrseitige). Auf 250–300 ms hochziehen — bleibt für den User unmerklich.
+Wenn weder `angebot` noch `rechnung` gesetzt ist (z. B. allgemeiner Mail-Dialog), bleibt das Verhalten unverändert (`kunde.email`).
 
-### 3. `afterprint`-Cleanup nicht mehr global
+## Out of scope
 
-Aktuell hängt der Listener am `window` — feuert pro Druck **aller** Iframes auf der Seite (wenn der User schnell mehrmals druckt, wird zu früh aufgeräumt). Auf das Iframe-`contentWindow` umstellen:
-```ts
-cw.addEventListener("afterprint", cleanup);
-```
-Plus beibehaltener Sicherheits-Timeout-Cleanup nach 60 s.
-
-### 4. `printed`-Detektion robuster
-
-Aktuell wird `printed = true` direkt nach dem `cw.print()`-Call gesetzt — bei Chromium blockiert `print()` synchron, also korrekt. In Firefox ist `print()` non-blocking; dort genügt der bestehende 6 s-Sicherheits-Fallback. Kein Eingriff nötig, nur Code-Kommentar präzisieren.
-
-## Was nicht geändert wird
-
-- Backend-PDF-Generierung (`backend/src/pdf/printer.ts`, `belegPdf.server.ts`): das PDF selbst ist korrekt, multi-page funktioniert dort längst.
-- `PrintButton.tsx`: API bleibt identisch (`url` / `getBlob`).
-- iOS-Safari-Pfad (`openInNewTab`): bleibt — dort funktioniert iframe-print prinzipiell nicht.
-- Aufrufer (Angebot/Rechnung/Protokoll-Detail): keine Änderung.
+- CC/BCC-Vorbelegung (User will nur „An" automatisch).
+- Mehrere Ansprechpartner gleichzeitig anschreiben.
+- Backend-Änderungen — Ansprechpartner-Daten kommen schon mit `useKunde`.
+- Aufrufer-Komponenten (`angebote.$id.tsx`, `rechnungen.$id.tsx`, `MahnSektion`, `NaechsteSchritteCard`) — keine Anpassung nötig.
 
 ## Verifikation
 
-- Preview auf Angebot-Detail navigieren, „Drucken" klicken → echter PDF-Inhalt im Druck-Dialog mit allen Seiten.
-- Gleiches für Rechnung und Schlüsselübergabe-Protokoll (nutzt `getBlob`-Pfad).
-- Mehrseitiges Angebot mit ≥2 Seiten testen → alle Seiten im Druckdialog vorhanden.
-
-## Risiken
-
-Minimal. Iframe ist via `opacity:0` + `pointer-events:none` + `z-index:-1` für den User unsichtbar/unklickbar; layout-bedingte Nebenwirkungen (Scrollbar etc.) sind durch `position: fixed` ausgeschlossen.
+- Auf Rechnung mit Ansprechpartner → Dialog öffnen → „An" enthält Ansprechpartner-E-Mail.
+- Ansprechpartner ohne E-Mail → Fallback auf Kunden-E-Mail.
+- Beleg ohne Ansprechpartner → Kunden-E-Mail wie bisher.
+- User kann den vorgefüllten Wert weiterhin überschreiben.
