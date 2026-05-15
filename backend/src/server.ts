@@ -107,6 +107,17 @@ async function main(): Promise<void> {
   // Wartungsmodus von der Platte laden (z. B. nach abgebrochenem Restore)
   loadMaintenanceFlagFromDisk();
 
+  // Default-E-Mail-Vorlagen idempotent einspielen. Ergänzt fehlende
+  // Defaults nach Updates, ohne User-Vorlagen zu überschreiben.
+  try {
+    const seed = seedOrUpdateDefaultVorlagen();
+    console.log(
+      `Email-Vorlagen seed: ${seed.eingefuegt} eingefügt, ${seed.bestand} bereits vorhanden.`,
+    );
+  } catch (e) {
+    console.error("Email-Vorlagen seed fehlgeschlagen (nicht fatal):", e);
+  }
+
   // Backup-Geister beerdigen + Disk/DB synchronisieren + verwaiste Restore-tmp aufräumen
   const zombies = reapZombies();
   const orphans = reconcileDiskState();
