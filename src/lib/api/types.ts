@@ -562,7 +562,7 @@ export interface EmailSignatur {
   erstelltAm: ISODateTime;
 }
 
-export type EmailVersandStatus = "queued" | "sending" | "sent" | "failed";
+export type EmailVersandStatus = "pending" | "sending" | "gesendet" | "manuell";
 
 export interface EmailAnhang {
   name: string;
@@ -586,8 +586,12 @@ export interface EmailVersand {
   anhaenge: EmailAnhang[];
   status: EmailVersandStatus;
   versendetAm?: ISODateTime;
-  fehlerGrund?: string;
+  fehlerText?: string;
   messageId?: string;
+  // Vom POST /email/versand-Endpoint zusätzlich gesetzt:
+  sendOk?: boolean;
+  sendError?: string;
+  sendErrorCode?: string;
 }
 
 export interface Nummernkreise {

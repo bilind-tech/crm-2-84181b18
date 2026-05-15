@@ -278,7 +278,7 @@ export function EmailVersandDialog({
       } as Parameters<typeof send.mutate>[0],
       {
         onSuccess: (res) => {
-          if (res.status === "sent") {
+          if (res.sendOk === true || res.status === "gesendet") {
             setPhase("success");
             // Erfolgs-Animation kurz zeigen, dann Toast + Dialog schließen
             setTimeout(() => {
@@ -291,7 +291,9 @@ export function EmailVersandDialog({
             }, 1100);
           } else {
             setPhase("idle");
-            toast.error(`Versand fehlgeschlagen: ${res.fehlerGrund ?? "Unbekannter Fehler"}`);
+            toast.error(
+              `Versand fehlgeschlagen: ${res.sendError ?? res.fehlerText ?? "Unbekannter Fehler"}`,
+            );
           }
         },
         onError: (e: unknown) => {
