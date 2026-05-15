@@ -198,8 +198,10 @@ export function postWithProgress<T>(
       const msg =
         typeof data === "string"
           ? data || xhr.statusText
-          : ((data as { error?: string; message?: string })?.error ??
+          : ((data as { sendError?: string })?.sendError ??
+            (data as { error?: string })?.error ??
             (data as { message?: string })?.message ??
+            (data as { hint?: string })?.hint ??
             xhr.statusText);
       reject(new PiApiError(msg, xhr.status, data));
     };
