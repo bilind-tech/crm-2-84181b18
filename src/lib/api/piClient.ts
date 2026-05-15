@@ -93,8 +93,10 @@ async function request<T>(method: string, path: string, init: FetchInit = {}): P
     const msg =
       typeof data === "string"
         ? data
-        : ((data as { error?: string; message?: string })?.error ??
+        : ((data as { sendError?: string })?.sendError ??
+          (data as { error?: string })?.error ??
           (data as { message?: string })?.message ??
+          (data as { hint?: string })?.hint ??
           res.statusText);
     if (res.status === 401 && !path.startsWith("/auth/")) {
       notifyUnauth();
