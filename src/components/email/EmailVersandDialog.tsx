@@ -200,6 +200,15 @@ export function EmailVersandDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
+  // Falls Ansprechpartner-Daten erst nach Öffnen des Dialogs eintreffen,
+  // den Empfänger nachträglich setzen — nur solange das Feld noch leer
+  // ist, damit User-Eingaben nie überschrieben werden.
+  useEffect(() => {
+    if (!open) return;
+    if (an) return;
+    if (empfaengerVorbelegt) setAn(empfaengerVorbelegt);
+  }, [open, an, empfaengerVorbelegt]);
+
   // Vorlage wechseln → Felder neu setzen
   const onVorlageChange = (id: string) => {
     setVorlageId(id);
