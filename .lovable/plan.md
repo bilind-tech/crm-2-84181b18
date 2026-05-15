@@ -1,65 +1,83 @@
-# Plan: „require is not defined" beim PDF-Versand fixen
+# Plan: „Versand fehlgeschlagen: Unbekannter Fehler" beheben
 
-## Was ist kaputt
+## Was wirklich passiert
 
-Beim Klick auf „E-Mail senden" antwortet der Pi-Backend mit 502 und der Fehlermeldung:
+Das vorherige `require`-Problem ist gelöst — der PDF-Drucker läuft, das Backend antwortet jetzt sauber. Der jetzt sichtbare Fehler kommt **nicht mehr vom Backend, sondern vom Frontend**, das die Antwort falsch interpretiert.
 
-> PDF konnten nicht erstellt werden: require is not defined
+## Ursache (mit Belegen)
 
-(jetzt sichtbar dank des vorherigen Fixes in `piClient.ts`).
-
-## Ursache
-
-Das Backend ist als ESM-Projekt konfiguriert (`backend/package.json` → `"type": "module"`, `tsconfig` → `"module": "ES2022"`).
-
-In `backend/src/pdf/printer.ts` (Zeile 26) steht aber:
+Backend (`backend/src/routes/email.ts`, Zeile 222–229) antwortet bei Erfolg mit HTTP **201** und folgendem Body:
 
 ```ts
-const { createRequire } = require("node:module");
-const requireCjs = createRequire(import.meta.url);
-const PdfPrinter = requireCjs("pdfmake/src/printer.js");
+{ ...row, sendOk: true, sendError: undefined, sendErrorCode: undefined }
 ```
 
-In einem ESM-Modul existiert `require` schlicht nicht — daher der Laufzeit-Fehler **„require is not defined"**, sobald zum ersten Mal eine PDF gerendert werden soll (also genau beim Mail-Versand mit Anhang). In der Lovable-Preview tritt das nicht auf, weil dort gar nicht das echte Backend läuft, sondern nur der Frontend-Build.
+`row.status` aus der DB ist im **deutschen** Wertebereich:
+`"pending" | "sending" | "gesendet" | "manuell"` (siehe `backend/src/email/versand-repo.ts`).
+Bei einem echten Sendefehler liefert es HTTP **502** mit `sendOk:false, sendError:"…", sendErrorCode:"…"`.
 
-Die Idee, `createRequire` zu nutzen, ist richtig (pdfmake hat keine sauberen ESM-Exports). Der Import war nur falsch geschrieben.
+Frontend dagegen prüft in `EmailVersandDialog.tsx`:
+- Zeile 281: `if (res.status === "sent")` — der englische Wert kommt nie vom Pi.
+- Zeile 294: Wenn ungleich `"sent"` → Toast `Versand fehlgeschlagen: ${res.fehlerGrund ?? "Unbekannter Fehler"}`.
+- Das Feld heißt im Backend aber `fehlerText`, nicht `fehlerGrund`.
 
-## Fix (genau eine Datei)
+Auch der TypeScript-Typ ist falsch (`src/lib/api/types.ts` Z. 565):
+```ts
+export type EmailVersandStatus = "queued" | "sending" | "sent" | "failed";
+```
+Die echten Werte sind `"pending" | "sending" | "gesendet" | "manuell"`.
 
-`backend/src/pdf/printer.ts`:
+**Konsequenz:** Selbst wenn die E-Mail erfolgreich verschickt wurde (HTTP 201, `sendOk:true`, `status:"gesendet"`), zeigt das UI „Versand fehlgeschlagen: Unbekannter Fehler". Der vorherige `require`-Fix hat die Mail real ausgeliefert — das UI hat das nur nicht erkannt.
 
-- Oben einen statischen ESM-Import hinzufügen:
+## Fix — minimal, nur Frontend
+
+Drei kleine Änderungen, kein Backend-Touch, kein Datenmodell:
+
+### 1) `src/lib/api/types.ts`
+- `EmailVersandStatus` auf die echten Werte ändern:
   ```ts
-  import { createRequire } from "node:module";
+  export type EmailVersandStatus = "pending" | "sending" | "gesendet" | "manuell";
   ```
-- In `getPrinter()` den falschen `require("node:module")`-Aufruf entfernen und direkt nutzen:
+- Im `EmailVersand`-Interface das Feld `fehlerGrund?: string` umbenennen / ergänzen zu `fehlerText?: string` (passend zum Backend-Mapping).
+- Optionale Antwort-Zusatzfelder ergänzen, damit das Versand-Endpoint-Result typisiert ist:
   ```ts
-  const requireCjs = createRequire(import.meta.url);
-  const PdfPrinter: any = requireCjs("pdfmake/src/printer.js");
+  sendOk?: boolean;
+  sendError?: string;
+  sendErrorCode?: string;
   ```
 
-Das ist die offiziell empfohlene ESM-kompatible Methode, CommonJS-Module wie `pdfmake/src/printer.js` zu laden. Verhalten der PDF-Erzeugung und der Singleton-Logik bleibt 1:1 identisch.
+### 2) `src/components/email/EmailVersandDialog.tsx`
+- Zeile 281: Erfolgskriterium auf das tatsächliche Backend-Schema umstellen:
+  ```ts
+  if (res.sendOk === true || res.status === "gesendet")
+  ```
+- Zeile 294: Fehlertext aus den realen Feldern ziehen:
+  ```ts
+  toast.error(`Versand fehlgeschlagen: ${res.sendError ?? res.fehlerText ?? "Unbekannter Fehler"}`);
+  ```
+
+### 3) Andere Stellen, die noch `"sent"`/`"failed"`/`fehlerGrund` lesen
+Kurze Suche und Anpassung in betroffenen Dateien (`MahnSektion`, ggf. Listen/Filter, `types.ts`-Konsumenten):
+- `=== "sent"` → `=== "gesendet"`
+- `=== "failed"` → `=== "manuell"`
+- `.fehlerGrund` → `.fehlerText`
+
+Nur Lesepfade, keine Logikänderung. Falls in der DB-/API-Seed-Schicht (`localPreviewData`) Mock-Werte mit `"sent"` stehen, dort ebenfalls auf `"gesendet"` ändern, damit Preview und Pi konsistent sind.
 
 ## Was NICHT angefasst wird
 
-- Keine Änderung am Frontend (PDF-Viewer, Detailseiten, Email-Dialog) — die laufen wieder, das soll so bleiben.
-- Keine Änderung an `piClient.ts`, am Mail-Worker, an den Routen oder am Datenmodell.
-- Keine Änderung an `package.json`, `tsconfig.json` oder Build-Skripten.
-- Keine neuen Dependencies.
+- Kein Backend-Code (`backend/**`), kein Datenbank-Schema, keine Migration.
+- Keine Änderung am `piClient.ts` (zeigt bereits `sendError` korrekt im Fehlerfall an).
+- Keine Änderung am PDF-Renderer, an Detailseiten, am PDF-Editor oder an der Vorschau.
+- Keine neuen Dependencies, keine Versionsbumps.
 
-## Deployment auf dem Pi
+## Deployment
 
-Da Code (nicht Daten) ersetzt wird, auf dem Pi nach dem Update:
+Nur Frontend-Änderung. Auf dem Pi: nach Update den Frontend-Build deployen wie üblich (Code in `/opt/mycleancenter/current/`, Daten in `/var/lib/mycleancenter/` werden nicht berührt — Regel eingehalten).
 
-1. `npm run build` im `backend/`-Ordner (kompiliert das geänderte `printer.ts` nach `dist/`).
-2. Backend-Service neu starten (z. B. `systemctl restart mycleancenter-backend`).
+## Verifikation
 
-Daten in `/var/lib/mycleancenter/` werden nicht berührt — die Regel wird eingehalten.
-
-## Verifikation nach dem Fix
-
-1. Auf einer Rechnungs-/Angebots-Detailseite „E-Mail senden" klicken.
-2. Erwartet: Mail geht raus, kein 502, kein „require is not defined".
-3. PDF-Vorschau / Editor weiterhin funktionsfähig (sollten von der Änderung nicht betroffen sein).
-
-Wenn ein neuer Fehler erscheint (z. B. SMTP `EAUTH`), ist das ein **anderer** Fehler und wird separat angegangen — der jetzige Fix beseitigt nur das `require`-Problem.
+1. „E-Mail senden" auslösen.
+2. Erwartet: Toast „E-Mail versendet" + Erfolgs-Animation, Dialog schließt.
+3. SMTP-Fehler künstlich provozieren (z. B. falsches Passwort temporär): Erwartet konkrete Server-Message statt „Unbekannter Fehler".
+4. Liste „Versand"-Status zeigt deutsche Werte korrekt an.
