@@ -22,6 +22,9 @@ cd "$BUILD_DIR"
 npm ci --no-audit --no-fund
 npm run build:spa
 
+echo "==> 2b/6  Frontend-node_modules entfernen (verhindert esbuild-Versions-Kollision beim Backend-Postinstall)"
+rm -rf "$BUILD_DIR/node_modules"
+
 echo "==> 3/6  Backend bauen"
 cd "$BUILD_DIR/backend"
 npm ci --no-audit --no-fund
