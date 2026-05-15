@@ -27,7 +27,7 @@ export function resetTransport(): void {
   _transport = null;
 }
 
-function readSmtpPassword(): string | null {
+export function readSmtpPassword(): string | null {
   const row = getDatabase()
     .prepare(`SELECT value, encrypted FROM setting WHERE key = ?`)
     .get(SENSITIVE_KEYS.smtpPassword) as { value: string; encrypted: number } | undefined;
