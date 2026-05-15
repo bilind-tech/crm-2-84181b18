@@ -4,6 +4,7 @@
 import { CheckCircle2, XCircle, Clock, Loader2, Paperclip } from "lucide-react";
 import { useEmailVersand } from "@/hooks/useApi";
 import { formatDateTime } from "@/lib/format";
+import type { EmailVersandStatus } from "@/lib/api/types";
 
 interface Props {
   belegId: string;
@@ -47,8 +48,8 @@ export function EmailVersandHistorie({ belegId, belegTyp }: Props) {
                       </span>
                     )}
                   </div>
-                  {v.fehlerGrund && (
-                    <p className="mt-1 text-xs text-destructive">{v.fehlerGrund}</p>
+                  {v.fehlerText && (
+                    <p className="mt-1 text-xs text-destructive">{v.fehlerText}</p>
                   )}
                 </div>
                 <StatusBadge status={v.status} />
@@ -61,15 +62,15 @@ export function EmailVersandHistorie({ belegId, belegTyp }: Props) {
   );
 }
 
-function StatusBadge({ status }: { status: "queued" | "sending" | "sent" | "failed" }) {
-  if (status === "sent") {
+function StatusBadge({ status }: { status: EmailVersandStatus }) {
+  if (status === "gesendet") {
     return (
       <span className="inline-flex items-center gap-1 rounded-full border border-success/30 bg-success/10 px-2 py-0.5 text-[11px] font-medium text-success">
         <CheckCircle2 className="h-3 w-3" /> Gesendet
       </span>
     );
   }
-  if (status === "failed") {
+  if (status === "manuell") {
     return (
       <span className="inline-flex items-center gap-1 rounded-full border border-destructive/30 bg-destructive/10 px-2 py-0.5 text-[11px] font-medium text-destructive">
         <XCircle className="h-3 w-3" /> Fehler
