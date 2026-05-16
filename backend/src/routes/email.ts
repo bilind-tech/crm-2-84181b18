@@ -141,13 +141,15 @@ export async function emailRoutes(app: FastifyInstance): Promise<void> {
       const q = z.object({
         status: z.enum(["pending", "sending", "gesendet", "fehler", "manuell"]).optional(),
         beleg_id: z.string().optional(),
+        beleg_art: z.enum(["angebot", "rechnung"]).optional(),
         q: z.string().optional(),
         limit: z.coerce.number().int().min(1).max(500).optional(),
         offset: z.coerce.number().int().min(0).optional(),
       }).parse(req.query ?? {});
       return listVersand({
         status: q.status as EmailVersandStatus | undefined,
-        belegId: q.beleg_id, q: q.q, limit: q.limit, offset: q.offset,
+        belegId: q.beleg_id, belegArt: q.beleg_art,
+        q: q.q, limit: q.limit, offset: q.offset,
       });
     });
     scoped.get<{ Params: { id: string } }>("/email/versand/:id", async (req, reply) => {
