@@ -1,45 +1,45 @@
-## Ziel
-Der QR-Handy-Upload muss auf iPhone und Android sichtbar und nachvollziehbar funktionieren: Nach Kamera oder Galerie-Auswahl muss das Bild sofort auf der Handy-Seite erscheinen, danach hochgeladen werden, und bei Fehlern muss klar sichtbar sein, was passiert ist.
+## Problem
 
-## Problem, das ich behebe
-Aktuell wird der Datei-Input direkt im `onChange` geleert. Auf iOS/Safari kann das dazu führen, dass die ausgewählte Datei nicht zuverlässig übernommen wird. Zusätzlich startet der Upload sofort und der sichtbare Zustand hängt davon ab, ob Datei-Übernahme, Preview-Erzeugung und Upload sauber durchlaufen. Wenn einer dieser Schritte scheitert, sieht man zu wenig.
+Beim Öffnen von `/einstellungen` auf dem Pi (localhost:8787 über SSH-Tunnel) crasht die Seite mit:
 
-## Umsetzung
-1. **Datei-Auswahl iPhone-sicher machen**
-   - Datei-Liste im `onChange` sofort synchron in ein echtes Array kopieren.
-   - `input.value = ""` erst nach dieser Kopie und nicht vor der Verarbeitung ausführen.
-   - Separate Refs für Kamera und Galerie verwenden, damit erneutes Auswählen derselben Datei sauber funktioniert.
+```
+TypeError: undefined is not an object (evaluating 't.unterordnerSchema.rechnungen')
+```
 
-2. **Preview immer sofort anzeigen**
-   - Direkt nach Auswahl einen sichtbaren Eintrag erzeugen.
-   - Bilder mit `URL.createObjectURL(file)` anzeigen.
-   - Falls Object-URL/Preview scheitert, trotzdem eine sichtbare Dateikachel mit Dateiname, Größe und Status anzeigen.
+## Ursache
 
-3. **Upload erst nach sichtbarer Übernahme starten**
-   - Neuer Statusfluss: `Ausgewählt` → `Wird vorbereitet` → `Wird hochgeladen` → `Gespeichert` oder `Fehler`.
-   - Die Datei bleibt auf der Handy-Seite stehen, auch nach Erfolg oder Fehler.
+`GoogleDriveTab.tsx` greift direkt auf `form.unterordnerSchema.rechnungen`, `form.dateinameSchema.rechnung` usw. zu. Liefert das Backend (z. B. ältere Pi-Release-Version oder ein noch nie gespeicherter Settings-State) eines dieser Objekte als `undefined`, knallt der ganze Tab — und damit die komplette Settings-Seite — weg. Genau das passiert gerade: der bundle-Hash im Stack (`einstellungen-CpFwLczC.js`) gehört zu einer älteren Pi-Version, deren `/einstellungen/google-drive`-Response diese Felder noch nicht enthält.
 
-4. **Fehler-Diagnose direkt auf dem Handy einbauen**
-   - Bei jedem Fehler wird eine klare Fehlermeldung mit Code angezeigt.
-   - Zusätzlich ein kleiner Bereich „Fehlerdetails kopieren“ auf der Handy-Seite, damit du mir den echten Fehler schicken kannst.
-   - Erfasst werden unter anderem: Browser, Dateiname, Dateityp, Dateigröße, Session-Token gekürzt, Schritt, HTTP-Status und Fehlermeldung.
+Das hat nichts mit dem OAuth-Tunnel-Setup zu tun. Dein Tunnel auf `localhost:8787` ist genau der richtige Weg, weil Google nur `localhost` oder eine öffentliche Domain als Redirect-URI akzeptiert. Sobald die Seite nicht mehr crasht, kannst du normal verbinden.
 
-5. **Upload-API robuster machen**
-   - `postWithProgress` bekommt sichere JSON-Fehlerbehandlung, falls das Backend kein sauberes JSON zurückgibt.
-   - Upload-Timeout klarer melden.
-   - Nach erfolgreichem Upload wird die Session einmal neu abgefragt, damit „am PC sichtbar“ erst kommt, wenn der Server die Datei wirklich kennt.
+## Lösung (rein Frontend, eine Datei)
 
-6. **PC-Dialog weiter synchron halten**
-   - Die vorhandene Live-Abfrage bleibt.
-   - Bei neu empfangener Datei wird die Dokumentenliste invalidiert, damit sie sofort erscheint.
+### `src/components/einstellungen/GoogleDriveTab.tsx`
 
-## Dateien
-- `src/routes/m.upload.$session.tsx`
-- `src/lib/dokument/upload.ts`
-- `src/lib/api/piClient.ts`
-- bei Bedarf klein: `src/components/dokumente/HandyScanDialog.tsx`
+1. Konstanten `DEFAULT_FOLDERS` und `DEFAULT_FILES` einführen (identisch zum Backend in `backend/src/routes/drive.ts`):
+   - `rechnungen: "Rechnungen/{YYYY}/{MM}"`, `angebote: "Angebote/{YYYY}/{MM}"`, `dokumente: "Dokumente/{YYYY}/{MM}"`, `protokollUebergabe`, `protokollSchluessel`
+   - `rechnung`, `angebot`, `protokoll`
+2. Kleine Helper-Funktion `normalize(data)`, die das eingehende `GoogleDriveEinstellungen`-Objekt unkaputtbar macht:
+   - `rootOrdnerName ??= "mycleancenter.cm"`
+   - `unterordnerSchema = { ...DEFAULT_FOLDERS, ...(data.unterordnerSchema ?? {}) }`
+   - `dateinameSchema = { ...DEFAULT_FILES, ...(data.dateinameSchema ?? {}) }`
+   - `autoUpload ??= true`
+3. Im `useEffect`, der `form` aus `data` setzt, durch `normalize(data)` ersetzen.
+4. `dirty`-Vergleich gegen die normalisierte Variante laufen lassen, damit kein Phantom-Dirty entsteht.
+5. Optional: alle JSX-Zugriffe zusätzlich mit `?.` absichern (`form.unterordnerSchema?.rechnungen ?? ""`), als zweiter Sicherheitsnetz für künftige Backend-Änderungen.
 
-## Nicht betroffen
-- Keine Änderungen an Datenordnern, Backup, Restore oder System-Update.
-- Kein automatischer E-Mail-Versand.
-- Keine Cloud-Umstellung.
+### Keine Backend-Änderungen
+
+`backend/src/routes/drive.ts` liefert bereits sauber gemergte Defaults. Der Crash kommt von alten Pi-Builds — der Frontend-Fix verhindert ihn dauerhaft, egal welche Backend-Version läuft.
+
+## Was du danach tust
+
+1. Neuen Release-Build aufs Pi spielen (damit dieser Frontend-Fix wirkt).
+2. Tunnel zu `localhost:8787` aufmachen.
+3. Einstellungen → Google Drive → „Mit Google verbinden" — sollte jetzt ohne Crash durchlaufen.
+4. Redirect-URI in der Google Cloud Console: `http://localhost:8787/einstellungen/google-drive/callback` (kein zusätzlicher Port nötig — `8080` kannst du wieder rausnehmen, weil das Backend auf `8787` läuft und den Callback dort empfängt).
+
+## Scope-Grenzen
+
+- Nur `src/components/einstellungen/GoogleDriveTab.tsx` wird geändert.
+- Kein Daten-Verzeichnis, kein Backup-/Restore-/Update-Flow, kein E-Mail-Code wird berührt.
