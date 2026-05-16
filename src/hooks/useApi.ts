@@ -1216,6 +1216,30 @@ export const useRetryDriveUpload = () => {
   });
 };
 
+export const useEnqueueDriveUpload = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { belegArt: DriveBelegArt; belegId: string }) =>
+      api.post<{ ok: true }>(`/drive/uploads/enqueue`, vars),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qkDriveUploads }),
+  });
+};
+
+export interface DriveBackfillResult {
+  ok: true;
+  angebote: number;
+  rechnungen: number;
+  dokumente: number;
+  skipped: number;
+}
+export const useDriveBackfill = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.post<DriveBackfillResult>(`/drive/backfill`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qkDriveUploads }),
+  });
+};
+
 // ---------- Backup-Historie & Live-Status & Sitzungen ----------
 export const useBackupHistorie = () =>
   useQuery({
