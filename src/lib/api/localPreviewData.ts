@@ -288,13 +288,6 @@ export function localPreviewGet<T>(path: string): T | null {
   if (cleanPath === "/einstellungen/nummernkreise") return previewNummernkreise as T;
   if (cleanPath === "/mahnung/status") return previewMahnungStatus as T;
   if (cleanPath === "/mahnung/laeufe") return [] as T;
-  if (method === "POST" && cleanPath === "/drive/backfill") {
-    return { ok: true, angebote: 0, rechnungen: 0, dokumente: 0, skipped: 0 } as T;
-  }
-  if (method === "POST" && cleanPath === "/drive/uploads/enqueue") {
-    return { ok: true } as T;
-  }
-
   return null;
 }
 
