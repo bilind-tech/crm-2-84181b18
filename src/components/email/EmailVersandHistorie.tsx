@@ -18,7 +18,13 @@ interface Props {
 }
 
 export function EmailVersandHistorie({ belegId, belegTyp }: Props) {
-  const { data: liste = [], isLoading } = useEmailVersand({ belegId, belegTyp });
+  const { data: rawListe = [], isLoading } = useEmailVersand({ belegId, belegTyp });
+  // Defensiv: auch client-seitig strikt auf den aktuellen Beleg filtern,
+  // damit eine versehentlich ungefilterte Backend-Antwort niemals einen
+  // fremden „gesendet"-Eintrag auf dieser Seite anzeigt.
+  const liste = rawListe.filter(
+    (v) => v.belegId === belegId && v.belegArt === belegTyp,
+  );
   const qc = useQueryClient();
   const [retrying, setRetrying] = useState(false);
 
