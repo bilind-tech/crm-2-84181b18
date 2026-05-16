@@ -468,7 +468,7 @@ export function GoogleDriveTab() {
       <StickySaveBar
         dirty={dirty}
         saving={update.isPending}
-        onReset={() => setForm(data)}
+        onReset={() => setForm(normalized)}
         onSave={save}
       />
     </div>
