@@ -57,8 +57,8 @@ async function processBeleg(row: DriveUpload): Promise<void> {
   };
 
   const pathTemplate = row.belegArt === "angebot"
-    ? settings.unterordnerSchema?.angebote ?? "Angebote/{YYYY}/{MM}"
-    : settings.unterordnerSchema?.rechnungen ?? "Rechnungen/{YYYY}/{MM}";
+    ? settings.unterordnerSchema?.angebote ?? "Angebote/{YYYY}/{MM}_{MMMM}"
+    : settings.unterordnerSchema?.rechnungen ?? "Rechnungen/{YYYY}/{MM}_{MMMM}";
   const fileTemplate = row.belegArt === "angebot"
     ? settings.dateinameSchema?.angebot ?? "{nummer} {kunde} {leistung} {MM}-{YYYY}"
     : settings.dateinameSchema?.rechnung ?? "{nummer} {kunde} {leistung} {MM}-{YYYY}";
@@ -104,12 +104,12 @@ async function processDokument(row: DriveUpload): Promise<void> {
     leistung: protokoll ? objektName : (dok.titel ?? dok.dateiname ?? ""),
   };
 
-  let folderTemplate = settings.unterordnerSchema?.dokumente ?? "Dokumente/{YYYY}/{MM}";
+  let folderTemplate = settings.unterordnerSchema?.dokumente ?? "Dokumente/{YYYY}/{MM}_{MMMM}";
   let fileName = row.dateiName || dok.dateiname || "Dokument";
   if (protokoll) {
     folderTemplate = protokoll.kind === "schluessel"
-      ? (settings.unterordnerSchema?.protokollSchluessel ?? "Protokolle/Schlüsselübergabe/{YYYY}/{MM}")
-      : (settings.unterordnerSchema?.protokollUebergabe ?? "Protokolle/Übergabe-Abnahme/{YYYY}/{MM}");
+      ? (settings.unterordnerSchema?.protokollSchluessel ?? "Protokolle/Schlüsselübergabe/{YYYY}/{MM}_{MMMM}")
+      : (settings.unterordnerSchema?.protokollUebergabe ?? "Protokolle/Übergabe-Abnahme/{YYYY}/{MM}_{MMMM}");
     const fileTemplate = settings.dateinameSchema?.protokoll ?? "{nummer} {kunde} {leistung} {DD}-{MM}-{YYYY}";
     const baseName = applyFileNameTemplate(fileTemplate, ctx) || fileName.replace(/\.pdf$/i, "");
     fileName = `${baseName}.pdf`;
