@@ -61,9 +61,19 @@ export function loadDriveSettings(): DriveSettings {
   };
 }
 
-function getRedirectUri(req?: { protocol?: string; hostname?: string }): string {
-  const fromCfg = process.env.GOOGLE_OAUTH_REDIRECT;
-  if (fromCfg) return fromCfg;
+function isSafeRedirectUri(uri: string): boolean {
+  try {
+    const u = new URL(uri);
+    if (u.protocol === "https:") return true;
+    return u.protocol === "http:" && ["localhost", "127.0.0.1"].includes(u.hostname);
+  } catch {
+    return false;
+  }
+}
+
+export function getGoogleOAuthRedirectUri(req?: { protocol?: string; hostname?: string }): string {
+  const fromCfg = process.env.GOOGLE_OAUTH_REDIRECT?.trim();
+  if (fromCfg && isSafeRedirectUri(fromCfg)) return fromCfg;
   // WICHTIG: redirect_uri ist IMMER localhost.
   // Google OAuth erlaubt bei http:// nur localhost/127.0.0.1 — keine .local-Hosts
   // oder LAN-IPs. Daher pinnen wir fest auf localhost, unabhängig davon, wie das
@@ -79,7 +89,7 @@ export function buildOAuthClient(redirectUri?: string): OAuth2Client {
   const clientId = settings?.clientId;
   const clientSecret = readSecret(SENSITIVE_KEYS.googleClientSecret);
   if (!clientId || !clientSecret) throw new Error("Google Drive Client-ID/Secret fehlen");
-  const client = new google.auth.OAuth2(clientId, clientSecret, redirectUri ?? getRedirectUri());
+  const client = new google.auth.OAuth2(clientId, clientSecret, redirectUri ?? getGoogleOAuthRedirectUri());
   const refresh = readSecret(SENSITIVE_KEYS.googleRefreshToken);
   if (refresh) client.setCredentials({ refresh_token: refresh });
   return client;
@@ -112,7 +122,7 @@ export function verifyState(token: string, maxAgeSec = 600): boolean {
 
 export function buildAuthUrl(req?: { protocol?: string; hostname?: string }): { url: string; state: string } {
   const state = createState();
-  const client = buildOAuthClient(getRedirectUri(req));
+  const client = buildOAuthClient(getGoogleOAuthRedirectUri(req));
   const url = client.generateAuthUrl({
     access_type: "offline",
     prompt: "consent",
@@ -124,7 +134,7 @@ export function buildAuthUrl(req?: { protocol?: string; hostname?: string }): { 
 }
 
 export async function exchangeCode(code: string, req?: { protocol?: string; hostname?: string }): Promise<{ kontoEmail?: string }> {
-  const client = buildOAuthClient(getRedirectUri(req));
+  const client = buildOAuthClient(getGoogleOAuthRedirectUri(req));
   const { tokens } = await client.getToken(code);
   if (!tokens.refresh_token) throw new Error("Kein refresh_token erhalten — bitte in Google-Konto-Berechtigungen alten Zugriff entfernen und erneut verbinden.");
   setSetting(SENSITIVE_KEYS.googleRefreshToken, tokens.refresh_token, { encrypt: true });
