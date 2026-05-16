@@ -118,9 +118,11 @@ export function GoogleDriveTab() {
   const [connectOpen, setConnectOpen] = useState(false);
   const { confirm, dialog: confirmDialog } = useConfirm();
 
+  const normalized = useMemo(() => (data ? normalize(data) : null), [data]);
+
   useEffect(() => {
-    if (data) setForm(data);
-  }, [data]);
+    if (normalized) setForm(normalized);
+  }, [normalized]);
 
   // Wenn nach OAuth zurückgekehrt wird (verbunden==true), Connect-Dialog
   // automatisch schließen.
@@ -129,9 +131,9 @@ export function GoogleDriveTab() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form?.verbunden]);
 
-  if (isLoading || !form || !data) return <LoadingPlaceholder />;
+  if (isLoading || !form || !normalized) return <LoadingPlaceholder />;
 
-  const dirty = JSON.stringify(form) !== JSON.stringify(data);
+  const dirty = JSON.stringify(form) !== JSON.stringify(normalized);
 
   const save = () => {
     update.mutate(
