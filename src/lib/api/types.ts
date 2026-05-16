@@ -574,6 +574,8 @@ export interface EmailAnhang {
 export interface EmailVersand {
   id: ID;
   belegTyp: "angebot" | "rechnung" | "allgemein";
+  /** Backend-Feldname (Spiegel von belegTyp für angebot/rechnung). */
+  belegArt?: "angebot" | "rechnung" | null;
   belegId?: ID;
   kundeId?: ID;
   empfaenger: string[];
