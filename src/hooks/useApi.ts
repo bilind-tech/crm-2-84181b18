@@ -997,8 +997,8 @@ export const useEmailVersand = (filter?: { belegId?: string; belegTyp?: string }
     queryKey: qk.email.versand(filter),
     queryFn: () => {
       const q = new URLSearchParams();
-      if (filter?.belegId) q.set("belegId", filter.belegId);
-      if (filter?.belegTyp) q.set("belegTyp", filter.belegTyp);
+      if (filter?.belegId) q.set("beleg_id", filter.belegId);
+      if (filter?.belegTyp) q.set("beleg_art", filter.belegTyp);
       const s = q.toString();
       return api.get<EmailVersand[]>(`/email/versand${s ? `?${s}` : ""}`);
     },
