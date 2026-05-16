@@ -1,42 +1,34 @@
-# Bug: „E-Mail versendet" erscheint bei frisch erstellter Rechnung/Angebot
+## Plan: Handy-Scan muss sofort sichtbar und nachvollziehbar funktionieren
 
-## Ursache (eindeutig identifiziert)
+Ich ändere den bestehenden QR-Code-Handy-Scan-Flow so, dass nach der Foto-/Dateiauswahl auf dem Handy sofort klar sichtbar ist, was ausgewählt wurde, ob es gerade hochlädt, ob es gespeichert wurde und ob es am PC angekommen ist.
 
-`EmailVersandHistorie` (Beleg-Detailseite) ruft `useEmailVersand({ belegId, belegTyp })`. Der Hook (`src/hooks/useApi.ts:995`) baut die URL aber so:
+### 1. Handy-Seite `/m/upload/:session` stabilisieren
+- Direkt nach Auswahl eines Fotos oder einer Datei wird eine große, eindeutige Vorschau angezeigt.
+- Zusätzlich steht sichtbar darunter: „Ausgewählt“, „Wird hochgeladen“, „Gespeichert“ oder „Fehler“.
+- Es gibt einen klar sichtbaren Button zum erneuten Auswählen bzw. weiteren Foto hinzufügen.
+- Bei Fehlern wird die konkrete Fehlermeldung sichtbar angezeigt und ein „Erneut versuchen“-Button angeboten.
+- Der erfolgreiche Upload bleibt sichtbar, statt dass der Nutzer das Gefühl hat, nichts sei passiert.
 
-```
-/email/versand?belegId=<id>&belegTyp=rechnung
-```
+### 2. Upload nicht nur still im Hintergrund laufen lassen
+- Der automatische Upload bleibt erhalten, aber die Oberfläche zeigt den Vorgang deutlich.
+- Während des Uploads wird Fortschritt angezeigt.
+- Nach Erfolg wird deutlich bestätigt: „Gespeichert und am PC sichtbar“.
+- Falls das Backend nicht erreichbar ist oder die Session abgelaufen ist, erscheint eine klare Meldung statt einer scheinbar leeren Seite.
 
-Das Backend-Schema (`backend/src/routes/email.ts:143`) erwartet jedoch **`beleg_id`** (snake_case). `belegId` wird ignoriert, es gibt keinen `belegTyp`-Filter überhaupt. Folge: Backend liefert die **globale, ungefilterte** Versand-Liste zurück. Die Komponente nimmt `liste[0]` bzw. `find(status==='gesendet')` — das ist dann irgendein älterer erfolgreicher Versand zu einem ganz anderen Beleg → grünes Badge „E-Mail versendet" auf einem Beleg, zu dem nie eine Mail rausging.
+### 3. PC-Dialog „Vom Handy scannen“ zuverlässiger aktualisieren
+- Der PC-Dialog pollt die Session bereits, wird aber so ergänzt, dass empfangene Dateien klarer sichtbar und gezählt werden.
+- Nach neu empfangenem Upload werden auch die Dokumentenlisten invalidiert, damit das Dokument direkt im Dokumente-Bereich auftaucht.
+- Der Wartestatus bleibt verständlich: erst „Warte auf Dateien“, danach „Datei empfangen“.
 
-Verstärkt wird das durch React-Query-Cache: Da `qk.email.versand(filter)` nach Filter keyt, aber alle gleichzeitig dieselben Daten zurückbekommen, wirkt es bei jedem neuen Beleg sofort „versendet".
+### 4. Backend-Session-Antwort als Quelle der Wahrheit nutzen
+- Die mobile Seite fragt nach Upload-Erfolg die Session nochmal ab, damit sie wirklich weiß, dass das Dokument serverseitig gespeichert und in der Session gelandet ist.
+- Dadurch wird nicht nur „XHR war erfolgreich“ angezeigt, sondern tatsächlich „im System angekommen“.
 
-## Fix (klein, rein Frontend + minimaler Backend-Filter)
+### 5. Technische Details
+- Dateien: `src/routes/m.upload.$session.tsx`, `src/components/dokumente/HandyScanDialog.tsx`, ggf. `src/hooks/useApi.ts`.
+- Kein automatischer E-Mail-Versand, kein Datenordner-Eingriff, kein Cloud-Deploy.
+- Keine Änderung am Backup-/Restore-/Update-System.
+- Keine neuen Rollen oder Benutzerlogik.
 
-### 1. `src/hooks/useApi.ts` — Param-Namen korrigieren
-- `q.set("belegId", ...)` → `q.set("beleg_id", filter.belegId)`
-- `belegTyp` zusätzlich als `beleg_art` mitsenden (vom Backend-Schema heute nicht gefiltert, siehe Schritt 2).
-
-### 2. `backend/src/routes/email.ts` — Filter um `beleg_art` erweitern
-- Schema um `beleg_art: z.enum(["angebot","rechnung"]).optional()` ergänzen.
-- An `listVersand` als zusätzliche WHERE-Bedingung weiterreichen.
-- `backend/src/email/versand-repo.ts` → `ListFilter` um `belegArt?: BelegArt` ergänzen, in der WHERE-Klausel `beleg_art = ?` anhängen.
-
-Damit ist garantiert, dass die Detailseite einer Rechnung niemals einen Angebots-Versand und umgekehrt zu sehen bekommt — auch wenn IDs zufällig kollidieren oder ein Beleg gelöscht/neu angelegt wurde.
-
-### 3. (Defensiv) `EmailVersandHistorie.tsx`
-- Zur Sicherheit zusätzlich client-seitig filtern: `liste.filter(v => v.belegId === belegId && v.belegArt === belegTyp)` bevor `letzterVersuch` / `letzterErfolg` bestimmt werden. So bleibt die UI auch korrekt, falls eine alte Backend-Version (ohne neuen Filter) im Cache sitzt.
-
-## Verifikation
-
-1. Neue Rechnung anlegen → Detailseite öffnen → Karte „E-Mail-Versand" zeigt **„Noch nicht versendet"** (grau, Mail-Icon).
-2. Über den Dialog tatsächlich versenden → Karte schaltet auf grünes „E-Mail versendet … am …".
-3. Eine zweite, neue Rechnung anlegen → wieder „Noch nicht versendet" (kein Übersprung mehr).
-4. Netzwerk-Tab: Request lautet `/email/versand?beleg_id=…&beleg_art=rechnung` und Response enthält ausschließlich Einträge zu diesem Beleg.
-
-## Nicht im Scope
-
-- Kein Eingriff in `enqueueVersand`, SMTP, Mahn-Cron, Vorlagen, Auto-Mail-Garantie.
-- Keine Datenbank-Migration nötig (Spalten existieren bereits).
-- Keine UI-Umgestaltung der Karte selbst.
+### Ergebnis
+Nach dem QR-Scan sieht der Nutzer auf dem Handy sofort das ausgewählte Bild, den Upload-Status und die Erfolgsmeldung. Am PC erscheint der Upload im Scan-Dialog und danach in den Dokumenten, ohne dass man raten muss, ob etwas passiert ist.
