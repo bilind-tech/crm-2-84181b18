@@ -36,11 +36,11 @@ export function loadDriveSettings(): DriveSettings {
     clientId: "",
     rootFolderName: "mycleancenter.cm",
     unterordnerSchema: {
-      rechnungen: "Rechnungen/{YYYY}/{MM}",
-      angebote: "Angebote/{YYYY}/{MM}",
-      dokumente: "Dokumente/{YYYY}/{MM}",
-      protokollUebergabe: "Protokolle/Übergabe-Abnahme/{YYYY}/{MM}",
-      protokollSchluessel: "Protokolle/Schlüsselübergabe/{YYYY}/{MM}",
+      rechnungen: "Rechnungen/{YYYY}/{MM}_{MMMM}",
+      angebote: "Angebote/{YYYY}/{MM}_{MMMM}",
+      dokumente: "Dokumente/{YYYY}/{MM}_{MMMM}",
+      protokollUebergabe: "Protokolle/Übergabe-Abnahme/{YYYY}/{MM}_{MMMM}",
+      protokollSchluessel: "Protokolle/Schlüsselübergabe/{YYYY}/{MM}_{MMMM}",
     },
     dateinameSchema: {
       rechnung: "{nummer} {kunde} {leistung} {MM}-{YYYY}",
