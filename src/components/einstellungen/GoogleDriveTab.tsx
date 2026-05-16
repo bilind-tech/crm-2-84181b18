@@ -54,6 +54,32 @@ const DATEI_PLATZHALTER = [
   "{datum}",
 ];
 
+// Defaults identisch zum Backend (backend/src/routes/drive.ts). Werden
+// gemergt, damit ein älteres Backend oder ein leerer Settings-State die
+// Seite nicht crashen lässt.
+const DEFAULT_FOLDERS = {
+  rechnungen: "Rechnungen/{YYYY}/{MM}",
+  angebote: "Angebote/{YYYY}/{MM}",
+  dokumente: "Dokumente/{YYYY}/{MM}",
+  protokollUebergabe: "Protokolle/Übergabe-Abnahme/{YYYY}/{MM}",
+  protokollSchluessel: "Protokolle/Schlüsselübergabe/{YYYY}/{MM}",
+} as const;
+const DEFAULT_FILES = {
+  rechnung: "{nummer} {kunde} {leistung} {MM}-{YYYY}",
+  angebot: "{nummer} {kunde} {leistung} {MM}-{YYYY}",
+  protokoll: "{nummer} {kunde} {leistung} {DD}-{MM}-{YYYY}",
+} as const;
+
+function normalize(data: GoogleDriveEinstellungen): GoogleDriveEinstellungen {
+  return {
+    ...data,
+    rootOrdnerName: data.rootOrdnerName ?? "mycleancenter.cm",
+    unterordnerSchema: { ...DEFAULT_FOLDERS, ...(data.unterordnerSchema ?? {}) },
+    dateinameSchema: { ...DEFAULT_FILES, ...(data.dateinameSchema ?? {}) },
+    autoUpload: data.autoUpload ?? true,
+  };
+}
+
 function pfadVorschau(template: string): string {
   const now = new Date();
   return template
@@ -92,9 +118,11 @@ export function GoogleDriveTab() {
   const [connectOpen, setConnectOpen] = useState(false);
   const { confirm, dialog: confirmDialog } = useConfirm();
 
+  const normalized = useMemo(() => (data ? normalize(data) : null), [data]);
+
   useEffect(() => {
-    if (data) setForm(data);
-  }, [data]);
+    if (normalized) setForm(normalized);
+  }, [normalized]);
 
   // Wenn nach OAuth zurückgekehrt wird (verbunden==true), Connect-Dialog
   // automatisch schließen.
@@ -103,9 +131,9 @@ export function GoogleDriveTab() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form?.verbunden]);
 
-  if (isLoading || !form || !data) return <LoadingPlaceholder />;
+  if (isLoading || !form || !normalized) return <LoadingPlaceholder />;
 
-  const dirty = JSON.stringify(form) !== JSON.stringify(data);
+  const dirty = JSON.stringify(form) !== JSON.stringify(normalized);
 
   const save = () => {
     update.mutate(
@@ -440,7 +468,7 @@ export function GoogleDriveTab() {
       <StickySaveBar
         dirty={dirty}
         saving={update.isPending}
-        onReset={() => setForm(data)}
+        onReset={() => setForm(normalized)}
         onSave={save}
       />
     </div>
