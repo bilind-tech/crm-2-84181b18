@@ -31,6 +31,11 @@ export interface DbKunde {
   geaendert_am: string;
 }
 
+export interface DbKundeWithLogoMeta extends DbKunde {
+  has_logo: number;
+  logo_updated_at: string | null;
+}
+
 export interface ApiKunde {
   id: string;
   nummer: string;
