@@ -36,13 +36,14 @@ export function PrintButton(props: Props) {
     if (busy) return;
     try {
       if ("url" in props && props.url) {
-        printPdfBlobUrl(props.url);
+        setBusy(true);
+        await printPdfBlobUrl(props.url);
         return;
       }
       if ("getBlob" in props && props.getBlob) {
         setBusy(true);
         const blob = await props.getBlob();
-        printPdfBlob(blob);
+        await printPdfBlob(blob);
         return;
       }
       toast.error("PDF ist noch nicht bereit.");
