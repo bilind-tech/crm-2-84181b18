@@ -461,8 +461,185 @@ export function localPreviewMutate<T>(method: string, path: string, body?: unkno
       geaendertAm: timestamp,
     };
     store.rechnungen.push(rechnung);
+    const opt = (input.optionen ?? {}) as {
+      wiederkehrend?: boolean;
+      wiederkehrendDetails?: { rhythmus?: string };
+    };
+    let dauerauftragNeu: { id: string; nummer: string } | undefined;
+    if (opt.wiederkehrend === true) {
+      const freq = mapRhythmusZuFrequenz(opt.wiederkehrendDetails?.rhythmus);
+      const da = createPreviewDauerauftrag(
+        store,
+        {
+          kundeId: rechnung.kundeId,
+          objektId: rechnung.objektId,
+          ansprechpartnerId: rechnung.ansprechpartnerId,
+          bezeichnung: rechnung.titel,
+          frequenz: freq,
+          positionen: rechnung.positionen,
+          rabattGesamt: rechnung.rabattGesamt,
+          steuersatz: rechnung.steuersatz,
+          rechnungsdatum: rechnung.rechnungsdatum,
+          introText: rechnung.introText,
+          outroText: rechnung.outroText,
+        },
+        timestamp,
+      );
+      dauerauftragNeu = { id: da.id, nummer: da.nummer };
+      (rechnung as Rechnung & { dauerauftragId?: string }).dauerauftragId = da.id;
+    }
     writeStore(store);
-    return rechnung as T;
+    return (dauerauftragNeu ? { ...rechnung, dauerauftragNeu } : rechnung) as T;
+  }
+
+  // ---------- Daueraufträge ----------
+
+  if (method === "POST" && cleanPath === "/dauerauftraege") {
+    const input = (body ?? {}) as Partial<Dauerauftrag> & { frequenz?: DauerauftragFrequenz };
+    const da = createPreviewDauerauftrag(
+      store,
+      {
+        kundeId: input.kundeId ?? "preview-kunde-1",
+        objektId: input.objektId,
+        ansprechpartnerId: input.ansprechpartnerId,
+        bezeichnung: input.bezeichnung ?? "Dauerauftrag",
+        frequenz: input.frequenz ?? "monatlich",
+        positionen: input.positionen ?? [],
+        rabattGesamt: input.rabattGesamt ?? 0,
+        steuersatz: input.steuersatz ?? 19,
+        rechnungsdatum: input.laufzeitVon,
+        notizen: input.notizen ?? null,
+      },
+      timestamp,
+    );
+    writeStore(store);
+    return da as T;
+  }
+
+  if (cleanPath.startsWith("/dauerauftraege/")) {
+    const parts = cleanPath.split("/");
+    const id = parts[2];
+    const action = parts[3];
+    const idx = store.dauerauftraege.findIndex((d) => d.id === id);
+
+    if (method === "PATCH" && !action) {
+      if (idx < 0) return null;
+      const patch = (body ?? {}) as Partial<Dauerauftrag>;
+      const updated: Dauerauftrag = {
+        ...store.dauerauftraege[idx],
+        ...patch,
+        id: store.dauerauftraege[idx].id,
+        nummer: store.dauerauftraege[idx].nummer,
+        geaendertAm: timestamp,
+      };
+      store.dauerauftraege[idx] = updated;
+      writeStore(store);
+      return updated as T;
+    }
+    if (method === "DELETE" && !action) {
+      if (idx < 0) return null;
+      store.dauerauftraege.splice(idx, 1);
+      store.dauerauftragLaeufe = store.dauerauftragLaeufe.filter((l) => l.dauerauftragId !== id);
+      store.dauerauftragSonderpos = store.dauerauftragSonderpos.filter((p) => p.dauerauftragId !== id);
+      writeStore(store);
+      return {} as T;
+    }
+    if (method === "POST" && action === "pausieren") {
+      if (idx < 0) return null;
+      const b = (body ?? {}) as { bis?: string | null };
+      store.dauerauftraege[idx] = {
+        ...store.dauerauftraege[idx],
+        status: "pausiert",
+        pausiertBis: b.bis ?? undefined,
+        geaendertAm: timestamp,
+      };
+      writeStore(store);
+      return store.dauerauftraege[idx] as T;
+    }
+    if (method === "POST" && action === "beenden") {
+      if (idx < 0) return null;
+      const b = (body ?? {}) as { zum?: string };
+      store.dauerauftraege[idx] = {
+        ...store.dauerauftraege[idx],
+        status: "beendet",
+        laufzeitBis: b.zum ?? today,
+        geaendertAm: timestamp,
+      };
+      writeStore(store);
+      return store.dauerauftraege[idx] as T;
+    }
+    if (method === "POST" && action === "sofort-lauf") {
+      if (idx < 0) return null;
+      const da = store.dauerauftraege[idx];
+      const b = (body ?? {}) as { periode?: string };
+      const periode = b.periode ?? periodeFuerFrequenz(da.frequenz, new Date());
+      const existing = store.dauerauftragLaeufe.find(
+        (l) => l.dauerauftragId === da.id && l.periode === periode,
+      );
+      if (existing) return existing as T;
+      // Neue Rechnung aus DA erzeugen
+      const rechnung: Rechnung = {
+        id: `preview-rechnung-${crypto.randomUUID()}`,
+        nummer: nextBelegnummer("rechnung", da.kundeId),
+        kundeId: da.kundeId,
+        objektId: da.objektId,
+        ansprechpartnerId: da.ansprechpartnerId,
+        titel: `${da.bezeichnung} — ${periode}`,
+        introText: da.textVorlage || undefined,
+        positionen: clone(da.positionen),
+        rabattGesamt: da.rabattGesamt,
+        steuersatz: da.steuersatz,
+        rechnungsdatum: today,
+        faelligkeitsdatum: due,
+        status: "entwurf",
+        archiviert: false,
+        zahlungen: [],
+        erstelltAm: timestamp,
+        geaendertAm: timestamp,
+      } as Rechnung;
+      (rechnung as Rechnung & { dauerauftragId?: string }).dauerauftragId = da.id;
+      store.rechnungen.push(rechnung);
+      const lauf: DauerauftragLauf = {
+        id: `preview-lauf-${crypto.randomUUID()}`,
+        dauerauftragId: da.id,
+        periode,
+        geplantFuer: today,
+        ausgefuehrtAm: timestamp,
+        rechnungId: rechnung.id,
+        status: "erzeugt",
+      };
+      store.dauerauftragLaeufe.push(lauf);
+      store.dauerauftraege[idx] = { ...da, letzteAusfuehrung: today, geaendertAm: timestamp };
+      writeStore(store);
+      return lauf as T;
+    }
+  }
+
+  if (method === "POST" && cleanPath === "/dauerauftrag-sonderpositionen") {
+    const input = (body ?? {}) as { dauerauftragId: string; fuerPeriode: string; position: DauerauftragSonderposition["position"] };
+    const sp: DauerauftragSonderposition = {
+      id: `preview-sopo-${crypto.randomUUID()}`,
+      dauerauftragId: input.dauerauftragId,
+      fuerPeriode: input.fuerPeriode,
+      position: input.position,
+    };
+    store.dauerauftragSonderpos.push(sp);
+    writeStore(store);
+    return sp as T;
+  }
+  if (method === "DELETE" && cleanPath.startsWith("/dauerauftrag-sonderpositionen/")) {
+    const id = cleanPath.split("/")[2];
+    store.dauerauftragSonderpos = store.dauerauftragSonderpos.filter((p) => p.id !== id);
+    writeStore(store);
+    return {} as T;
+  }
+
+  if (method === "PATCH" && cleanPath === "/einstellungen/dauerauftrag") {
+    const current = store.dauerauftragEinstellungen ?? DA_DEFAULT_EINSTELLUNGEN;
+    const next = { ...current, ...(body as Partial<DauerauftragEinstellungen>) };
+    store.dauerauftragEinstellungen = next;
+    writeStore(store);
+    return next as T;
   }
 
   return null;
