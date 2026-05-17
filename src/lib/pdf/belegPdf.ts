@@ -644,7 +644,6 @@ export async function generateAngebotPdf(
   };
   const effFirma = mergeFirma(firma, angebot.optionen?.firmaOverride);
   const tracker = createHotspotTracker(A4);
-  const kundenLogo = await fetchKundenLogoDataUrl(kunde);
   const doc = await buildDoc(
     { firma: effFirma, kunde, ansprechpartner },
     `Angebot ${angebot.titel || ""}`.trim(),
@@ -660,7 +659,6 @@ export async function generateAngebotPdf(
     defaultOutroAngebot(angebot, opts),
     signaturFromFirma(effFirma),
     angebot.optionen?.logoOverride ?? null,
-    kundenLogo,
     tracker.pageBreakBefore,
   );
   const result = await renderPdf(doc, []);
@@ -687,7 +685,6 @@ export async function generateRechnungPdf(
   };
   const effFirma = mergeFirma(firma, rechnung.optionen?.firmaOverride);
   const tracker = createHotspotTracker(A4);
-  const kundenLogo = await fetchKundenLogoDataUrl(kunde);
   const t = totals(rechnung.positionen, rechnung.rabattGesamt, rechnung.steuersatz);
   // Tage zwischen Rechnungsdatum und Fälligkeit
   let tage = 14;
@@ -725,7 +722,6 @@ export async function generateRechnungPdf(
     fullOutro,
     signaturFromFirma(effFirma),
     rechnung.optionen?.logoOverride ?? null,
-    kundenLogo,
     tracker.pageBreakBefore,
   );
   const result = await renderPdf(doc, []);
