@@ -291,3 +291,10 @@ export function markiereInkasso(id: string): ApiRechnung | null {
   db.prepare(`UPDATE rechnung SET inkasso_markiert = 1 WHERE id = ?`).run(id);
   return getRechnung(id);
 }
+
+/** Verknüpft eine Rechnung nachträglich mit einem Dauerauftrag (intern, ohne Audit). */
+export function setRechnungDauerauftragId(rechnungId: string, dauerauftragId: string | null): void {
+  getDatabase()
+    .prepare(`UPDATE rechnung SET dauerauftrag_id = ? WHERE id = ?`)
+    .run(dauerauftragId, rechnungId);
+}
