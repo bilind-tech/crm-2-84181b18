@@ -14,6 +14,7 @@ const PanelResizeHandle = Separator;
 import { LivePdfPreview } from "./LivePdfPreview";
 import { EditorPanel, type EditorTab } from "./EditorPanel";
 import { HotspotInlineEditor } from "./HotspotInlineEditor";
+import type { RowAction, TableAction } from "./PdfFieldOverlay";
 import { useBelegEditor } from "@/hooks/useBelegEditor";
 import { metaForId } from "@/lib/pdf/fieldMap";
 import type {
@@ -59,6 +60,7 @@ export function PdfEditorLayout(props: Props) {
       kind={kind}
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       set={editor.set as any}
+      rowActions={rowActions}
       onOpenAdvanced={() => {
         const meta = metaForId(fieldId);
         setActiveTab(meta.tab as EditorTab);
@@ -70,6 +72,25 @@ export function PdfEditorLayout(props: Props) {
     />
   );
 
+  const positions = draft.positionen;
+  const rowActions: RowAction = {
+    onMoveUp: (id) => editor.movePosition(id, "up"),
+    onMoveDown: (id) => editor.movePosition(id, "down"),
+    onDuplicate: (id) => editor.duplicatePosition(id),
+    onInsertBelow: (id) => editor.insertPositionAfter(id),
+    onDelete: (id) => editor.removePosition(id),
+    canMoveUp: (id) => positions.findIndex((p) => p.id === id) > 0,
+    canMoveDown: (id) => {
+      const i = positions.findIndex((p) => p.id === id);
+      return i >= 0 && i < positions.length - 1;
+    },
+  };
+  const tableActions: TableAction = {
+    onAddRow: () => editor.addEmptyPosition("einzel"),
+    onAddStundenRow: () => editor.addEmptyPosition("stunden"),
+    onAddPauschalRow: () => editor.addEmptyPosition("pauschal"),
+  };
+
   const preview = (
     <LivePdfPreview
       kind={kind === "angebot" ? "angebot" : "rechnung"}
@@ -79,6 +100,8 @@ export function PdfEditorLayout(props: Props) {
       firma={firma}
       ansprechpartner={ansprechpartner}
       renderEditor={renderEditor}
+      rowActions={rowActions}
+      tableActions={tableActions}
     />
   );
 
