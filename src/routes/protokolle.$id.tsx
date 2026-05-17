@@ -81,7 +81,10 @@ function Page() {
               ? "error"
               : "idle") as "idle" | "loading" | "ready" | "error",
         error: archived.error,
-        blob: null as Blob | null,
+        // Blob direkt durchreichen → PdfCanvasViewer nimmt den stabilen
+        // ArrayBuffer-Pfad statt blob:-URL (vermeidet
+        // "Unexpected server response (0)" im PDF.js-Worker).
+        blob: archived.blob,
       }
     : livePdf;
 
