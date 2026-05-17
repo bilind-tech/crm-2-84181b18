@@ -49,6 +49,9 @@ export interface KundeFilter {
 export function listKunden(f: KundeFilter = {}): ApiKunde[] {
   const where: string[] = [];
   const params: unknown[] = [];
+  // Soft-Delete: gelöschte Kunden tauchen nirgends in der normalen UI auf.
+  // Wiederherstellung nur über die Datenbank-Seite.
+  where.push("geloescht_am IS NULL");
   if (f.status) {
     where.push("status = ?");
     params.push(f.status);
@@ -78,7 +81,7 @@ export function listKunden(f: KundeFilter = {}): ApiKunde[] {
 
 export function getKunde(id: string): ApiKunde | null {
   const row = getDatabase()
-    .prepare(`SELECT ${KUNDE_COLS} FROM kunde WHERE id = ?`)
+    .prepare(`SELECT ${KUNDE_COLS} FROM kunde WHERE id = ? AND geloescht_am IS NULL`)
     .get(id) as DbKunde | undefined;
   return row ? kundeRowToApi(row) : null;
 }
@@ -238,56 +241,21 @@ export function hasKundeReferences(id: string): boolean {
   return false;
 }
 
-export function deleteKunde(
-  id: string,
-  opts: { force?: boolean } = {},
-): "soft" | "hard" | "missing" {
+// Soft-Delete: setzt `geloescht_am`. Der Datensatz verschwindet aus allen
+// normalen Listen/Detail-Views — bleibt aber komplett wiederherstellbar in
+// Einstellungen → Datenbank. Hart-Löschen passiert ausschließlich dort
+// (passwortgeschützt). Belegnummern-Zähler und Kürzel werden NICHT freigegeben,
+// damit ein Restore keine Doppel-Vergabe verursacht.
+export function deleteKunde(id: string): "ok" | "missing" {
   const db = getDatabase();
-  const exists = db.prepare(`SELECT 1 FROM kunde WHERE id = ?`).get(id);
-  if (!exists) return "missing";
-
-  if (!opts.force && hasKundeReferences(id)) {
-    db.prepare(`UPDATE kunde SET archiviert = 1, status = 'inaktiv' WHERE id = ?`).run(id);
-    return "soft";
+  const r = db
+    .prepare(`UPDATE kunde SET geloescht_am = datetime('now') WHERE id = ? AND geloescht_am IS NULL`)
+    .run(id);
+  if (r.changes === 0) {
+    const exists = db.prepare(`SELECT 1 FROM kunde WHERE id = ?`).get(id);
+    return exists ? "ok" : "missing";
   }
-
-  // Force-Delete: alle abhängigen Daten in einer Transaction kaskadierend löschen.
-  // Angebot/Rechnung haben ON DELETE RESTRICT auf kunde_id → wir müssen sie
-  // explizit zuerst löschen. Positionen/Zahlungen/Mahnungen hängen via CASCADE
-  // an Angebot/Rechnung und gehen automatisch mit. Dokumente/Protokolle/Upload-
-  // Sessions sind via SET NULL gekoppelt — wir markieren Dokumente als gelöscht
-  // (soft) und stellen Protokoll-Verknüpfungen automatisch auf NULL.
-  const tx = db.transaction(() => {
-    const tableExists = (name: string): boolean =>
-      !!db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name=?`).get(name);
-
-    if (tableExists("rechnung")) {
-      db.prepare(`DELETE FROM rechnung WHERE kunde_id = ?`).run(id);
-    }
-    if (tableExists("angebot")) {
-      db.prepare(`DELETE FROM angebot WHERE kunde_id = ?`).run(id);
-    }
-    if (tableExists("dokumente")) {
-      db.prepare(
-        `UPDATE dokumente
-           SET geloescht_am = datetime('now')
-         WHERE kunde_id = ? AND geloescht_am IS NULL`,
-      ).run(id);
-    }
-    if (tableExists("belegnummer_zaehler")) {
-      db.prepare(`DELETE FROM belegnummer_zaehler WHERE kunde_id = ?`).run(id);
-    }
-    if (tableExists("belegnummer_zaehler_v2")) {
-      db.prepare(`DELETE FROM belegnummer_zaehler_v2 WHERE kunde_id = ?`).run(id);
-    }
-    if (tableExists("belegnummer_reserviert")) {
-      db.prepare(`DELETE FROM belegnummer_reserviert WHERE kunde_id = ?`).run(id);
-    }
-    // Ansprechpartner, Objekte, Notizen löschen via ON DELETE CASCADE.
-    db.prepare(`DELETE FROM kunde WHERE id = ?`).run(id);
-  });
-  tx();
-  return "hard";
+  return "ok";
 }
 
 // ----------------------------- LOGO -----------------------------
@@ -342,14 +310,14 @@ const AP_COLS = `
 
 export function listAnsprechpartner(kundeId: string): ApiAnsprechpartner[] {
   const rows = getDatabase()
-    .prepare(`SELECT ${AP_COLS} FROM ansprechpartner WHERE kunde_id = ? ORDER BY primaer DESC, erstellt_am ASC`)
+    .prepare(`SELECT ${AP_COLS} FROM ansprechpartner WHERE kunde_id = ? AND geloescht_am IS NULL ORDER BY primaer DESC, erstellt_am ASC`)
     .all(kundeId) as DbAnsprechpartner[];
   return rows.map(ansprechpartnerRowToApi);
 }
 
 export function getAnsprechpartner(id: string): ApiAnsprechpartner | null {
   const row = getDatabase()
-    .prepare(`SELECT ${AP_COLS} FROM ansprechpartner WHERE id = ?`)
+    .prepare(`SELECT ${AP_COLS} FROM ansprechpartner WHERE id = ? AND geloescht_am IS NULL`)
     .get(id) as DbAnsprechpartner | undefined;
   return row ? ansprechpartnerRowToApi(row) : null;
 }
@@ -448,17 +416,20 @@ export function updateAnsprechpartner(id: string, patch: Record<string, unknown>
   return getAnsprechpartner(id);
 }
 
+// Soft-Delete (siehe deleteKunde).
 export function deleteAnsprechpartner(id: string): boolean {
   const db = getDatabase();
   const cur = getAnsprechpartner(id);
   if (!cur) return false;
   const tx = db.transaction(() => {
-    db.prepare(`DELETE FROM ansprechpartner WHERE id = ?`).run(id);
+    db.prepare(`UPDATE ansprechpartner SET geloescht_am = datetime('now') WHERE id = ?`).run(id);
     if (cur.primaer) {
-      // Wenn der primäre weg war, ersten verbliebenen zum primären machen.
+      // Primären-Flag an einen verbliebenen aktiven Ansprechpartner weiterreichen.
       const next = db
         .prepare(
-          `SELECT id FROM ansprechpartner WHERE kunde_id = ? ORDER BY erstellt_am ASC LIMIT 1`,
+          `SELECT id FROM ansprechpartner
+             WHERE kunde_id = ? AND geloescht_am IS NULL
+             ORDER BY erstellt_am ASC LIMIT 1`,
         )
         .get(cur.kundeId) as { id: string } | undefined;
       if (next) {
@@ -483,8 +454,8 @@ const OBJEKT_COLS = `
 
 export function listObjekte(kundeId?: string): ApiObjekt[] {
   const sql = kundeId
-    ? `SELECT ${OBJEKT_COLS} FROM objekt WHERE kunde_id = ? ORDER BY archiviert ASC, geaendert_am DESC`
-    : `SELECT ${OBJEKT_COLS} FROM objekt ORDER BY archiviert ASC, geaendert_am DESC LIMIT 500`;
+    ? `SELECT ${OBJEKT_COLS} FROM objekt WHERE kunde_id = ? AND geloescht_am IS NULL ORDER BY archiviert ASC, geaendert_am DESC`
+    : `SELECT ${OBJEKT_COLS} FROM objekt WHERE geloescht_am IS NULL ORDER BY archiviert ASC, geaendert_am DESC LIMIT 500`;
   const rows = (kundeId
     ? getDatabase().prepare(sql).all(kundeId)
     : getDatabase().prepare(sql).all()) as DbObjekt[];
@@ -493,7 +464,7 @@ export function listObjekte(kundeId?: string): ApiObjekt[] {
 
 export function getObjekt(id: string): ApiObjekt | null {
   const row = getDatabase()
-    .prepare(`SELECT ${OBJEKT_COLS} FROM objekt WHERE id = ?`)
+    .prepare(`SELECT ${OBJEKT_COLS} FROM objekt WHERE id = ? AND geloescht_am IS NULL`)
     .get(id) as DbObjekt | undefined;
   return row ? objektRowToApi(row) : null;
 }
@@ -615,13 +586,17 @@ export function updateObjekt(id: string, patch: Record<string, unknown>): ApiObj
   return getObjekt(id);
 }
 
-export function deleteObjekt(id: string): "soft" | "hard" | "missing" {
+// Soft-Delete (siehe deleteKunde).
+export function deleteObjekt(id: string): "ok" | "missing" {
   const db = getDatabase();
-  const exists = db.prepare(`SELECT 1 FROM objekt WHERE id = ?`).get(id);
-  if (!exists) return "missing";
-  // Step 4/7: später check auf rechnungspositionen / angebotsbezug.
-  db.prepare(`DELETE FROM objekt WHERE id = ?`).run(id);
-  return "hard";
+  const r = db
+    .prepare(`UPDATE objekt SET geloescht_am = datetime('now') WHERE id = ? AND geloescht_am IS NULL`)
+    .run(id);
+  if (r.changes === 0) {
+    const exists = db.prepare(`SELECT 1 FROM objekt WHERE id = ?`).get(id);
+    return exists ? "ok" : "missing";
+  }
+  return "ok";
 }
 
 // =============================================================================
@@ -632,7 +607,7 @@ const NOTIZ_COLS = `id, kunde_id, objekt_id, angebot_id, rechnung_id, text, auto
 
 export function listNotizenForKunde(kundeId: string): ApiNotiz[] {
   const rows = getDatabase()
-    .prepare(`SELECT ${NOTIZ_COLS} FROM notiz WHERE kunde_id = ? ORDER BY erstellt_am DESC`)
+    .prepare(`SELECT ${NOTIZ_COLS} FROM notiz WHERE kunde_id = ? AND geloescht_am IS NULL ORDER BY erstellt_am DESC`)
     .all(kundeId) as DbNotiz[];
   return rows.map(notizRowToApi);
 }
@@ -672,7 +647,10 @@ export function createNotiz(data: NotizWrite): ApiNotiz {
   return notizRowToApi(row);
 }
 
+// Soft-Delete (siehe deleteKunde).
 export function deleteNotiz(id: string): boolean {
-  const r = getDatabase().prepare(`DELETE FROM notiz WHERE id = ?`).run(id);
+  const r = getDatabase()
+    .prepare(`UPDATE notiz SET geloescht_am = datetime('now') WHERE id = ? AND geloescht_am IS NULL`)
+    .run(id);
   return r.changes > 0;
 }

@@ -150,33 +150,15 @@ export async function stammdatenRoutes(app: FastifyInstance): Promise<void> {
       }
     });
 
-    scoped.delete<{ Params: { id: string }; Querystring: { force?: string } }>(
-      "/kunden/:id",
-      async (req, reply) => {
-        const force = req.query?.force === "1" || req.query?.force === "true";
-        try {
-          const mode = deleteKunde(req.params.id, { force });
-          if (mode === "missing") {
-            reply.status(404);
-            return { error: "not-found" };
-          }
-          audit({
-            userId: req.user?.id,
-            action: "kunde.delete",
-            detail: { id: req.params.id, mode, force },
-            ip: req.ip,
-          });
-          return { ok: true, mode };
-        } catch (err) {
-          req.log.error({ err }, "kunde.delete failed");
-          reply.status(409);
-          return {
-            error: "delete-failed",
-            message: err instanceof Error ? err.message : "Löschen fehlgeschlagen",
-          };
-        }
-      },
-    );
+    scoped.delete<{ Params: { id: string } }>("/kunden/:id", async (req, reply) => {
+      const r = deleteKunde(req.params.id);
+      if (r === "missing") {
+        reply.status(404);
+        return { error: "not-found" };
+      }
+      audit({ userId: req.user?.id, action: "kunde.delete", detail: { id: req.params.id }, ip: req.ip });
+      return { ok: true };
+    });
 
     // ---------------- LOGO ----------------
     const LOGO_MAX_BYTES = 2 * 1024 * 1024; // 2 MB
@@ -363,13 +345,13 @@ export async function stammdatenRoutes(app: FastifyInstance): Promise<void> {
     });
 
     scoped.delete<{ Params: { id: string } }>("/objekte/:id", async (req, reply) => {
-      const mode = deleteObjekt(req.params.id);
-      if (mode === "missing") {
+      const r = deleteObjekt(req.params.id);
+      if (r === "missing") {
         reply.status(404);
         return { error: "not-found" };
       }
-      audit({ userId: req.user?.id, action: "objekt.delete", detail: { id: req.params.id, mode }, ip: req.ip });
-      return { ok: true, mode };
+      audit({ userId: req.user?.id, action: "objekt.delete", detail: { id: req.params.id }, ip: req.ip });
+      return { ok: true };
     });
 
     // ---------------- NOTIZEN ----------------

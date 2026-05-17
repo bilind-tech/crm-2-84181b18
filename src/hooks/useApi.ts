@@ -191,9 +191,10 @@ export const useDeleteKunde = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (arg: string | { id: string; force?: boolean }) => {
+      // `force` wird vom alten Aufruf noch akzeptiert, aber ignoriert.
+      // Soft-Delete ist jetzt einheitlich — Hart-Löschen nur über die Datenbank-Seite.
       const id = typeof arg === "string" ? arg : arg.id;
-      const force = typeof arg === "string" ? false : !!arg.force;
-      return api.delete<void>(`/kunden/${id}${force ? "?force=1" : ""}`);
+      return api.delete<void>(`/kunden/${id}`);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: qk.kunden });
@@ -352,8 +353,7 @@ export const useDeleteAngebot = () => {
   return useMutation({
     mutationFn: (arg: string | { id: string; force?: boolean }) => {
       const id = typeof arg === "string" ? arg : arg.id;
-      const force = typeof arg === "string" ? false : !!arg.force;
-      return api.delete<void>(`/angebote/${id}${force ? "?force=1" : ""}`);
+      return api.delete<void>(`/angebote/${id}`);
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["angebote"] }),
   });
@@ -454,8 +454,7 @@ export const useDeleteRechnung = () => {
   return useMutation({
     mutationFn: (arg: string | { id: string; force?: boolean }) => {
       const id = typeof arg === "string" ? arg : arg.id;
-      const force = typeof arg === "string" ? false : !!arg.force;
-      return api.delete<void>(`/rechnungen/${id}${force ? "?force=1" : ""}`);
+      return api.delete<void>(`/rechnungen/${id}`);
     },
     onSuccess: () => invalidateRechnungScope(qc),
   });

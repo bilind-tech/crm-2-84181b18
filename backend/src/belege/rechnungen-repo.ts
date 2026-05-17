@@ -50,6 +50,8 @@ export function listRechnungen(f: RechnungFilter = {}): ApiRechnung[] {
   const db = getDatabase();
   const where: string[] = [];
   const params: unknown[] = [];
+  // Soft-Delete: gelöschte Rechnungen werden ausgeblendet (Restore via DB-Seite).
+  where.push("geloescht_am IS NULL");
   if (f.kundeId) {
     where.push("kunde_id = ?");
     params.push(f.kundeId);
@@ -84,7 +86,7 @@ export function listRechnungen(f: RechnungFilter = {}): ApiRechnung[] {
 
 export function getRechnung(id: string): ApiRechnung | null {
   const db = getDatabase();
-  const row = db.prepare(`SELECT ${RECHNUNG_COLS} FROM rechnung WHERE id = ?`).get(id) as
+  const row = db.prepare(`SELECT ${RECHNUNG_COLS} FROM rechnung WHERE id = ? AND geloescht_am IS NULL`).get(id) as
     | DbRechnung
     | undefined;
   if (!row) return null;
@@ -197,7 +199,7 @@ const RECHNUNG_UPDATABLE: Record<string, string> = {
 
 export function updateRechnung(id: string, patch: Record<string, unknown>): ApiRechnung | null {
   const db = getDatabase();
-  const cur = db.prepare(`SELECT status FROM rechnung WHERE id = ?`).get(id) as
+  const cur = db.prepare(`SELECT status FROM rechnung WHERE id = ? AND geloescht_am IS NULL`).get(id) as
     | { status: string }
     | undefined;
   if (!cur) return null;
@@ -245,34 +247,26 @@ export function updateRechnung(id: string, patch: Record<string, unknown>): ApiR
   return getRechnung(id);
 }
 
-export function deleteRechnung(
-  id: string,
-  opts: { force?: boolean } = {},
-): "soft" | "hard" | "missing" {
+// Soft-Delete: setzt `geloescht_am`. Belegnummer bleibt belegt. Zahlungen,
+// Mahn-Einträge, Drive- und E-Mail-Historie werden NICHT angefasst (sind beim
+// Restore wieder verfügbar). Hart-Löschen passiert ausschließlich über
+// Einstellungen → Datenbank.
+export function deleteRechnung(id: string): "ok" | "missing" {
   const db = getDatabase();
-  const cur = db.prepare(`SELECT versendet_am, status FROM rechnung WHERE id = ?`).get(id) as
-    | { versendet_am: string | null; status: string }
-    | undefined;
-  if (!cur) return "missing";
-  if (!opts.force && (cur.versendet_am || cur.status !== "entwurf")) {
-    db.prepare(`UPDATE rechnung SET archiviert = 1 WHERE id = ?`).run(id);
-    emitBelegMutated("rechnung", id);
-    return "soft";
+  const r = db
+    .prepare(`UPDATE rechnung SET geloescht_am = datetime('now') WHERE id = ? AND geloescht_am IS NULL`)
+    .run(id);
+  if (r.changes === 0) {
+    const exists = db.prepare(`SELECT 1 FROM rechnung WHERE id = ?`).get(id);
+    return exists ? "ok" : "missing";
   }
-  const tx = db.transaction(() => {
-    db.prepare(`DELETE FROM email_versand WHERE beleg_art='rechnung' AND beleg_id = ?`).run(id);
-    db.prepare(`DELETE FROM drive_upload_queue WHERE beleg_art='rechnung' AND beleg_id = ?`).run(id);
-    db.prepare(`DELETE FROM mahn_lauf_eintraege WHERE rechnung_id = ?`).run(id);
-    db.prepare(`DELETE FROM rechnung WHERE id = ?`).run(id);
-  });
-  tx();
   emitBelegMutated("rechnung", id);
-  return "hard";
+  return "ok";
 }
 
 export function sendeRechnung(id: string): ApiRechnung | null {
   const db = getDatabase();
-  const cur = db.prepare(`SELECT status FROM rechnung WHERE id = ?`).get(id) as
+  const cur = db.prepare(`SELECT status FROM rechnung WHERE id = ? AND geloescht_am IS NULL`).get(id) as
     | { status: string }
     | undefined;
   if (!cur) return null;

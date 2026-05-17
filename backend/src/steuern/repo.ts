@@ -78,7 +78,7 @@ export function deleteBezahltByPrefix(prefix: string): number {
 export function listManuellePosten(): ManuellerPosten[] {
   const db = getDatabase();
   const rows = db
-    .prepare("SELECT * FROM steuer_manueller_posten ORDER BY faellig_am ASC")
+    .prepare("SELECT * FROM steuer_manueller_posten WHERE geloescht_am IS NULL ORDER BY faellig_am ASC")
     .all() as ManuellerRow[];
   return rows.map(rowToManueller);
 }
@@ -86,7 +86,7 @@ export function listManuellePosten(): ManuellerPosten[] {
 export function getManuellerPosten(id: string): ManuellerPosten | null {
   const db = getDatabase();
   const r = db
-    .prepare("SELECT * FROM steuer_manueller_posten WHERE id = ?")
+    .prepare("SELECT * FROM steuer_manueller_posten WHERE id = ? AND geloescht_am IS NULL")
     .get(id) as ManuellerRow | undefined;
   return r ? rowToManueller(r) : null;
 }
@@ -139,11 +139,12 @@ export function updateManuellerPosten(
   return getManuellerPosten(id);
 }
 
+// Soft-Delete. Hart-Löschen (inkl. Bezahlt-Markierung) passiert über
+// Einstellungen → Datenbank.
 export function removeManuellerPosten(id: string): boolean {
-  const db = getDatabase();
-  const r = db.prepare("DELETE FROM steuer_manueller_posten WHERE id = ?").run(id);
-  // Auch Bezahlt-Markierung räumen
-  db.prepare("DELETE FROM steuer_bezahlt_markierung WHERE posten_id = ?").run(id);
+  const r = getDatabase()
+    .prepare("UPDATE steuer_manueller_posten SET geloescht_am = datetime('now') WHERE id = ? AND geloescht_am IS NULL")
+    .run(id);
   return r.changes > 0;
 }
 

@@ -89,9 +89,7 @@ export function KundeLoeschenDialog({ kunde, open, onOpenChange }: Props) {
       {
       onSuccess: () => {
         toast.success(
-          force
-            ? `Kunde „${fullName}“ endgültig gelöscht`
-            : `Kunde „${fullName}“ archiviert`,
+          `Kunde „${fullName}“ gelöscht. Wiederherstellbar in Einstellungen → Datenbank.`,
         );
         handleOpenChange(false);
         navigate({ to: "/kunden" });

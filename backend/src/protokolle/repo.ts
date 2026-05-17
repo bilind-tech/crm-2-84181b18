@@ -98,23 +98,25 @@ export interface CreateInput {
 
 export function listProtokolle(filter: { kind?: ProtokollKind; kundeId?: string }): Protokoll[] {
   const db = getDatabase();
-  const where: string[] = [];
+  const where: string[] = ["geloescht_am IS NULL"];
   const params: unknown[] = [];
   if (filter.kind) { where.push("kind = ?"); params.push(filter.kind); }
   if (filter.kundeId) { where.push("kunde_id = ?"); params.push(filter.kundeId); }
-  const sql = `SELECT * FROM protokolle ${where.length ? "WHERE " + where.join(" AND ") : ""} ORDER BY erstellt_am DESC`;
+  const sql = `SELECT * FROM protokolle WHERE ${where.join(" AND ")} ORDER BY erstellt_am DESC`;
   const rows = db.prepare(sql).all(...params) as ProtokollRow[];
   return rows.map(rowToApi);
 }
 
 export function getProtokoll(id: string): Protokoll | null {
-  const r = getDatabase().prepare(`SELECT * FROM protokolle WHERE id = ?`).get(id) as ProtokollRow | undefined;
+  const r = getDatabase()
+    .prepare(`SELECT * FROM protokolle WHERE id = ? AND geloescht_am IS NULL`)
+    .get(id) as ProtokollRow | undefined;
   return r ? rowToApi(r) : null;
 }
 
 export function getProtokollByDokumentId(dokumentId: string): Protokoll | null {
   const r = getDatabase()
-    .prepare(`SELECT * FROM protokolle WHERE dokument_id = ? LIMIT 1`)
+    .prepare(`SELECT * FROM protokolle WHERE dokument_id = ? AND geloescht_am IS NULL LIMIT 1`)
     .get(dokumentId) as ProtokollRow | undefined;
   return r ? rowToApi(r) : null;
 }
@@ -183,8 +185,12 @@ export function updateProtokoll(id: string, patch: Partial<CreateInput>): Protok
   return getProtokoll(id);
 }
 
+// Soft-Delete. Das verknüpfte Dokument bleibt unangetastet — es kann separat
+// in Einstellungen → Datenbank verwaltet werden.
 export function deleteProtokoll(id: string): boolean {
-  const res = getDatabase().prepare(`DELETE FROM protokolle WHERE id = ?`).run(id);
+  const res = getDatabase()
+    .prepare(`UPDATE protokolle SET geloescht_am = datetime('now') WHERE id = ? AND geloescht_am IS NULL`)
+    .run(id);
   return res.changes > 0;
 }
 
