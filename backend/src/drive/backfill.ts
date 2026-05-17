@@ -14,13 +14,13 @@ interface Row { id: string }
 
 function listAngebotIdsForSync(): string[] {
   const rows = getDatabase()
-    .prepare(`SELECT id FROM angebot WHERE status IN ('angenommen','versendet') LIMIT 1000`)
+    .prepare(`SELECT id FROM angebot WHERE status IN ('angenommen','versendet') AND geloescht_am IS NULL LIMIT 1000`)
     .all() as Row[];
   return rows.map((r) => r.id);
 }
 function listRechnungIdsForSync(): string[] {
   const rows = getDatabase()
-    .prepare(`SELECT id FROM rechnung WHERE status IN ('versendet','bezahlt','teilbezahlt') LIMIT 1000`)
+    .prepare(`SELECT id FROM rechnung WHERE status IN ('versendet','bezahlt','teilbezahlt') AND geloescht_am IS NULL LIMIT 1000`)
     .all() as Row[];
   return rows.map((r) => r.id);
 }

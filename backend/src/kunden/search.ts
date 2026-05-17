@@ -56,7 +56,7 @@ function nummerLikeFallback(q: string, limit: number): SuchTreffer[] {
       `SELECT a.id, a.nummer, a.titel,
               COALESCE(k.firmenname, TRIM(COALESCE(k.nachname,'') || ' ' || COALESCE(k.vorname,''))) AS kunde
          FROM angebot a LEFT JOIN kunde k ON k.id = a.kunde_id
-        WHERE a.nummer LIKE ? LIMIT ?`,
+        WHERE a.nummer LIKE ? AND a.geloescht_am IS NULL LIMIT ?`,
     )
     .all(like, limit) as Array<{ id: string; nummer: string; titel: string | null; kunde: string | null }>) {
     rows.push({
@@ -73,7 +73,7 @@ function nummerLikeFallback(q: string, limit: number): SuchTreffer[] {
       `SELECT a.id, a.nummer, a.titel,
               COALESCE(k.firmenname, TRIM(COALESCE(k.nachname,'') || ' ' || COALESCE(k.vorname,''))) AS kunde
          FROM rechnung a LEFT JOIN kunde k ON k.id = a.kunde_id
-        WHERE a.nummer LIKE ? LIMIT ?`,
+        WHERE a.nummer LIKE ? AND a.geloescht_am IS NULL LIMIT ?`,
     )
     .all(like, limit) as Array<{ id: string; nummer: string; titel: string | null; kunde: string | null }>) {
     rows.push({
@@ -93,7 +93,7 @@ function nummerLikeFallback(q: string, limit: number): SuchTreffer[] {
          FROM protokolle p
          LEFT JOIN kunde k ON k.id = p.kunde_id
          LEFT JOIN objekt o ON o.id = p.objekt_id
-        WHERE p.nummer LIKE ? LIMIT ?`,
+        WHERE p.nummer LIKE ? AND p.geloescht_am IS NULL LIMIT ?`,
     )
     .all(like, limit) as Array<{ id: string; nummer: string; kind: string; kunde: string | null; objekt: string | null }>) {
     rows.push({
@@ -109,7 +109,7 @@ function nummerLikeFallback(q: string, limit: number): SuchTreffer[] {
     .prepare(
       `SELECT id, nummer,
               COALESCE(firmenname, TRIM(COALESCE(nachname,'') || ' ' || COALESCE(vorname,''))) AS name
-         FROM kunde WHERE nummer LIKE ? LIMIT ?`,
+         FROM kunde WHERE nummer LIKE ? AND geloescht_am IS NULL LIMIT ?`,
     )
     .all(like, limit) as Array<{ id: string; nummer: string; name: string | null }>) {
     rows.push({
