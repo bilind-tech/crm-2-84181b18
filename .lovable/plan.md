@@ -1,88 +1,34 @@
-# Plan: Restarbeiten Kunden-Löschen, Logo-UI & Stundenzettel-Proxy
+## Plan
 
-Drei abgegrenzte Bausteine, die alle Backend- und Frontend-Endstücke aus dem letzten Lauf abschließen.
+1. **E-Mail-versenden Button optisch aufwerten**
+   - Einen wiederverwendbaren Premium-Button für „Per E-Mail versenden“ bauen, optisch passend zum blauen „Neue Rechnung/Neues Angebot“-Button.
+   - Dezent edel: blauer Verlauf, feiner Innen-Glanz, hochwertiger Schatten, ruhiger Hover-Effekt, kein übertriebener Glow.
+   - Einsetzen bei Angeboten, Rechnungen, Listen-Aktionen und überall dort, wo der Versand-Button als Hauptaktion sichtbar ist.
 
-## 1. KundeLoeschenDialog: echtes „Endgültig löschen"
+2. **Übergabe-/Abnahmeprotokoll und Schlüsselübergabe einbeziehen**
+   - Die relevanten Erstellen-/Abschließen-/PDF-Aktionsbuttons auf den Protokoll-Seiten optisch konsistent an den Premium-Primary-Stil anpassen, ohne die bestehende Bedienung zu verändern.
+   - Icons und Abstände sauber angleichen, damit Angebot, Rechnung und Protokolle wie aus einem Guss wirken.
 
-**Problem:** Backend kann bereits `?force=1` (cascading delete), aber `KundeLoeschenDialog.tsx` ruft `del.mutate(kunde.id)` ohne `force` — deshalb bleibt der Kunde nach Soft-Delete als inaktiv hängen.
+3. **Google-Drive-Sync fachlich korrigieren**
+   - Backend prüfen und ändern: Drive-Upload für Angebote/Rechnungen soll erst nach erfolgreichem manuellem E-Mail-Versand angestoßen werden.
+   - Aktuell hängt der Drive-Auto-Upload an allgemeinen Beleg-Mutationen/statusbasierten Änderungen; das wird auf das vorhandene „Beleg versendet“-Event umgestellt.
+   - Keine automatische E-Mail-Logik anfassen oder hinzufügen. Versand bleibt ausschließlich User-Klick.
 
-- Dialog auf neue Signatur umstellen: `del.mutate({ id: kunde.id, force: true })`.
-- Stufe 2 zusätzlich um eine sichtbare Checkbox **„Inkl. aller Rechnungen, Angebote, Zahlungen und Dokumente endgültig löschen"** ergänzen (default an, wenn `hatDaten`). Wenn Nutzer abwählt, wird `force=false` gesendet (Soft-Archiv).
-- Button-Text dynamisch: „Endgültig löschen" vs. „Archivieren".
-- Fehler-Toast: zeigt Server-Message (z. B. 409) klartext.
+4. **Dauerhaften Sync-Spinner in der PDF-Vorschau entfernen**
+   - Den unteren PDF-Vorschau-Badge so ändern, dass „Wird synchronisiert …“ nur erscheint, wenn wirklich ein Drive-Upload läuft.
+   - Wenn noch kein Drive-Upload geplant/gestartet ist, wird stattdessen ruhig „Lokal“ oder kein störender Status angezeigt.
+   - Der separate kleine Drive-Status oben bleibt sinnvoll, aber ohne dauerhaft drehenden Spinner, wenn nichts synchronisiert wird.
 
-**Datei:** `src/components/forms/KundeLoeschenDialog.tsx`
+5. **Drucken zuverlässig reparieren**
+   - Den aktuellen iframe-Druck ersetzen, weil dieser bei PDFs offenbar leere Seiten erzeugt.
+   - Neue robuste Druckstrategie: PDF per PDF.js in echte Seitenbilder rendern, in ein druckoptimiertes Fenster/Layout setzen und erst drucken, wenn alle Seiten fertig geladen sind.
+   - Anwenden bei Angebot, Rechnung und Protokollen, inklusive Übergabe-/Abnahmeprotokoll und Schlüsselübergabe.
+   - Fallback: Wenn Rendering fehlschlägt, wird die PDF sauber in einem neuen Tab geöffnet statt ein leeres Druckblatt auszugeben.
 
-## 2. Kunden-Logo Frontend
+6. **Jahresfilter standardmäßig auf aktuelles Jahr setzen**
+   - Bei Angebote und Rechnungen den Zeitraum-Filter initial auf das aktuelle Jahr setzen, Monat weiter auf „Alle Monate“.
+   - „Alle Jahre“ bleibt weiterhin manuell auswählbar und der Reset funktioniert weiterhin.
 
-Backend liefert bereits `GET/POST/DELETE /kunden/:id/logo`, `hasLogo` und `logoUpdatedAt` im Kunde-Objekt. Frontend baut darauf auf.
-
-### 2.1 Typ & API-Helpers
-- `Kunde` in `src/lib/api/types.ts` erweitern: `hasLogo?: boolean; logoUpdatedAt?: string`.
-- `src/hooks/useApi.ts`: neue Hooks
-  - `useKundeLogoUrl(kundeId, logoUpdatedAt)` → liefert authentifizierte Blob-URL (Cache-Bust über `logoUpdatedAt`).
-  - `useUploadKundeLogo()` → multipart POST.
-  - `useDeleteKundeLogo()` → DELETE; invalidiert `kunden`-Queries.
-
-### 2.2 Wiederverwendbare Komponente
-- Neu: `src/components/kunden/KundeLogo.tsx`
-  - Props: `kunde, size: "sm"|"md"|"lg"|"xl", className?`
-  - Wenn `hasLogo`: zeigt Bild via Blob-URL.
-  - Fallback: Initialen-Avatar in `bg-muted` (Firmenkürzel oder erste 2 Buchstaben).
-- Neu: `src/components/kunden/KundeLogoUploadDialog.tsx`
-  - Drag-and-drop + File-Input, Vorschau, MIME-/Größen-Check vor Upload (≤2 MB, PNG/JPG/WebP/SVG).
-  - Buttons „Hochladen", „Entfernen" (nur wenn vorhanden), „Schließen".
-
-### 2.3 Einbindung
-- **Kundenliste** `src/routes/kunden.tsx`: kleines `KundeLogo size="sm"` links neben Name in jeder Zeile / Karte.
-- **Kunden-Detailseite** `src/routes/kunden.$id.tsx`: großes `KundeLogo size="xl"` im Header, daneben „Logo ändern"-Button → öffnet Upload-Dialog.
-- **PDF (Rechnung/Angebot)**: in `src/lib/pdf/belegPdf.ts` Logo-Quelle erweitern — wenn Kunde `hasLogo`, lade Blob als Data-URL und reiche es als sekundäres Logo („Kunden-Logo") an den PDF-Renderer. Position: rechts oben unter dem Firmen-Logo, max. 30 mm breit. Wenn `logoOverride` (Per-Beleg) gesetzt ist, hat das weiterhin Vorrang. Renderer-Anpassung minimal in `belegPdf.ts`/Layout, kein neuer PDF-Server-Code nötig (Daten gehen über bestehenden Payload).
-
-## 3. Stundenzettel Reverse-Proxy
-
-**Problem:** Iframe lädt LAN-Adresse nicht aus der Cloud-Preview und HTTP-in-HTTPS wird vom Browser blockiert. Lösung: Backend (Pi) proxied die externe App, Frontend lädt sie über `/extern/stundenzettel/*` derselben Origin.
-
-### 3.1 Backend
-- Neu: `backend/src/routes/extern.ts`
-  - Registriert unter Auth-geschütztem Scope: `ALL /extern/stundenzettel/*`.
-  - Liest `externeUrl` aus Settings-Store (Cache + Invalidate bei PATCH).
-  - Forward via `undici`/`fetch`: Methode, Path-Splat, Query, Body, Header (außer `host`, `cookie` durchreichen optional). Antwort streamt zurück; entfernt `X-Frame-Options` und `Content-Security-Policy` headers, damit Einbettung im iframe funktioniert.
-  - Wenn `externeUrl` leer → 503 mit JSON `{error:"not-configured"}`.
-- Registrieren in `backend/src/server.ts`.
-
-### 3.2 Frontend
-- `src/lib/stundenzettel/config.ts`: zusätzliche Ableitung `useStundenzettelEmbedUrl()` → wenn `externeUrl` gesetzt, gibt sie `'/extern/stundenzettel/'` (relativ zur Backend-Origin via `backendUrl`) zurück; sonst leer.
-- `src/routes/stundenzettel.tsx`:
-  - Iframe-`src` benutzt Embed-URL statt direkter `externeUrl`.
-  - Die Hindernis-Analyse (`lan-aus-cloud`, `mixed-content`) entfällt für den Embed-Pfad — Proxy löst beides. Hinweisbox nur noch, wenn Backend 503 zurückgibt (eigener Empty-State „Stundenzettel-Backend nicht erreichbar / nicht konfiguriert").
-  - „In neuem Tab" weiterhin mit Original-`externeUrl`.
-
-## Out of scope
-
-- Keine Anpassung der Lifecycle-Status für Belege (separates Thema).
-- Kein automatischer E-Mail-Versand (verboten laut Core-Memory).
-- Kein Drive-Sync für Kunden-Logos.
-
-## Technical notes
-
-- `useApi.ts` Blob-Fetch via `api.getBlob` (existiert bereits für PDF). Falls nicht, ad-hoc mit `fetch` + Auth-Header aus `client.ts`.
-- Proxy-Route nutzt Fastify-Raw-Stream: `reply.raw` für Streaming. Headers-Whitelist Response: alles außer `content-encoding` (gzip wird vom Upstream-Server schon gesetzt) — sicherer: re-deflate vermeiden, Encoding 1:1 durchleiten. `x-frame-options` und `content-security-policy` entfernen.
-- Tests: kein Pflichtmuss, aber `backend/test/` ein kleiner Smoke-Test für `/extern/stundenzettel` (503 wenn unkonfiguriert) wäre nice-to-have.
-
-## Dateien (Übersicht)
-
-Backend:
-- `backend/src/routes/extern.ts` (neu)
-- `backend/src/server.ts` (Route registrieren)
-
-Frontend:
-- `src/lib/api/types.ts`
-- `src/hooks/useApi.ts`
-- `src/components/forms/KundeLoeschenDialog.tsx`
-- `src/components/kunden/KundeLogo.tsx` (neu)
-- `src/components/kunden/KundeLogoUploadDialog.tsx` (neu)
-- `src/routes/kunden.tsx`
-- `src/routes/kunden.$id.tsx`
-- `src/lib/pdf/belegPdf.ts`
-- `src/lib/stundenzettel/config.ts`
-- `src/routes/stundenzettel.tsx`
+7. **Validierung nach Umsetzung**
+   - Relevante Stellen gezielt prüfen: Angebot-Detail, Rechnung-Detail, Protokoll-Detail, Listen mit E-Mail-Aktion, PDF-Vorschau/Drive-Status und Jahresfilter.
+   - Druckfunktion technisch so absichern, dass nicht mehr das leere Browser-Druckblatt entsteht.
