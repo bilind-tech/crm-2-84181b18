@@ -17,7 +17,7 @@ import { PdfFieldOverlay } from "@/components/pdf-editor/PdfFieldOverlay";
 import { protokollMetaForId, FALLBACK_HOTSPOTS_PROTOKOLL_SEITE_1 } from "@/lib/pdf/fieldMap";
 import { A4, type RuntimeHotspot } from "@/lib/pdf/hotspotTracker";
 
-const DEBOUNCE_MS = 350;
+const DEBOUNCE_MS = 450;
 const LOADER_DELAY_MS = 250;
 
 const VOLATILE = new Set(["aktualisiertAm", "erstelltAm", "updatedAt", "createdAt"]);
@@ -77,10 +77,17 @@ export function ProtokollLivePreview({ draft, kunde, objekt, firma, renderEditor
   }, [rendering]);
 
   const draftKey = useMemo(() => semKey(draft), [draft]);
+  const ctxKey = useMemo(() => semKey({ kunde, objekt, firma }), [kunde, objekt, firma]);
+  const inFlightRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
     const timer = setTimeout(async () => {
+      if (inFlightRef.current) {
+        // Vorheriger Build noch nicht fertig — kurz warten, dann nächster Effekt erledigt es.
+        return;
+      }
+      inFlightRef.current = true;
       setRendering(true);
       setBuildError(null);
       try {
@@ -92,18 +99,29 @@ export function ProtokollLivePreview({ draft, kunde, objekt, firma, renderEditor
         const buf = await blob.arrayBuffer();
         if (cancelled) return;
         const newUrl = URL.createObjectURL(blob);
-        setPendingHotspots(hs);
-        setPendingBuffer(buf);
-        setPendingUrl((prev) => {
-          if (prev) URL.revokeObjectURL(prev);
-          return newUrl;
-        });
+        // Beim allerersten Build keinen Pending-Pfad → schneller initialer Sichtbar-Moment.
+        if (!pdfBuffer) {
+          setHotspots(hs);
+          setPdfBuffer(buf);
+          setPdfUrl((prev) => {
+            if (prev) URL.revokeObjectURL(prev);
+            return newUrl;
+          });
+        } else {
+          setPendingHotspots(hs);
+          setPendingBuffer(buf);
+          setPendingUrl((prev) => {
+            if (prev) URL.revokeObjectURL(prev);
+            return newUrl;
+          });
+        }
         setViewerError(null);
       } catch (e) {
         // eslint-disable-next-line no-console
         console.error("[ProtokollLivePreview] build failed", e);
         if (!cancelled) setBuildError(e instanceof Error ? e.message : "PDF-Fehler");
       } finally {
+        inFlightRef.current = false;
         if (!cancelled) setRendering(false);
       }
     }, DEBOUNCE_MS);
@@ -112,7 +130,7 @@ export function ProtokollLivePreview({ draft, kunde, objekt, firma, renderEditor
       clearTimeout(timer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draftKey, kunde, objekt, firma]);
+  }, [draftKey, ctxKey]);
 
   useEffect(() => {
     return () => {
@@ -184,7 +202,7 @@ export function ProtokollLivePreview({ draft, kunde, objekt, firma, renderEditor
 
       {fileSource && containerWidth > 0 && !viewerError && (
         <Document
-          key={`buf#${pdfBuffer?.byteLength}#${loadAttempt}`}
+          key={`pdf-${loadAttempt}`}
           file={fileSource}
           onLoadSuccess={({ numPages }) => {
             setNumPages(numPages);
@@ -246,8 +264,9 @@ export function ProtokollLivePreview({ draft, kunde, objekt, firma, renderEditor
           <Document
             key={`pending#${pendingBuffer?.byteLength}`}
             file={pendingFileSource}
-            onLoadSuccess={({ numPages }) => {
-              setNumPages(numPages);
+            onLoadSuccess={() => {
+              // numPages NICHT hier setzen — sichtbares Document setzt es nach dem Swap,
+              // sonst springt die Seitenanzahl vor dem Buffer-Tausch.
               setPdfBuffer(pendingBuffer);
               if (pendingHotspots) setHotspots(pendingHotspots);
               setLoadAttempt(0);
