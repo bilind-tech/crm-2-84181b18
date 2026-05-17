@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { DetailSkeleton } from "@/components/layout/DetailSkeleton";
 import { NotFoundState } from "@/components/layout/NotFoundState";
 import { useState } from "react";
-import { Pencil, Archive, Building2, Plus, Trash2 } from "lucide-react";
+import { Pencil, Archive, Building2, Plus, Trash2, Image as ImageIcon } from "lucide-react";
 import { useKunde } from "@/hooks/useApi";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,8 @@ import { RechnungForm } from "@/components/forms/RechnungForm";
 import { FormErrorBoundary } from "@/components/layout/FormErrorBoundary";
 import { KundeBearbeitenDialog } from "@/components/forms/KundeBearbeitenDialog";
 import { KundeLoeschenDialog } from "@/components/forms/KundeLoeschenDialog";
+import { KundeLogo } from "@/components/kunden/KundeLogo";
+import { KundeLogoUploadDialog } from "@/components/kunden/KundeLogoUploadDialog";
 import { formatEUR, formatDate } from "@/lib/format";
 import { summenRechnung } from "@/lib/belege/summen";
 import { FlowBar } from "@/components/flow/FlowBar";
@@ -44,6 +46,7 @@ function Page() {
   const [openRechnung, setOpenRechnung] = useState(false);
   const [openEdit, setOpenEdit] = useState(false);
   const [openDelete, setOpenDelete] = useState(false);
+  const [openLogo, setOpenLogo] = useState(false);
 
   if (isLoading) return <DetailSkeleton variant="kunde" />;
   if (!k) {
@@ -80,13 +83,6 @@ function Page() {
   };
 
   const fullName = k.firmenname || `${k.vorname ?? ""} ${k.nachname ?? ""}`.trim();
-  const initialen =
-    (k.firmenname
-      ? k.firmenname.slice(0, 2)
-      : `${(k.vorname ?? "")[0] ?? ""}${(k.nachname ?? "")[0] ?? ""}`
-    )
-      .toUpperCase()
-      .slice(0, 2) || "K";
 
   const aktiveObjekte = objekte.filter((o) => o.status === "aktiv").length;
 
@@ -127,9 +123,17 @@ function Page() {
 
       {/* Header card */}
       <div className="flex items-center gap-5 rounded-2xl border border-border bg-card p-5 shadow-sm">
-        <div className="grid h-16 w-16 place-content-center rounded-2xl bg-primary/10 text-xl font-semibold text-primary">
-          {initialen}
-        </div>
+        <button
+          type="button"
+          onClick={() => setOpenLogo(true)}
+          className="group relative shrink-0 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary"
+          aria-label="Logo ändern"
+        >
+          <KundeLogo kunde={k} size="lg" />
+          <span className="pointer-events-none absolute inset-0 grid place-content-center rounded-2xl bg-foreground/40 text-xs font-medium text-background opacity-0 transition-opacity group-hover:opacity-100">
+            <ImageIcon className="h-5 w-5" />
+          </span>
+        </button>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-xl font-semibold tracking-tight">{fullName}</h2>
@@ -144,6 +148,14 @@ function Page() {
             {aktiveObjekte === 1 ? "Objekt" : "Objekte"}
           </p>
         </div>
+        <Button
+          variant="outline"
+          size="sm"
+          className="rounded-full"
+          onClick={() => setOpenLogo(true)}
+        >
+          <ImageIcon className="mr-1.5 h-4 w-4" /> Logo
+        </Button>
       </div>
 
       {/* Tabs */}
