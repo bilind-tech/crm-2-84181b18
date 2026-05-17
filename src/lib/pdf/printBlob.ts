@@ -1,26 +1,23 @@
-// Druckt ein PDF (als Blob oder fertige Blob-URL) ohne Tab-Wechsel.
+// Druckt ein PDF zuverlässig — ohne auf das native Browser-PDF-Plugin angewiesen
+// zu sein. Das alte iframe-basierte Vorgehen produzierte in vielen Konstellationen
+// nur ein leeres Blatt mit URL/Datum (weil das Plugin den Print-Befehl nicht an
+// den eigentlichen PDF-Renderer weiterreichte).
 //
-// Strategie:
-//  1. Verstecktes <iframe> in den DOM hängen, src = blob-URL.
-//  2. Auf 'load' → contentWindow.print() aufrufen → nativer Druck-Dialog
-//     mit allen Seiten des PDFs.
-//  3. Nach 'afterprint' (oder Timeout) iframe entfernen + URL freigeben.
+// Neue Strategie:
+//  1. PDF mit PDF.js öffnen
+//  2. Jede Seite in einen Canvas rendern (hohe DPI, druckscharf)
+//  3. PNG-DataURLs in ein neues Fenster mit @page-CSS schreiben
+//  4. window.print() im neuen Fenster auslösen → druckt die echten Bilder
 //
-// Fallback (Safari iOS, alte Browser, blockiertes iframe-print):
-//  → window.open(url, "_blank") öffnet das PDF in neuem Tab; der User kann
-//    von dort aus den Geräte-Druck-Dialog auslösen.
+// Fallback (Pop-up blockiert / PDF.js-Fehler): PDF in neuem Tab öffnen,
+// damit der User wenigstens manuell drucken kann.
 
-const PRINT_FALLBACK_TIMEOUT = 1500;
-const CLEANUP_DELAY = 60_000;
+import { configurePdfWorker } from "./pdfjsWorker";
+import { pdfjs } from "react-pdf";
 
-function isLikelyIosSafari(): boolean {
-  if (typeof navigator === "undefined") return false;
-  const ua = navigator.userAgent;
-  const isIos =
-    /iPad|iPhone|iPod/.test(ua) || (ua.includes("Macintosh") && "ontouchend" in document);
-  const isSafari = /Safari/.test(ua) && !/CriOS|FxiOS|EdgiOS|Chrome/.test(ua);
-  return isIos && isSafari;
-}
+configurePdfWorker();
+
+const PRINT_DPI = 2; // 2 = ~144 dpi, gutes Verhältnis Schärfe ↔ Größe
 
 function openInNewTab(url: string): boolean {
   try {
@@ -45,98 +42,140 @@ function openInNewTab(url: string): boolean {
   return false;
 }
 
-/** Druckt eine vorhandene Blob-URL. URL wird NICHT freigegeben (gehört dem Caller). */
-export function printPdfBlobUrl(url: string): void {
-  if (isLikelyIosSafari()) {
-    openInNewTab(url);
-    return;
-  }
-
-  const iframe = document.createElement("iframe");
-  iframe.style.position = "fixed";
-  iframe.style.inset = "0";
-  iframe.style.width = "100vw";
-  iframe.style.height = "100vh";
-  iframe.style.border = "0";
-  iframe.style.opacity = "0";
-  iframe.style.pointerEvents = "none";
-  iframe.style.zIndex = "-1";
-  iframe.setAttribute("aria-hidden", "true");
-  iframe.src = url;
-
-  let printed = false;
-  let cleaned = false;
-
-  const cleanup = () => {
-    if (cleaned) return;
-    cleaned = true;
+async function renderPdfToImages(data: ArrayBuffer): Promise<string[]> {
+  // PDF.js erwartet einen frischen Buffer, der zum Worker transferiert wird.
+  const loadingTask = pdfjs.getDocument({ data: new Uint8Array(data) });
+  const doc = await loadingTask.promise;
+  const images: string[] = [];
+  try {
+    for (let i = 1; i <= doc.numPages; i++) {
+      const page = await doc.getPage(i);
+      const viewport = page.getViewport({ scale: PRINT_DPI });
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.ceil(viewport.width);
+      canvas.height = Math.ceil(viewport.height);
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("Canvas-Context nicht verfügbar");
+      await page.render({ canvasContext: ctx, viewport, canvas }).promise;
+      images.push(canvas.toDataURL("image/png"));
+      page.cleanup();
+    }
+  } finally {
     try {
-      const cw = iframe.contentWindow;
-      if (cw) cw.removeEventListener("afterprint", cleanup);
+      await doc.cleanup();
+      await doc.destroy();
     } catch {
       /* noop */
     }
-    setTimeout(() => {
-      if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
-    }, 100);
-  };
-
-  iframe.onload = () => {
-    try {
-      const cw = iframe.contentWindow;
-      if (!cw) throw new Error("iframe contentWindow nicht verfügbar");
-      // afterprint am iframe-eigenen Window — global feuert sonst pro Druck
-      // aller Iframes gleichzeitig.
-      try { cw.addEventListener("afterprint", cleanup); } catch { /* noop */ }
-      // Etwas Zeit, damit der PDF-Plugin den Inhalt vollständig rendert
-      // (Chromium braucht für mehrseitige PDFs deutlich länger als 50 ms).
-      setTimeout(() => {
-        try {
-          cw.focus();
-          cw.print();
-          printed = true;
-        } catch {
-          openInNewTab(url);
-          cleanup();
-        }
-      }, 300);
-    } catch {
-      openInNewTab(url);
-      cleanup();
-    }
-  };
-
-  iframe.onerror = () => {
-    openInNewTab(url);
-    cleanup();
-  };
-
-  document.body.appendChild(iframe);
-
-  // In Firefox blockiert print() nicht synchron → Sicherheits-Cleanup.
-  setTimeout(() => {
-    if (!printed) {
-      // load hat nie gefeuert → harter Fallback
-      openInNewTab(url);
-      cleanup();
-    }
-  }, PRINT_FALLBACK_TIMEOUT * 4);
-  setTimeout(cleanup, CLEANUP_DELAY);
+  }
+  return images;
 }
 
-/** Druckt einen frischen Blob. Blob-URL wird verwaltet & wieder freigegeben. */
-export function printPdfBlob(blob: Blob): void {
+function openPrintWindowWithImages(images: string[]): boolean {
+  const win = window.open("", "_blank", "noopener,noreferrer,width=900,height=1200");
+  if (!win) return false;
+
+  const imgsHtml = images
+    .map(
+      (src) =>
+        `<div class="page"><img src="${src}" alt="" /></div>`,
+    )
+    .join("\n");
+
+  win.document.open();
+  win.document.write(`<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<title>Drucken</title>
+<style>
+  @page { size: A4; margin: 0; }
+  html, body { margin: 0; padding: 0; background: #fff; }
+  .page { page-break-after: always; display: flex; align-items: center; justify-content: center; }
+  .page:last-child { page-break-after: auto; }
+  .page img { width: 100%; height: auto; display: block; }
+  @media screen {
+    body { padding: 16px; background: #f3f4f6; }
+    .page { background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,0.1); margin: 0 auto 16px; max-width: 800px; }
+  }
+  @media print {
+    body { padding: 0; background: #fff; }
+    .page { margin: 0; }
+  }
+</style>
+</head>
+<body>
+${imgsHtml}
+<script>
+  (function() {
+    var imgs = document.images;
+    var pending = imgs.length;
+    function done() {
+      if (--pending > 0) return;
+      setTimeout(function () {
+        try { window.focus(); window.print(); } catch (e) {}
+        try {
+          window.onafterprint = function () { setTimeout(function () { window.close(); }, 200); };
+        } catch (e) {}
+      }, 150);
+    }
+    if (pending === 0) { done(); pending = 1; }
+    for (var i = 0; i < imgs.length; i++) {
+      if (imgs[i].complete) { done(); }
+      else { imgs[i].addEventListener('load', done); imgs[i].addEventListener('error', done); }
+    }
+  })();
+</script>
+</body>
+</html>`);
+  win.document.close();
+  return true;
+}
+
+async function printPdfFromArrayBuffer(data: ArrayBuffer, fallbackUrl: string | null): Promise<void> {
+  let images: string[] = [];
+  try {
+    images = await renderPdfToImages(data);
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error("[printPdf] render failed", err);
+    if (fallbackUrl) openInNewTab(fallbackUrl);
+    return;
+  }
+  if (images.length === 0) {
+    if (fallbackUrl) openInNewTab(fallbackUrl);
+    return;
+  }
+  const opened = openPrintWindowWithImages(images);
+  if (!opened && fallbackUrl) openInNewTab(fallbackUrl);
+}
+
+/** Druckt eine vorhandene Blob-URL. URL wird NICHT freigegeben (gehört dem Caller). */
+export async function printPdfBlobUrl(url: string): Promise<void> {
+  try {
+    const res = await fetch(url);
+    const buf = await res.arrayBuffer();
+    await printPdfFromArrayBuffer(buf, url);
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error("[printPdf] fetch failed", err);
+    openInNewTab(url);
+  }
+}
+
+/** Druckt einen frischen Blob. */
+export async function printPdfBlob(blob: Blob): Promise<void> {
+  const buf = await blob.arrayBuffer();
   const url = URL.createObjectURL(blob);
   try {
-    printPdfBlobUrl(url);
+    await printPdfFromArrayBuffer(buf, url);
   } finally {
-    // Spät freigeben — Druck-Dialog hält die Quelle solange offen.
     setTimeout(() => {
       try {
         URL.revokeObjectURL(url);
       } catch {
         /* noop */
       }
-    }, CLEANUP_DELAY);
+    }, 60_000);
   }
 }

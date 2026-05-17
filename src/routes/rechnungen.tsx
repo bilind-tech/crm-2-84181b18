@@ -22,6 +22,7 @@ import { rechnungFlow } from "@/lib/flow/flows";
 import {
   ZEITRAUM_ALLE,
   passtInZeitraum,
+  zeitraumAktuellesJahr,
   type ZeitraumState,
 } from "@/components/filters/ZeitraumFilter";
 import type { Rechnung } from "@/lib/api/types";
@@ -90,7 +91,7 @@ function Page() {
   const del = useDeleteRechnung();
   const [filter, setFilter] = useState("alle");
   const [q, setQ] = useState("");
-  const [zeitraum, setZeitraum] = useState<ZeitraumState>(ZEITRAUM_ALLE);
+  const [zeitraum, setZeitraum] = useState<ZeitraumState>(() => zeitraumAktuellesJahr());
   const [nurDA, setNurDA] = useState(false);
   const [open, setOpen] = useState(false);
   const [daDialog, setDaDialog] = useState(false);
@@ -278,7 +279,7 @@ function Page() {
                       e.preventDefault();
                       setEmailFuer(r);
                     }}
-                    className="rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-primary"
+                    className="inline-flex h-9 items-center gap-1.5 rounded-md border border-primary/30 bg-primary/5 px-2.5 text-sm font-medium text-primary shadow-sm transition hover:bg-primary/10 hover:shadow-md"
                     title="Per E-Mail versenden"
                   >
                     <Mail className="h-4 w-4" />
@@ -427,7 +428,7 @@ function Page() {
                             e.preventDefault();
                             setEmailFuer(r);
                           }}
-                          className="rounded-md p-1.5 hover:bg-muted hover:text-primary"
+                          className="inline-flex h-8 items-center gap-1 rounded-md border border-primary/30 bg-primary/5 px-2 text-primary shadow-sm transition hover:bg-primary/10 hover:shadow"
                           title="Per E-Mail versenden"
                         >
                           <Mail className="h-4 w-4" />

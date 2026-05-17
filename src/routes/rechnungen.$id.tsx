@@ -19,6 +19,7 @@ import { MahnSektion } from "@/components/mahnung/MahnSektion";
 import { PdfViewButton } from "@/components/pdf/PdfViewButton";
 import { PdfPreviewCard } from "@/components/pdf/PdfPreviewCard";
 import { PrintButton } from "@/components/pdf/PrintButton";
+import { PrimaryAction } from "@/components/layout/PrimaryAction";
 import { formatEUR, formatDate } from "@/lib/format";
 import { summenRechnung } from "@/lib/belege/summen";
 import { DauerauftragVerwaltungCard } from "@/components/dauerauftrag/DauerauftragVerwaltungCard";
@@ -68,9 +69,11 @@ function Page() {
   const renderPrimaryAction = () => {
     if (r.status === "entwurf") {
       return (
-        <Button className="rounded-lg" onClick={() => setEmailOpen(true)}>
-          <Send className="mr-1.5 h-4 w-4" /> Per E-Mail versenden
-        </Button>
+        <PrimaryAction
+          icon={Send}
+          label="Per E-Mail versenden"
+          onClick={() => setEmailOpen(true)}
+        />
       );
     }
     if (r.status === "versendet" || r.status === "ueberfaellig" || r.status === "teilbezahlt") {

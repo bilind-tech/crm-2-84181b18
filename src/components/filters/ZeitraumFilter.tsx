@@ -26,6 +26,11 @@ export interface ZeitraumState {
 
 export const ZEITRAUM_ALLE: ZeitraumState = { jahr: "alle", monat: "alle" };
 
+/** Standard: aktuelles Jahr, alle Monate. Wird live ausgewertet. */
+export function zeitraumAktuellesJahr(): ZeitraumState {
+  return { jahr: new Date().getFullYear().toString(), monat: "alle" };
+}
+
 /** Liefert sortierte Jahresliste aus den verfügbaren ISO-Daten + aktuelles Jahr. */
 export function jahreAusDaten(verfuegbareDaten: string[]): string[] {
   const set = new Set<string>();

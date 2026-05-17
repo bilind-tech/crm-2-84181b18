@@ -10,6 +10,14 @@ interface Props {
 }
 
 export function DriveStatusBadge({ drive, className, compact }: Props) {
+  // Wenn KEINE Drive-Info vorliegt, gibt es nichts anzuzeigen — vor allem
+  // keinen dauerhaft drehenden „Wird synchronisiert …"-Spinner. Der Status
+  // entsteht erst nach einem manuellen E-Mail-Versand, der den Drive-Upload
+  // anstößt. Vorher: kein Badge, kein Lärm.
+  if (!drive || (!drive.fileId && !drive.error && !drive.ordner)) {
+    return null;
+  }
+
   // Status ableiten
   const synced = !!drive?.fileId && !drive.error;
   const failed = !!drive?.error;

@@ -669,7 +669,8 @@ export function EmailVersandDialog({
           >
             Abbrechen
           </Button>
-          <Button
+          <button
+            type="button"
             onClick={handleSend}
             disabled={
               !istValide ||
@@ -678,8 +679,16 @@ export function EmailVersandDialog({
               phase !== "idle" ||
               (pdfAnhangAktiv && pdfStatus === "loading")
             }
-            className="min-w-[160px] gap-1.5 shadow-sm"
-            size="lg"
+            className={cn(
+              "group relative inline-flex h-12 min-w-[180px] items-center justify-center gap-2 rounded-lg px-5 text-sm font-semibold text-white",
+              "bg-[linear-gradient(180deg,#3B82F6_0%,#2563EB_55%,#1D4ED8_100%)]",
+              "shadow-[0_1px_0_rgba(255,255,255,0.25)_inset,0_8px_22px_-8px_rgba(37,99,235,0.55),0_1px_2px_rgba(15,23,42,0.18)]",
+              "ring-1 ring-inset ring-white/15 transition-all duration-150 ease-out",
+              "hover:shadow-[0_1px_0_rgba(255,255,255,0.3)_inset,0_12px_28px_-8px_rgba(37,99,235,0.7),0_1px_2px_rgba(15,23,42,0.2)]",
+              "hover:brightness-[1.06] active:brightness-[0.96] active:translate-y-[0.5px]",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3B82F6]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+              "disabled:pointer-events-none disabled:opacity-60",
+            )}
           >
             {send.isPending || phase === "sending" ? (
               <>
@@ -698,7 +707,7 @@ export function EmailVersandDialog({
                 <Send className="h-4 w-4" /> E-Mail senden
               </>
             )}
-          </Button>
+          </button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
