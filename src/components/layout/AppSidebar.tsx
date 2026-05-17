@@ -1,4 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
+import { useState, useEffect } from "react";
 import {
   LayoutDashboard,
   Users,
@@ -10,6 +11,8 @@ import {
   Wrench,
   Settings,
   Lock,
+  ChevronRight,
+  Database,
 } from "lucide-react";
 import {
   Sidebar,
@@ -17,11 +20,13 @@ import {
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
-  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
   useSidebar,
 } from "@/components/ui/sidebar";
 import logo from "@/assets/logo.png";
@@ -59,17 +64,26 @@ export function AppSidebar() {
     { title: "Stundenzettel", url: "/stundenzettel", icon: Clock },
     { title: "Sonstiges", url: "/werkzeuge", icon: Wrench },
   ];
-  const system: NavItem[] = [{ title: "Einstellungen", url: "/einstellungen", icon: Settings }];
+  // Einstellungen wird unten als einklappbare Gruppe gerendert
+  const einstellungenAktiv = path === "/einstellungen" || path.startsWith("/einstellungen/");
+  const [einstellungenOffen, setEinstellungenOffen] = useState(einstellungenAktiv);
+  useEffect(() => {
+    if (einstellungenAktiv) setEinstellungenOffen(true);
+  }, [einstellungenAktiv]);
 
   const isActive = (url: string, exact = false) =>
     exact ? path === url : path === url || path.startsWith(url + "/");
 
-  const renderGroup = (label: string, items: NavItem[]) => (
+  const renderGroup = (key: string, items: NavItem[], withSeparator: boolean) => (
     <SidebarGroup>
-      {!collapsed && (
-        <SidebarGroupLabel className="px-3 text-[11px] font-medium uppercase tracking-wider text-muted-foreground/70">
-          {label}
-        </SidebarGroupLabel>
+      {withSeparator && (
+        <div
+          aria-hidden
+          className={cn(
+            "h-px bg-sidebar-foreground/15",
+            collapsed ? "mx-2 my-1" : "mx-3 my-1",
+          )}
+        />
       )}
       <SidebarGroupContent>
         <SidebarMenu>
@@ -156,10 +170,82 @@ export function AppSidebar() {
         </Link>
       </SidebarHeader>
       <SidebarContent className="gap-1 py-2">
-        {renderGroup("Übersicht", uebersicht)}
-        {renderGroup("Stammdaten", stammdaten)}
-        {renderGroup("Vertrieb & Abrechnung", vertrieb)}
-        {renderGroup("System", system)}
+        {renderGroup("uebersicht", uebersicht, false)}
+        {renderGroup("stammdaten", stammdaten, true)}
+        {renderGroup("vertrieb", vertrieb, true)}
+
+        {/* Einstellungen — einklappbare Gruppe mit Sub-Items */}
+        <SidebarGroup>
+          <div
+            aria-hidden
+            className={cn(
+              "h-px bg-sidebar-foreground/15",
+              collapsed ? "mx-2 my-1" : "mx-3 my-1",
+            )}
+          />
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  tooltip="Einstellungen"
+                  isActive={einstellungenAktiv}
+                  onClick={() => setEinstellungenOffen((v) => !v)}
+                  className={cn(
+                    "transition-colors duration-150",
+                    einstellungenAktiv
+                      ? "bg-sidebar-accent font-medium text-sidebar-primary border border-sidebar-border shadow-sm"
+                      : "hover:bg-sidebar-accent/60",
+                  )}
+                  aria-expanded={einstellungenOffen}
+                >
+                  <Settings
+                    className={cn(
+                      "h-4 w-4",
+                      einstellungenAktiv && "text-sidebar-primary",
+                    )}
+                  />
+                  {!collapsed && (
+                    <>
+                      <span className="flex-1 text-left">Einstellungen</span>
+                      <ChevronRight
+                        className={cn(
+                          "h-4 w-4 text-muted-foreground transition-transform duration-150",
+                          einstellungenOffen && "rotate-90",
+                        )}
+                      />
+                    </>
+                  )}
+                </SidebarMenuButton>
+                {!collapsed && einstellungenOffen && (
+                  <SidebarMenuSub>
+                    <SidebarMenuSubItem>
+                      <SidebarMenuSubButton
+                        asChild
+                        isActive={path === "/einstellungen"}
+                      >
+                        <Link to="/einstellungen" onClick={closeOnMobile}>
+                          <Settings className="h-4 w-4" />
+                          <span>Übersicht</span>
+                        </Link>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                    <SidebarMenuSubItem>
+                      <SidebarMenuSubButton
+                        asChild
+                        isActive={path === "/einstellungen/datenbank"}
+                      >
+                        <Link to="/einstellungen/datenbank" onClick={closeOnMobile}>
+                          <Database className="h-4 w-4" />
+                          <span>Datenbank</span>
+                        </Link>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                  </SidebarMenuSub>
+                )}
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
       </SidebarContent>
       <SidebarFooter className="border-t border-sidebar-border/60">
         <SidebarMenu>
