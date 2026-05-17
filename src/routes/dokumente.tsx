@@ -72,24 +72,6 @@ function Page() {
     return m;
   }, [kunden]);
 
-  const counts = useMemo(() => {
-    const ueberfaellig = alle.filter((d) => fristStatus(d) === "ueberfaellig").length;
-    const offen = alle.filter((d) => {
-      const s = fristStatus(d);
-      return s === "offen" || s === "bald" || s === "ueberfaellig";
-    }).length;
-    const steuer = alle.filter(
-      (d) => d.steuerrelevant && d.dokumentdatum?.startsWith(String(jahr)),
-    );
-    return {
-      gesamt: alle.length,
-      offen,
-      ueberfaellig,
-      steuerrelevant: steuer.length,
-      summe: steuer.reduce((a, d) => a + (d.betrag ?? 0), 0),
-    };
-  }, [alle, jahr]);
-
   const tabCounts = useMemo(
     () => ({
       alle: alle.length,
