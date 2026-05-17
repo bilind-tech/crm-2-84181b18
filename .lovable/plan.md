@@ -1,83 +1,100 @@
-## Ursache
+## Ziel
 
-Im Lovable-Preview (lovableproject.com) läuft kein Pi-Backend — `localhost:8787` ist offline (siehe Netzwerk-Log: lauter `Load failed`). Der Client fällt deshalb auf den lokalen Mock (`src/lib/api/localPreviewData.ts`) zurück. Dieser Mock kennt für Daueraufträge nur zwei harte Einträge:
+Die Detail-Bearbeitung von **Übergabe-/Abnahmeprotokoll** und **Schlüsselübergabe** soll sich exakt so anfühlen wie der PDF-Editor von Angebot/Rechnung: links Live-PDF, **mit der Maus direkt auf ein Feld klicken → Inline-Editor öffnet sich**, rechts Tab-Editor mit allen Optionen. Plus drei Verbesserungen, die der Beleg-Editor heute nicht hat. Plus der Flacker-Bug wird behoben.
 
-```ts
-if (cleanPath === "/dauerauftraege") return [] as T;
-if (cleanPath === "/dauerauftrag-laeufe") return [] as T;
-```
+## Bestandsaufnahme
 
-→ Liste immer leer, deshalb zeigt der „Aus Dauerauftrag"-Dialog im Preview nichts an. Backend, Dialog und Hooks sind funktional korrekt — auf dem echten Pi würde es laufen.
+- Beleg-Editor (`src/components/pdf-editor/*`): PDF-Tracker (`hotspotTracker.ts`) erkennt pdfmake-Nodes mit `id`, `PdfFieldOverlay` legt klickbare Hotspots darüber, `HotspotInlineEditor` schreibt in den Draft.
+- Protokoll-Editor (`src/components/protokoll-editor/*`): Split-Layout existiert, aber `werkzeugePdf.ts` setzt **keine** `id`s und übergibt keinen Tracker → keine Hotspots → man muss alles im rechten Panel suchen.
+- `ProtokollLivePreview` macht atomaren Buffer-Swap wie `LivePdfPreview` — Flacker kommt also nicht vom Swap, sondern davon, dass `renderWidth` bei jedem Scrollbar-Sprung neu berechnet wird und `<Page width=…>` jeden Subpixel-Schritt neu rasterisiert.
 
-Damit du es **im Preview testen und nutzen** kannst, baue ich den Mock zu einem vollständigen In-Browser-Dauerauftrags-Backend aus, das genau das nachbildet, was der Pi macht.
+## Umsetzung
 
-## Lösung — Mock-Backend für Daueraufträge
+### 1. Hotspots in `src/lib/pdf/werkzeugePdf.ts`
 
-Erweitere ausschließlich `src/lib/api/localPreviewData.ts` (gleicher localStorage-Store `mcc.localPreview.belege.v1`, Schlüssel ergänzt). Keine Änderungen am Backend, an den Hooks oder am Dialog nötig.
+Beide PDF-Generatoren auf das Beleg-Muster umstellen:
 
-### 1. Store erweitern
-```ts
-interface PreviewStore {
-  angebote: Angebot[];
-  rechnungen: Rechnung[];
-  dauerauftraege: Dauerauftrag[];           // NEU
-  dauerauftragLaeufe: DauerauftragLauf[];   // NEU
-  dauerauftragSonderpos: DauerauftragSonderposition[]; // NEU
-}
-```
-Read/Write/Default-Fallbacks aktualisieren.
+- Tracker erzeugen: `const tracker = createHotspotTracker(A4)`, an `pm.createPdf(doc, …, …, tracker.pageBreakBefore)` übergeben.
+- Stabile `id`s an die relevanten pdfmake-Nodes setzen. **Übergabe-/Abnahmeprotokoll:**
 
-### 2. POST /rechnungen — Auto-Anlage Dauerauftrag
-Im bestehenden `POST /rechnungen`-Handler nach dem Anlegen prüfen:
+  | Feld-ID | Bereich |
+  |---|---|
+  | `kunde` | Empfänger-Adresse |
+  | `meta` | Meta-Box (Nr./Datum/Uhrzeit) |
+  | `titel` | Hauptüberschrift („Übergabeprotokoll" …) |
+  | `leistungsumfang` | Leistungs-Block |
+  | `bemerkungen` | Mängel-/Bemerkungen-Block |
+  | `ergebnis` | „Ohne Vorbehalt"-Zeile |
+  | `unterschriften` | Unterschriften-Block |
+  | `art` | (versteckter Hotspot auf dem Titel, öffnet Radio Übergabe/Abnahme/Beides) |
 
-```ts
-const opt = (input.optionen ?? {}) as { wiederkehrend?: boolean; wiederkehrendDetails?: { rhythmus?: string } };
-if (opt.wiederkehrend === true) {
-  const freq = mapRhythmus(opt.wiederkehrendDetails?.rhythmus); // → monatlich/quartalsweise/halbjaehrlich/jaehrlich
-  const da = createPreviewDauerauftrag({
-    rechnungId: rechnung.id,
-    kundeId: rechnung.kundeId,
-    bezeichnung: rechnung.titel,
-    positionen: rechnung.positionen,
-    rabattGesamt: rechnung.rabattGesamt,
-    steuersatz: rechnung.steuersatz,
-    frequenz: freq,
-    rechnungsdatum: rechnung.rechnungsdatum,
-  });
-  return { ...rechnung, dauerauftragNeu: { id: da.id, nummer: da.nummer } } as T;
-}
-```
-Damit erscheint der Dauerauftrag sofort nach Anlegen einer wiederkehrenden Rechnung im „Aus Dauerauftrag"-Dialog.
+  **Schlüsselübergabe:** `kunde`, `meta`, `titel`, `richtung` (Hotspot auf Titel), `schluessel.tabelle`, `pfand`, `bestaetigung`, `unterschriften`.
 
-### 3. Neue Mock-Endpoints
+- Rückgabe ändern: `Promise<{ blob: Blob; hotspots: RuntimeHotspot[] }>`.
+- `generateProtokollPdf(...)` (Adapter) gibt ebenfalls `{ blob, hotspots }` zurück. Die zwei Aufrufstellen, die heute nur den Blob benötigen (Abschließen-Flow, Download-Button), greifen auf `.blob` zu — kurze Anpassung in `ProtokollEditorLayout.onAbschliessen` und in `src/components/pdf/PrintButton.tsx` (`grep`-Ergebnisse zeigen ~2 Stellen).
 
-| Methode + Pfad | Verhalten |
+### 2. `src/lib/pdf/fieldMap.ts` erweitern
+
+Zweite Lookup-Map für Protokoll-Felder + Helper `protokollMetaForId(id)`. Tabs: `stammdaten` | `inhalt` | `unterschriften` | `optionen`.
+
+### 3. Neue Komponente `src/components/protokoll-editor/ProtokollHotspotEditor.tsx`
+
+Analog zu `HotspotInlineEditor`, aber für Protokolle. Pro Feld-ID rendert sie ein Mini-Form-Stück (Input/Textarea/RadioGroup, für `schluessel.tabelle` eine kompakte Zeilen-Editor-Liste mit „Zeile +"). Schreibt via `editor.set(key, value)`. Footer: „Erweitert" → öffnet zugehörigen Tab im rechten Panel.
+
+### 4. `ProtokollLivePreview.tsx` um Overlay erweitern
+
+- Generator-Aufruf liefert jetzt `{ blob, hotspots }`. Hotspots in State halten und beim atomaren Swap mit-übernehmen.
+- Pro Seite (`<div>` um `<Page>`) zusätzlich `<PdfFieldOverlay hotspots={…} scale={…} openId/onOpenChange renderEditor={…}>` rendern — Komponente wird 1:1 wiederverwendet.
+- Fallback-Hotspots für Seite 1 ergänzen (eine zweite Konstante `FALLBACK_HOTSPOTS_PROTOKOLL`) für den Fall, dass der Tracker leer bleibt.
+
+### 5. Flacker-Fix in `ProtokollLivePreview.tsx` (und gleicher Patch in `LivePdfPreview.tsx`)
+
+- `renderWidth` auf das nächste Vielfache von 20 runden:
+  ```ts
+  const renderWidth = useMemo(() => {
+    const raw = Math.min(Math.max(containerWidth - 16, 280), 900);
+    return Math.round(raw / 20) * 20;
+  }, [containerWidth]);
+  ```
+  → Scrollbar-Wackler ändern `renderWidth` nicht mehr → kein Re-Render der Seiten.
+- `<Page width={useDeferredValue(renderWidth)} …>` damit das erneute Rastern zudem entkoppelt von Eingaben passiert.
+- `key` der visiblen Seiten zusätzlich an `renderWidth` binden, damit nicht halb-skalierte Reste sichtbar bleiben.
+
+### 6. Rechtes Panel: Tabs statt Single-Form
+
+`ProtokollEditorLayout` bekommt die Tab-Architektur des Beleg-Editors (`EditorPanel`-Muster). Vier Tabs, Active-Tab steuerbar von außen, damit die „Erweitert"-Buttons der Inline-Editoren direkt darauf springen können:
+
+| Tab | Inhalt |
 |---|---|
-| `GET /dauerauftraege` | Store-Liste |
-| `GET /dauerauftraege/:id` | DA + `laeufe`, `sonderpositionen` |
-| `POST /dauerauftraege` | Neuanlage |
-| `PATCH /dauerauftraege/:id` | Felder aktualisieren (Bezeichnung, Frequenz, Status, Steuersatz, Rabatt, Notizen — exakt was der Edit-Dialog sendet) |
-| `DELETE /dauerauftraege/:id` | Eintrag entfernen |
-| `POST /dauerauftraege/:id/sofort-lauf` | **Kern:** erzeugt neue Rechnung im Store (mit `nextBelegnummer`, übernommenen Positionen, Periode in Titel), legt `DauerauftragLauf{status:"erzeugt", periode, rechnungId, erstelltAm}` an. Idempotent: existiert bereits ein Lauf für `(id, periode)` → vorhandenen Lauf zurückgeben (kein Duplikat). |
-| `POST /dauerauftraege/:id/pausieren` | Status auf `pausiert` |
-| `POST /dauerauftraege/:id/beenden` | Status auf `beendet`, `laufzeitBis` setzen |
-| `GET /dauerauftrag-laeufe` | optional `?status=` filtern |
-| `POST /dauerauftrag-sonderpositionen` | Append |
-| `DELETE /dauerauftrag-sonderpositionen/:id` | Remove |
-| `GET /einstellungen/dauerauftrag` | Default-Einstellungen liefern |
-| `PATCH /einstellungen/dauerauftrag` | Werte merken |
+| **Stammdaten** | Kunde/Objekt-Picker, Datum, Uhrzeit, Art bzw. Richtung |
+| **Inhalt** | Übergabe: Leistungsumfang, Bemerkungen · Schlüssel: Zeilen-Editor + Pfand |
+| **Unterschriften** | Vertreter AG/AN, „Ohne Vorbehalt" bzw. „Bestätigt" |
+| **Optionen** *(neu — geht über Beleg-Editor hinaus)* | • Eigener Titel-Override · • Untertitel-Zeile · • Zusatzklausel-Freitext (eigener Absatz im PDF) · • Logo im PDF ein/aus · • Footer-Firmendaten ein/aus · • Sektions-Titel umbenennen (Leistungsumfang/Mängel/Ergebnis bzw. Übergebene Schlüssel/Bestätigung) · • „Druckfreundlich" (Tabellen-Linien dünner) |
 
-### 4. Periode-Mapping
-Analog `backend/src/dauerauftrag/periode.ts`: `YYYY-MM` (monatlich), `YYYY-Qn` (quartal), `YYYY-Hn` (halbjahr), `YYYY` (jahr). Bei `sofort-lauf` ohne `periode` → aktuelle Periode aus heutigem Datum + DA-Frequenz.
+`Protokoll`-Type bekommt dafür ein optionales Feld `optionen?: { titelOverride?: string; untertitel?: string; zusatzKlausel?: string; logoSichtbar?: boolean; footerSichtbar?: boolean; sektionsTitel?: Partial<Record<"leistung"|"bemerkungen"|"ergebnis"|"schluessel"|"bestaetigung", string>>; druckfreundlich?: boolean }`. PDF-Generator wertet diese aus (defaultet auf heutige Werte → keine Migration nötig).
+
+### 7. Abschluss-Button & Header
+
+Bleibt wie heute, der Detail-Button „PDF bearbeiten" (Pencil-Icon) führt weiterhin auf `/protokolle/$id/bearbeiten`. Header verliert nichts.
+
+## Out of Scope
+
+- E-Mail-Versand des PDFs aus dem Editor (Mails nur per User-Klick aus dem bestehenden Versand-Dialog).
+- Skalierung des PDFs auf eine andere Seitengröße als A4.
+- Neue Protokoll-Typen.
 
 ## Verifikation
 
-1. Im Preview: neue Rechnung anlegen → Häkchen „Wiederkehrend" + Rhythmus wählen → speichern.
-2. In Rechnungs-Liste „Aus Dauerauftrag" anklicken → Dauerauftrag wird angezeigt mit Frequenz, Brutto/Lauf, Status-Pill.
-3. Periode wählen, Häkchen setzen, „Erzeugen (1)" → Toast „1 Rechnung erzeugt" → neue Rechnung erscheint in der Liste; zweiter Erzeugungs-Versuch derselben Periode zeigt Warn-Badge „bereits erzeugt".
-4. Bleistift-Icon → Edit-Dialog → Bezeichnung/Frequenz/Status ändern → Speichern → Liste reflektiert Änderung.
+1. `/protokolle/$id/bearbeiten` öffnen — Felder im PDF zeigen beim Hover dünne, gestrichelte Outline + Pencil-Pille.
+2. Klick auf „Leistungsumfang" → Popover mit Textarea, Eingabe ändert das PDF debounced ohne Layout-Sprung.
+3. Klick auf den Titel → Inline-RadioGroup Übergabe/Abnahme/Beides; Wechsel ändert Überschrift im PDF.
+4. Schlüssel-Protokoll: Klick auf Tabelle → Mini-Zeilen-Editor mit Hinzufügen/Entfernen; Klick auf Pfand → kleines Eurofeld.
+5. Tab „Optionen" → eigene Klausel eintippen → erscheint im PDF als neuer Absatz unter „Ergebnis".
+6. Fenster schmaler/breiter ziehen, Scrollbar erscheinen/verschwinden → kein Aufblitzen mehr; die Seitenbreite springt nur in 20-px-Stufen.
+7. „Abschließen" → PDF wird gespeichert und in Dokumenten erzeugt wie vorher.
 
-## Out of Scope
-- Echte E-Mail-Versendung (im Preview generell nicht).
-- PDF-Generierung im Mock (war auch vorher nicht da).
-- Persistenz über Geräte hinweg — bleibt browser-lokal, wie der gesamte Preview-Store.
+## Hinweise
+
+- Keine Sparkles/Glitzer-Deko (Core-Regel) und keine Gradient-Backgrounds im Popover.
+- Keine automatischen E-Mails irgendwo in dem Flow.
+- `Protokoll.optionen`-Felder sind alle optional → bestehende Protokolle bleiben unverändert kompatibel.
