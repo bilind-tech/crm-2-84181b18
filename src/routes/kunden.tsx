@@ -8,6 +8,7 @@ import { FilterBar } from "@/routes/angebote";
 import { SlideOver } from "@/components/ui/slide-over";
 import { MobileListCard } from "@/components/ui/mobile-list-card";
 import { KundeForm } from "@/components/forms/KundeForm";
+import { KundeLogo } from "@/components/kunden/KundeLogo";
 
 export const Route = createFileRoute("/kunden")({ component: Layout });
 
@@ -87,6 +88,7 @@ function Page() {
             onClick={() => navigate({ to: "/kunden/$id", params: { id: k.id } })}
             title={k.firmenname || `${k.vorname ?? ""} ${k.nachname ?? ""}`.trim() || "—"}
             subtitle={k.email ?? undefined}
+            leading={<KundeLogo kunde={k} size="sm" />}
             meta={
               <>
                 <span className="font-mono">{k.nummer}</span>
@@ -138,7 +140,10 @@ function Page() {
                 >
                   <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{k.nummer}</td>
                   <td className="px-4 py-3 font-medium">
-                    {k.firmenname || `${k.vorname ?? ""} ${k.nachname ?? ""}`.trim()}
+                    <div className="flex items-center gap-3">
+                      <KundeLogo kunde={k} size="sm" />
+                      <span>{k.firmenname || `${k.vorname ?? ""} ${k.nachname ?? ""}`.trim()}</span>
+                    </div>
                   </td>
                   <td className="px-4 py-3 text-muted-foreground">{k.ort ?? "—"}</td>
                   <td className="px-4 py-3 text-muted-foreground">{k.email ?? "—"}</td>
