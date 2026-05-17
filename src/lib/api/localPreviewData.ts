@@ -367,8 +367,26 @@ export function localPreviewGet<T>(path: string): T | null {
   if (cleanPath === "/dashboard/kennzahlen") return previewDashboardKennzahlen() as T;
   if (cleanPath === "/dashboard/umsatz") return previewUmsatz() as T;
   if (cleanPath === "/dashboard/warnungen") return [] as T;
-  if (cleanPath === "/dauerauftraege") return [] as T;
-  if (cleanPath === "/dauerauftrag-laeufe") return [] as T;
+  if (cleanPath === "/dauerauftraege") return readStore().dauerauftraege as T;
+  if (cleanPath.startsWith("/dauerauftraege/")) {
+    const id = cleanPath.split("/")[2];
+    const s = readStore();
+    const da = s.dauerauftraege.find((d) => d.id === id);
+    if (!da) return null;
+    return {
+      ...da,
+      laeufe: s.dauerauftragLaeufe.filter((l) => l.dauerauftragId === id),
+      sonderpositionen: s.dauerauftragSonderpos.filter((p) => p.dauerauftragId === id),
+    } as T;
+  }
+  if (cleanPath === "/dauerauftrag-laeufe") {
+    const status = params.get("status");
+    const all = readStore().dauerauftragLaeufe;
+    return (status ? all.filter((l) => l.status === status) : all) as T;
+  }
+  if (cleanPath === "/einstellungen/dauerauftrag") {
+    return (readStore().dauerauftragEinstellungen ?? DA_DEFAULT_EINSTELLUNGEN) as T;
+  }
   if (cleanPath === "/aktivitaeten") return [] as T;
   if (cleanPath === "/benachrichtigungen") return [] as T;
   if (cleanPath === "/einstellungen/firma") return previewFirma as T;
