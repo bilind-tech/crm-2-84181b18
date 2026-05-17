@@ -188,7 +188,11 @@ export const useKuerzelFrei = (kuerzel: string, exceptId?: string) => {
 export const useDeleteKunde = () => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => api.delete<void>(`/kunden/${id}`),
+    mutationFn: (arg: string | { id: string; force?: boolean }) => {
+      const id = typeof arg === "string" ? arg : arg.id;
+      const force = typeof arg === "string" ? false : !!arg.force;
+      return api.delete<void>(`/kunden/${id}${force ? "?force=1" : ""}`);
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: qk.kunden });
       qc.invalidateQueries({ queryKey: qk.dashboard.kennzahlen });
