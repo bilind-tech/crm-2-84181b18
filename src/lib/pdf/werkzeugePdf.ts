@@ -650,7 +650,7 @@ export async function generateProtokollPdf(
   kunde: KundeT | undefined,
   objekt: ObjektT | undefined,
   firma: FirmaT | undefined,
-): Promise<Blob> {
+): Promise<PdfBuildResult> {
   if (p.kind === "schluessel") {
     const s = p as SchluesselProtokoll;
     return generateSchluesseluebergabePdf({
@@ -666,6 +666,7 @@ export async function generateProtokollPdf(
       kunde,
       objekt,
       firma,
+      optionen: s.optionen,
     });
   }
   const u = p as UebergabeProtokoll;
@@ -682,6 +683,7 @@ export async function generateProtokollPdf(
     kunde,
     objekt,
     firma,
+    optionen: u.optionen,
   });
 }
 
