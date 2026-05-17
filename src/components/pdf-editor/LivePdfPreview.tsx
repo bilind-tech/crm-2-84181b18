@@ -12,7 +12,7 @@ configurePdfWorker();
 import { Loader2 } from "lucide-react";
 import { generateAngebotPdf, generateRechnungPdf } from "@/lib/pdf/belegPdf";
 import type { Angebot, Rechnung, Kunde, Firmendaten, Ansprechpartner } from "@/lib/api/types";
-import { PdfFieldOverlay } from "./PdfFieldOverlay";
+import { PdfFieldOverlay, type RowAction, type TableAction } from "./PdfFieldOverlay";
 import { A4 } from "@/lib/pdf/hotspotTracker";
 import type { RuntimeHotspot } from "@/lib/pdf/hotspotTracker";
 import { FALLBACK_HOTSPOTS_SEITE_1 } from "@/lib/pdf/fieldMap";
@@ -23,6 +23,10 @@ interface CommonProps {
   ansprechpartner?: Ansprechpartner;
   /** Inline-Editor pro Hotspot (Render-Prop). */
   renderEditor: (fieldId: string, close: () => void) => React.ReactNode;
+  /** Aktionen für `pos:`-Zeilen. */
+  rowActions?: RowAction;
+  /** Aktionen für den `tabelle`-Hotspot. */
+  tableActions?: TableAction;
 }
 
 type Props =
@@ -40,7 +44,8 @@ function semanticKey<T>(obj: T): string {
 }
 
 export function LivePdfPreview(props: Props) {
-  const { draft, kunde, firma, ansprechpartner, renderEditor, kind } = props;
+  const { draft, kunde, firma, ansprechpartner, renderEditor, kind, rowActions, tableActions } =
+    props;
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
@@ -264,6 +269,8 @@ export function LivePdfPreview(props: Props) {
                   openId={openHotspotId}
                   onOpenChange={setOpenHotspotId}
                   renderEditor={renderEditor}
+                  rowActions={rowActions}
+                  tableActions={tableActions}
                 />
               </div>
             );
