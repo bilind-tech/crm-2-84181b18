@@ -167,7 +167,14 @@ export function ProtokollLivePreview({ draft, kunde, objekt, firma }: Props) {
           }}
           onLoadError={(err) => {
             // eslint-disable-next-line no-console
-            console.error("[ProtokollLivePreview] viewer error", err);
+            console.error("[ProtokollLivePreview] viewer error", {
+              message: err?.message,
+              byteLength: pdfBuffer?.byteLength ?? 0,
+              hasPendingBuffer: !!pendingBuffer,
+              loadAttempt,
+              kind: draft.kind,
+              draftId: draft.id,
+            });
             const msg = err?.message || String(err);
             if (loadAttempt < 1 && pdfBuffer && /detached|already detached|neutered/i.test(msg)) {
               setLoadAttempt((n) => n + 1);
@@ -228,6 +235,9 @@ export function ProtokollLivePreview({ draft, kunde, objekt, firma }: Props) {
         <div className="flex h-full min-h-[40vh] flex-col items-center justify-center gap-2 px-6 text-center text-sm">
           <p className="font-medium text-destructive">PDF kann nicht angezeigt werden</p>
           <p className="text-xs text-muted-foreground">{viewerError}</p>
+          <p className="font-mono text-[10px] text-muted-foreground/70">
+            Quelle: ArrayBuffer · {Math.round((pdfBuffer?.byteLength ?? 0) / 1024)} KB · Versuch {loadAttempt + 1}
+          </p>
           {pdfUrl && (
             <a href={pdfUrl} download className="mt-2 text-xs text-primary underline">
               PDF trotzdem herunterladen

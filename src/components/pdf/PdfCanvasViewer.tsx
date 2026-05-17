@@ -129,6 +129,17 @@ export function PdfCanvasViewer({
 
   const hasSource = !!pdfBuffer || !!pdfUrl;
   const sourceKey = pdfBuffer ? `buf#${pdfBuffer.byteLength}` : (pdfUrl ?? "none");
+  const sourceMode: "buffer" | "url" | "none" = pdfBuffer
+    ? "buffer"
+    : pdfUrl
+      ? "url"
+      : "none";
+  const sourceLabel =
+    sourceMode === "buffer"
+      ? `ArrayBuffer · ${Math.round((pdfBuffer?.byteLength ?? 0) / 1024)} KB`
+      : sourceMode === "url"
+        ? `${pdfUrl?.startsWith("blob:") ? "blob-URL" : pdfUrl?.startsWith("data:") ? "data-URL" : "HTTP-URL"}`
+        : "—";
 
   return (
     <div ref={containerRef} className={className ?? "h-full w-full overflow-y-auto bg-muted/30"}>
@@ -146,6 +157,9 @@ export function PdfCanvasViewer({
             PDF kann nicht angezeigt werden
           </div>
           <p className="max-w-md text-xs text-muted-foreground">{loadError}</p>
+          <p className="max-w-md text-[10px] font-mono text-muted-foreground/70">
+            Quelle: {sourceLabel} · Versuch {attempt + 1}
+          </p>
           <div className="flex flex-wrap justify-center gap-2">
             <button
               type="button"
@@ -188,7 +202,14 @@ export function PdfCanvasViewer({
           onLoadSuccess={({ numPages }) => setNumPages(numPages)}
           onLoadError={(err) => {
             // eslint-disable-next-line no-console
-            console.error("[PdfCanvasViewer] load error", err);
+            console.error("[PdfCanvasViewer] load error", {
+              message: err?.message,
+              sourceMode,
+              byteLength: pdfBuffer?.byteLength ?? 0,
+              pdfUrl,
+              attempt,
+              fileName,
+            });
             const msg = err?.message || String(err);
             // Auto-Retry bei detached-ArrayBuffer (StrictMode / Re-Mount).
             if (
