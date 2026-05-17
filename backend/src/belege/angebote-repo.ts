@@ -197,28 +197,21 @@ export function updateAngebot(id: string, patch: Record<string, unknown>): ApiAn
   return getAngebot(id);
 }
 
-export function deleteAngebot(
-  id: string,
-  opts: { force?: boolean } = {},
-): "soft" | "hard" | "missing" {
+// Soft-Delete: setzt `geloescht_am`. Belegnummer bleibt belegt (wird bei
+// Restore wiederverwendet). Hart-Löschen passiert ausschließlich über
+// Einstellungen → Datenbank (passwortgeschützt; räumt dort auch
+// email_versand, drive_upload_queue etc. auf).
+export function deleteAngebot(id: string): "ok" | "missing" {
   const db = getDatabase();
-  const cur = db.prepare(`SELECT versendet_am FROM angebot WHERE id = ?`).get(id) as
-    | { versendet_am: string | null }
-    | undefined;
-  if (!cur) return "missing";
-  if (!opts.force && cur.versendet_am) {
-    db.prepare(`UPDATE angebot SET archiviert = 1 WHERE id = ?`).run(id);
-    emitBelegMutated("angebot", id);
-    return "soft";
+  const r = db
+    .prepare(`UPDATE angebot SET geloescht_am = datetime('now') WHERE id = ? AND geloescht_am IS NULL`)
+    .run(id);
+  if (r.changes === 0) {
+    const exists = db.prepare(`SELECT 1 FROM angebot WHERE id = ?`).get(id);
+    return exists ? "ok" : "missing";
   }
-  const tx = db.transaction(() => {
-    db.prepare(`DELETE FROM email_versand WHERE beleg_art='angebot' AND beleg_id = ?`).run(id);
-    db.prepare(`DELETE FROM drive_upload_queue WHERE beleg_art='angebot' AND beleg_id = ?`).run(id);
-    db.prepare(`DELETE FROM angebot WHERE id = ?`).run(id);
-  });
-  tx();
   emitBelegMutated("angebot", id);
-  return "hard";
+  return "ok";
 }
 
 export function sendeAngebot(id: string): ApiAngebot | null {
