@@ -6,13 +6,13 @@ import { useDauerauftragLaeufe } from "@/hooks/useDauerauftraege";
 import { formatEUR, formatDate } from "@/lib/format";
 import {
   Building2,
-  ClipboardList,
   Euro,
   FileText,
   Bell,
   CheckCircle2,
   ArrowRight,
   Inbox,
+  Hourglass,
 } from "lucide-react";
 import { PageHeader, KpiCard } from "@/components/layout/PageHeader";
 import { NaechsteSchritteCard } from "@/components/dashboard/NaechsteSchritteCard";
@@ -108,10 +108,11 @@ function Dashboard() {
           tone="primary"
         />
         <KpiCard
-          label="Aufträge"
-          value={k?.aktiveObjekte ?? 0}
-          sublabel={`${k?.aktiveObjekte ?? 0} Objekte`}
-          icon={ClipboardList}
+          label="Ausstehend"
+          value={formatEUR(k?.ausstehendEUR ?? 0)}
+          sublabel={`${offene.length} ${offene.length === 1 ? "Rechnung offen" : "Rechnungen offen"}`}
+          icon={Hourglass}
+          tone="warning"
         />
         <KpiCard
           label="Offene Rechnungen"
