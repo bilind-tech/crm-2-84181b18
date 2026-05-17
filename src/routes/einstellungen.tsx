@@ -1,5 +1,5 @@
 // Einstellungen-Seite. Sub-Sidebar (Desktop) + Select (Mobile).
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Outlet, useRouterState } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import {
@@ -99,6 +99,8 @@ const tabs: { id: TabId; label: string; icon: typeof Building2; gruppe: string }
 const gruppen = Array.from(new Set(tabs.map((t) => t.gruppe)));
 
 function Page() {
+  const pathname = useRouterState({ select: (r) => r.location.pathname });
+  if (pathname !== "/einstellungen") return <Outlet />;
   const sichtbareTabs = tabs;
   const sichtbareGruppen = gruppen;
   const [tab, setTab] = useState<TabId>("firmendaten");
