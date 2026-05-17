@@ -35,6 +35,8 @@ export function listAngebote(f: AngebotFilter = {}): ApiAngebot[] {
   const db = getDatabase();
   const where: string[] = [];
   const params: unknown[] = [];
+  // Soft-Delete: gelöschte Angebote werden ausgeblendet (Restore via DB-Seite).
+  where.push("geloescht_am IS NULL");
   if (f.kundeId) {
     where.push("kunde_id = ?");
     params.push(f.kundeId);
@@ -63,7 +65,7 @@ export function listAngebote(f: AngebotFilter = {}): ApiAngebot[] {
 
 export function getAngebot(id: string): ApiAngebot | null {
   const db = getDatabase();
-  const row = db.prepare(`SELECT ${ANGEBOT_COLS} FROM angebot WHERE id = ?`).get(id) as
+  const row = db.prepare(`SELECT ${ANGEBOT_COLS} FROM angebot WHERE id = ? AND geloescht_am IS NULL`).get(id) as
     | DbAngebot
     | undefined;
   if (!row) return null;
