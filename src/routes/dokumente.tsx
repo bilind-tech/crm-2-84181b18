@@ -172,26 +172,6 @@ function Page() {
         }
       />
 
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-        <KpiCard label="Dokumente gesamt" value={counts.gesamt} tone="primary" />
-        <KpiCard
-          label="Offen"
-          value={counts.offen}
-          tone={counts.offen > 0 ? "warning" : "default"}
-        />
-        <KpiCard
-          label="Überfällig"
-          value={counts.ueberfaellig}
-          tone={counts.ueberfaellig > 0 ? "danger" : "default"}
-        />
-        <KpiCard
-          label={`Steuerrelevant ${jahr}`}
-          value={counts.steuerrelevant}
-          tone="success"
-          sublabel={formatEUR(counts.summe)}
-        />
-      </div>
-
       <div ref={uploadPanelRef}>
         <DokumentUploadPanel ref={uploadRef} />
       </div>
