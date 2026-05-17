@@ -22,7 +22,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useDeleteKunde } from "@/hooks/useApi";
+import { errorToMessage } from "@/lib/api/piClient";
 import type {
   Kunde,
   Ansprechpartner,
@@ -50,6 +52,7 @@ interface Props {
 export function KundeLoeschenDialog({ kunde, open, onOpenChange }: Props) {
   const [step, setStep] = useState<1 | 2>(1);
   const [eingabe, setEingabe] = useState("");
+  const [force, setForce] = useState(true);
   const del = useDeleteKunde();
   const navigate = useNavigate();
 
@@ -72,6 +75,7 @@ export function KundeLoeschenDialog({ kunde, open, onOpenChange }: Props) {
   function reset() {
     setStep(1);
     setEingabe("");
+    setForce(true);
   }
 
   function handleOpenChange(o: boolean) {
@@ -80,14 +84,21 @@ export function KundeLoeschenDialog({ kunde, open, onOpenChange }: Props) {
   }
 
   function handleDelete() {
-    del.mutate(kunde.id, {
+    del.mutate(
+      { id: kunde.id, force },
+      {
       onSuccess: () => {
-        toast.success(`Kunde „${fullName}“ gelöscht`);
+        toast.success(
+          force
+            ? `Kunde „${fullName}“ endgültig gelöscht`
+            : `Kunde „${fullName}“ archiviert`,
+        );
         handleOpenChange(false);
         navigate({ to: "/kunden" });
       },
-      onError: (e) => toast.error(e instanceof Error ? e.message : "Löschen fehlgeschlagen"),
-    });
+        onError: (e) => toast.error(errorToMessage(e, "Löschen fehlgeschlagen")),
+      },
+    );
   }
 
   return (
@@ -154,16 +165,31 @@ export function KundeLoeschenDialog({ kunde, open, onOpenChange }: Props) {
                 autoFocus
               />
             </div>
+            <Label className="flex items-start gap-2 text-sm">
+              <Checkbox
+                checked={force}
+                onCheckedChange={(v) => setForce(v === true)}
+                className="mt-0.5"
+              />
+              <span>
+                Endgültig löschen inkl. aller Objekte, Angebote, Rechnungen, Zahlungen und Belege.
+                Wenn abgewählt, wird der Kunde nur archiviert (auf inaktiv gesetzt).
+              </span>
+            </Label>
             <DialogFooter>
               <Button variant="outline" onClick={() => setStep(1)}>
                 Zurück
               </Button>
               <Button
-                variant="destructive"
+                variant={force ? "destructive" : "secondary"}
                 disabled={!matches || del.isPending}
                 onClick={handleDelete}
               >
-                {del.isPending ? "Lösche…" : "Endgültig löschen"}
+                {del.isPending
+                  ? "Lösche…"
+                  : force
+                    ? "Endgültig löschen"
+                    : "Archivieren"}
               </Button>
             </DialogFooter>
           </div>
