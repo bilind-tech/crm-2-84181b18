@@ -4,7 +4,13 @@
 // Firmendaten. Damit fühlen sich die Protokolle wie ein Beleg an.
 
 import logoFallback from "@/assets/logo.png";
-import type { Firmendaten, Kunde, Objekt } from "@/lib/api/types";
+import type { Firmendaten, Kunde, Objekt, ProtokollOptionen } from "@/lib/api/types";
+import { A4, createHotspotTracker, type RuntimeHotspot } from "./hotspotTracker";
+
+export interface PdfBuildResult {
+  blob: Blob;
+  hotspots: RuntimeHotspot[];
+}
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type AnyPdfMake = any;
@@ -82,7 +88,7 @@ function absenderzeile(f?: Firmendaten): string {
   return teile.join(" – ");
 }
 
-function header(firma: Firmendaten | undefined, logo: string | null) {
+function header(firma: Firmendaten | undefined, logo: string | null, logoSichtbar = true) {
   return {
     margin: [55, 30, 55, 0] as [number, number, number, number],
     columns: [
@@ -98,7 +104,7 @@ function header(firma: Firmendaten | undefined, logo: string | null) {
           },
         ],
       },
-      logo
+      logo && logoSichtbar
         ? { width: 270, image: logo, fit: [270, 120], alignment: "right" }
         : {
             width: 270,
@@ -166,6 +172,7 @@ function metaBox(meta: { label: string; wert: string }[]) {
     },
   ]);
   return {
+    id: "meta",
     width: 235,
     table: { widths: ["auto", "*"], body },
     layout: {
