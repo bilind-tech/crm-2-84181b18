@@ -1,79 +1,88 @@
-## Ziel
+# Plan: Restarbeiten Kunden-Löschen, Logo-UI & Stundenzettel-Proxy
 
-Drei Änderungen:
-1. Angebote und Rechnungen vollständig löschen können (auch versendete/bezahlte) — mit klarer Warnung.
-2. Sidebar-Gruppenüberschriften „Stammdaten" und „Vertrieb & Abrechnung" ersetzen durch dezente Trennlinien (gleiche Farbe wie Text, niedrige Opacity). „Übersicht" und „System" ebenfalls.
-3. Neue Unterseite **Einstellungen → Datenbank** anlegen. „Einstellungen" wird zu einer einklappbaren Gruppe in der Sidebar (Datenbank als Kind), standardmäßig **eingeklappt**. Inhalt der Datenbank-Seite vorerst leer/Platzhalter — Logik folgt später.
+Drei abgegrenzte Bausteine, die alle Backend- und Frontend-Endstücke aus dem letzten Lauf abschließen.
 
----
+## 1. KundeLoeschenDialog: echtes „Endgültig löschen"
 
-## 1. Angebote/Rechnungen löschen
+**Problem:** Backend kann bereits `?force=1` (cascading delete), aber `KundeLoeschenDialog.tsx` ruft `del.mutate(kunde.id)` ohne `force` — deshalb bleibt der Kunde nach Soft-Delete als inaktiv hängen.
 
-**Backend** (`backend/src/belege/angebote-repo.ts`, `rechnungen-repo.ts`):
-- `deleteAngebot(id, opts?: { force?: boolean })` und `deleteRechnung(id, opts?: { force?: boolean })`.
-- Ohne `force`: aktuelles Verhalten (soft-archive wenn versendet/nicht-entwurf).
-- Mit `force=true`: harter Delete inkl. Positionen, Zahlungen, Mahnungen, `email_versand`, `dokument`-Verknüpfungen in einer Transaktion.
-- Drive-Aufräumen: bei hartem Delete `drive_upload_queue`-Einträge entfernen (Drive-Datei selbst bleibt — kein automatischer Drive-Delete in MVP).
+- Dialog auf neue Signatur umstellen: `del.mutate({ id: kunde.id, force: true })`.
+- Stufe 2 zusätzlich um eine sichtbare Checkbox **„Inkl. aller Rechnungen, Angebote, Zahlungen und Dokumente endgültig löschen"** ergänzen (default an, wenn `hatDaten`). Wenn Nutzer abwählt, wird `force=false` gesendet (Soft-Archiv).
+- Button-Text dynamisch: „Endgültig löschen" vs. „Archivieren".
+- Fehler-Toast: zeigt Server-Message (z. B. 409) klartext.
 
-**Routes** (`backend/src/routes/belege.ts`):
-- `DELETE /angebote/:id?force=1` und `DELETE /rechnungen/:id?force=1` reichen `force` durch.
-- Response unverändert (`mode`).
+**Datei:** `src/components/forms/KundeLoeschenDialog.tsx`
 
-**Frontend**:
-- `useDeleteAngebot` / `useDeleteRechnung` (`src/hooks/useApi.ts`): akzeptieren `{ id, force? }`.
-- Neue Komponente `src/components/forms/BelegLoeschenDialog.tsx` (gemeinsam für Angebot/Rechnung):
-  - Stufe 1: einfache Bestätigung („Als Entwurf löschen / Archivieren").
-  - Wenn Status ≠ Entwurf: roter Warn-Block + Checkbox „Endgültig löschen inkl. aller Zahlungen, Mahnungen, E-Mail-Historie". Button rot, nur aktiv wenn Checkbox gesetzt.
-- Detailseiten `angebote.$id.tsx` und `rechnungen.$id.tsx`: Trash-Button in Action-Bar, öffnet den Dialog; nach Erfolg Navigation zurück zur Liste.
-- Listenseiten `angebote.tsx`/`rechnungen.tsx`: bestehenden Inline-Confirm durch denselben Dialog ersetzen (konsistentes Verhalten).
+## 2. Kunden-Logo Frontend
 
----
+Backend liefert bereits `GET/POST/DELETE /kunden/:id/logo`, `hasLogo` und `logoUpdatedAt` im Kunde-Objekt. Frontend baut darauf auf.
 
-## 2. Sidebar: Trennlinien statt Gruppenlabels
+### 2.1 Typ & API-Helpers
+- `Kunde` in `src/lib/api/types.ts` erweitern: `hasLogo?: boolean; logoUpdatedAt?: string`.
+- `src/hooks/useApi.ts`: neue Hooks
+  - `useKundeLogoUrl(kundeId, logoUpdatedAt)` → liefert authentifizierte Blob-URL (Cache-Bust über `logoUpdatedAt`).
+  - `useUploadKundeLogo()` → multipart POST.
+  - `useDeleteKundeLogo()` → DELETE; invalidiert `kunden`-Queries.
 
-`src/components/layout/AppSidebar.tsx`:
-- `renderGroup` umbauen: statt `<SidebarGroupLabel>` mit Text eine schmale `<div>`-Linie rendern, z. B.
-  `<div className="mx-3 my-1 h-px bg-sidebar-foreground/15" />`.
-- Erste Gruppe (Übersicht) ohne Trennlinie davor; ab der zweiten Gruppe (Stammdaten) jeweils eine Linie als visueller Separator.
-- Im eingeklappten Sidebar-State (Icon-only) auch dünne Linie zentriert (`mx-2`).
-- Tooltips/Aria bleiben, Reihenfolge bleibt.
+### 2.2 Wiederverwendbare Komponente
+- Neu: `src/components/kunden/KundeLogo.tsx`
+  - Props: `kunde, size: "sm"|"md"|"lg"|"xl", className?`
+  - Wenn `hasLogo`: zeigt Bild via Blob-URL.
+  - Fallback: Initialen-Avatar in `bg-muted` (Firmenkürzel oder erste 2 Buchstaben).
+- Neu: `src/components/kunden/KundeLogoUploadDialog.tsx`
+  - Drag-and-drop + File-Input, Vorschau, MIME-/Größen-Check vor Upload (≤2 MB, PNG/JPG/WebP/SVG).
+  - Buttons „Hochladen", „Entfernen" (nur wenn vorhanden), „Schließen".
 
----
+### 2.3 Einbindung
+- **Kundenliste** `src/routes/kunden.tsx`: kleines `KundeLogo size="sm"` links neben Name in jeder Zeile / Karte.
+- **Kunden-Detailseite** `src/routes/kunden.$id.tsx`: großes `KundeLogo size="xl"` im Header, daneben „Logo ändern"-Button → öffnet Upload-Dialog.
+- **PDF (Rechnung/Angebot)**: in `src/lib/pdf/belegPdf.ts` Logo-Quelle erweitern — wenn Kunde `hasLogo`, lade Blob als Data-URL und reiche es als sekundäres Logo („Kunden-Logo") an den PDF-Renderer. Position: rechts oben unter dem Firmen-Logo, max. 30 mm breit. Wenn `logoOverride` (Per-Beleg) gesetzt ist, hat das weiterhin Vorrang. Renderer-Anpassung minimal in `belegPdf.ts`/Layout, kein neuer PDF-Server-Code nötig (Daten gehen über bestehenden Payload).
 
-## 3. Einstellungen-Gruppe mit Datenbank-Unterseite
+## 3. Stundenzettel Reverse-Proxy
 
-**Neue Route** `src/routes/einstellungen.datenbank.tsx`:
-- Leere Seite mit `PageHeader` „Datenbank" + Hinweistext „Wird in Kürze gebaut".
-- Kein Backend, keine Daten.
+**Problem:** Iframe lädt LAN-Adresse nicht aus der Cloud-Preview und HTTP-in-HTTPS wird vom Browser blockiert. Lösung: Backend (Pi) proxied die externe App, Frontend lädt sie über `/extern/stundenzettel/*` derselben Origin.
 
-**Sidebar-Änderung** (`AppSidebar.tsx`):
-- System-Gruppe: „Einstellungen" wird ein einklappbarer Eintrag mit Sub-Items.
-  - Verwendet shadcn `SidebarMenuSub` + `Collapsible` (oder eigenes `useState`).
-  - Default: **eingeklappt** (`defaultOpen={false}`). Auto-expand wenn `pathname.startsWith("/einstellungen")`.
-  - Sub-Items: „Übersicht" → `/einstellungen`, „Datenbank" → `/einstellungen/datenbank`.
-- Chevron-Icon rechts (rotiert beim Aufklappen).
-- Im collapsed-Sidebar-State: nur Haupt-Icon, Sub-Menu via Hover-Popover (shadcn default verhalten).
+### 3.1 Backend
+- Neu: `backend/src/routes/extern.ts`
+  - Registriert unter Auth-geschütztem Scope: `ALL /extern/stundenzettel/*`.
+  - Liest `externeUrl` aus Settings-Store (Cache + Invalidate bei PATCH).
+  - Forward via `undici`/`fetch`: Methode, Path-Splat, Query, Body, Header (außer `host`, `cookie` durchreichen optional). Antwort streamt zurück; entfernt `X-Frame-Options` und `Content-Security-Policy` headers, damit Einbettung im iframe funktioniert.
+  - Wenn `externeUrl` leer → 503 mit JSON `{error:"not-configured"}`.
+- Registrieren in `backend/src/server.ts`.
 
----
+### 3.2 Frontend
+- `src/lib/stundenzettel/config.ts`: zusätzliche Ableitung `useStundenzettelEmbedUrl()` → wenn `externeUrl` gesetzt, gibt sie `'/extern/stundenzettel/'` (relativ zur Backend-Origin via `backendUrl`) zurück; sonst leer.
+- `src/routes/stundenzettel.tsx`:
+  - Iframe-`src` benutzt Embed-URL statt direkter `externeUrl`.
+  - Die Hindernis-Analyse (`lan-aus-cloud`, `mixed-content`) entfällt für den Embed-Pfad — Proxy löst beides. Hinweisbox nur noch, wenn Backend 503 zurückgibt (eigener Empty-State „Stundenzettel-Backend nicht erreichbar / nicht konfiguriert").
+  - „In neuem Tab" weiterhin mit Original-`externeUrl`.
 
-## Technische Details
+## Out of scope
 
-| Aufgabe | Datei |
-| --- | --- |
-| Force-Delete Logic | `backend/src/belege/angebote-repo.ts`, `rechnungen-repo.ts` |
-| Route-Param | `backend/src/routes/belege.ts` |
-| Hook-Signatur | `src/hooks/useApi.ts` |
-| Dialog | `src/components/forms/BelegLoeschenDialog.tsx` (neu) |
-| Detail-Buttons | `src/routes/angebote.$id.tsx`, `src/routes/rechnungen.$id.tsx` |
-| Listen-Refactor | `src/routes/angebote.tsx`, `src/routes/rechnungen.tsx` |
-| Sidebar | `src/components/layout/AppSidebar.tsx` |
-| Datenbank-Seite | `src/routes/einstellungen.datenbank.tsx` (neu) |
+- Keine Anpassung der Lifecycle-Status für Belege (separates Thema).
+- Kein automatischer E-Mail-Versand (verboten laut Core-Memory).
+- Kein Drive-Sync für Kunden-Logos.
 
-Tests: `backend/tests/belege-delete-force.spec.ts` (force löscht Zahlungen+Mahnungen+email_versand kaskadiert).
+## Technical notes
 
----
+- `useApi.ts` Blob-Fetch via `api.getBlob` (existiert bereits für PDF). Falls nicht, ad-hoc mit `fetch` + Auth-Header aus `client.ts`.
+- Proxy-Route nutzt Fastify-Raw-Stream: `reply.raw` für Streaming. Headers-Whitelist Response: alles außer `content-encoding` (gzip wird vom Upstream-Server schon gesetzt) — sicherer: re-deflate vermeiden, Encoding 1:1 durchleiten. `x-frame-options` und `content-security-policy` entfernen.
+- Tests: kein Pflichtmuss, aber `backend/test/` ein kleiner Smoke-Test für `/extern/stundenzettel` (503 wenn unkonfiguriert) wäre nice-to-have.
 
-## Nicht Teil dieses Plans
+## Dateien (Übersicht)
 
-- Google-Drive-Datei wird beim Force-Delete **nicht** automatisch im Drive entfernt (Sicherheit). Optionale „Aus Drive löschen"-Aktion später.
-- Datenbank-Seiteninhalt (Backup-Status, Tabellen-Statistik, …) — kommt im Folgeschritt.
+Backend:
+- `backend/src/routes/extern.ts` (neu)
+- `backend/src/server.ts` (Route registrieren)
+
+Frontend:
+- `src/lib/api/types.ts`
+- `src/hooks/useApi.ts`
+- `src/components/forms/KundeLoeschenDialog.tsx`
+- `src/components/kunden/KundeLogo.tsx` (neu)
+- `src/components/kunden/KundeLogoUploadDialog.tsx` (neu)
+- `src/routes/kunden.tsx`
+- `src/routes/kunden.$id.tsx`
+- `src/lib/pdf/belegPdf.ts`
+- `src/lib/stundenzettel/config.ts`
+- `src/routes/stundenzettel.tsx`
