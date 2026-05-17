@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { useStundenzettelUrl } from "@/lib/stundenzettel/config";
+import { useStundenzettelUrl, useStundenzettelEmbedUrl } from "@/lib/stundenzettel/config";
 
 export const Route = createFileRoute("/stundenzettel")({ component: Page });
 
@@ -65,11 +65,14 @@ function analysiereUmfeld(url: string): Hindernis {
 
 function Page() {
   const { url } = useStundenzettelUrl();
+  const embedUrl = useStundenzettelEmbedUrl();
   const [reloadKey, setReloadKey] = useState(0);
   const [loaded, setLoaded] = useState(false);
   const [slow, setSlow] = useState(false);
 
-  const hindernis = useMemo(() => analysiereUmfeld(url), [url]);
+  // Reverse-Proxy im Backend löst Mixed-Content / LAN / X-Frame-Options.
+  // Frühere Hindernis-Analyse entfällt — wir laden immer über `embedUrl`.
+  const hindernis = null as Hindernis;
 
   useEffect(() => {
     if (!url || hindernis) return;
@@ -161,7 +164,7 @@ function Page() {
           )}
           <iframe
             key={reloadKey}
-            src={url}
+            src={embedUrl || url}
             title="Stundenzettel"
             className="h-full w-full"
             onLoad={() => {
