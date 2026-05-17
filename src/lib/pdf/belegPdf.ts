@@ -348,7 +348,7 @@ function leistungstabelle(
     { text: eur(totalsT.brutto), fontSize: 10, alignment: "right", bold: true },
   ]);
 
-  const widths = showStunden ? ["*", 60, 90, 85] : ["*", 110, 95];
+  const widths = showStunden ? TABLE_COL_WIDTHS_STUNDEN : TABLE_COL_WIDTHS_STANDARD;
 
   return {
     id: "tabelle",
@@ -371,6 +371,12 @@ function leistungstabelle(
     },
   };
 }
+
+/** Spaltenbreiten der Leistungstabelle in pdfmake-Punkten. Wird im
+ *  Inline-Editor wiederverwendet, damit die Editor-Reihe optisch auf der
+ *  PDF-Zeile sitzt. */
+export const TABLE_COL_WIDTHS_STANDARD = ["*", 110, 95] as const;
+export const TABLE_COL_WIDTHS_STUNDEN = ["*", 60, 90, 85] as const;
 
 // ───────── Meta-Box ────────────────────────────────────────────────────────
 
