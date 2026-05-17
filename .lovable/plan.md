@@ -1,100 +1,72 @@
 ## Ziel
 
-Die Detail-Bearbeitung von **Übergabe-/Abnahmeprotokoll** und **Schlüsselübergabe** soll sich exakt so anfühlen wie der PDF-Editor von Angebot/Rechnung: links Live-PDF, **mit der Maus direkt auf ein Feld klicken → Inline-Editor öffnet sich**, rechts Tab-Editor mit allen Optionen. Plus drei Verbesserungen, die der Beleg-Editor heute nicht hat. Plus der Flacker-Bug wird behoben.
+Beim Bearbeiten von Übergabe-/Abnahme- und Schlüsselübergabeprotokollen darf die PDF-Vorschau nicht mehr flackern. Click-to-Edit über die PDF, Tabs rechts und der Abschluss-Flow bleiben unverändert — sie werden nur ruhiger und vorhersagbarer.
 
-## Bestandsaufnahme
+## Ursachenanalyse (gemessen im aktuellen Code)
 
-- Beleg-Editor (`src/components/pdf-editor/*`): PDF-Tracker (`hotspotTracker.ts`) erkennt pdfmake-Nodes mit `id`, `PdfFieldOverlay` legt klickbare Hotspots darüber, `HotspotInlineEditor` schreibt in den Draft.
-- Protokoll-Editor (`src/components/protokoll-editor/*`): Split-Layout existiert, aber `werkzeugePdf.ts` setzt **keine** `id`s und übergibt keinen Tracker → keine Hotspots → man muss alles im rechten Panel suchen.
-- `ProtokollLivePreview` macht atomaren Buffer-Swap wie `LivePdfPreview` — Flacker kommt also nicht vom Swap, sondern davon, dass `renderWidth` bei jedem Scrollbar-Sprung neu berechnet wird und `<Page width=…>` jeden Subpixel-Schritt neu rasterisiert.
+`src/components/protokoll-editor/ProtokollLivePreview.tsx` macht zwar einen „atomaren Swap" über ein verstecktes Pending-`<Document>`, hat aber **drei** echte Flackerquellen:
 
-## Umsetzung
+1. **`key` wechselt beim Swap**
+   ```tsx
+   <Document key={`buf#${pdfBuffer?.byteLength}#${loadAttempt}`} … />
+   ```
+   Bei jedem neuen Buffer hängt die `byteLength` mit drin → React unmountet das gesamte `<Document>` inkl. aller Page-Canvases → kurzer Weißblitz → Remount + neues Rendern. Das ist der Hauptflicker beim Tippen.
 
-### 1. Hotspots in `src/lib/pdf/werkzeugePdf.ts`
+2. **`setNumPages` wird auch vom Pending-Document gesetzt**
+   Im versteckten Pre-Loader steht `onLoadSuccess={({ numPages }) => { setNumPages(numPages); … }}`. Wenn die neue PDF eine andere Seitenzahl hat (z. B. Schlüsselliste wächst auf Seite 2), springt die sichtbare Liste **vor** dem Buffer-Swap auf die neue Zahl → kurz fehlende oder leere Seiten.
 
-Beide PDF-Generatoren auf das Beleg-Muster umstellen:
+3. **`kunde` / `objekt` / `firma` als Effekt-Dependencies**
+   Der Build-Effekt hängt direkt an den React-Query-Objekten. Jedes Refetch/Background-Refresh ändert die Identität → unnötiger PDF-Rebuild ohne inhaltliche Änderung → Flackern ohne User-Input.
 
-- Tracker erzeugen: `const tracker = createHotspotTracker(A4)`, an `pm.createPdf(doc, …, …, tracker.pageBreakBefore)` übergeben.
-- Stabile `id`s an die relevanten pdfmake-Nodes setzen. **Übergabe-/Abnahmeprotokoll:**
+Zusätzlich in `werkzeugePdf.ts`: `generateProtokollPdf` baut bei jedem Tastendruck pdfmake komplett neu auf (inkl. Font-Setup). Das ist unvermeidbar teuer, aber wir können den Build deduplizieren, damit nicht zwei parallele Builds gleichzeitig laufen und sich gegenseitig swappen.
 
-  | Feld-ID | Bereich |
-  |---|---|
-  | `kunde` | Empfänger-Adresse |
-  | `meta` | Meta-Box (Nr./Datum/Uhrzeit) |
-  | `titel` | Hauptüberschrift („Übergabeprotokoll" …) |
-  | `leistungsumfang` | Leistungs-Block |
-  | `bemerkungen` | Mängel-/Bemerkungen-Block |
-  | `ergebnis` | „Ohne Vorbehalt"-Zeile |
-  | `unterschriften` | Unterschriften-Block |
-  | `art` | (versteckter Hotspot auf dem Titel, öffnet Radio Übergabe/Abnahme/Beides) |
+## Plan
 
-  **Schlüsselübergabe:** `kunde`, `meta`, `titel`, `richtung` (Hotspot auf Titel), `schluessel.tabelle`, `pfand`, `bestaetigung`, `unterschriften`.
+### 1. Stabilen Document-`key` verwenden
 
-- Rückgabe ändern: `Promise<{ blob: Blob; hotspots: RuntimeHotspot[] }>`.
-- `generateProtokollPdf(...)` (Adapter) gibt ebenfalls `{ blob, hotspots }` zurück. Die zwei Aufrufstellen, die heute nur den Blob benötigen (Abschließen-Flow, Download-Button), greifen auf `.blob` zu — kurze Anpassung in `ProtokollEditorLayout.onAbschliessen` und in `src/components/pdf/PrintButton.tsx` (`grep`-Ergebnisse zeigen ~2 Stellen).
+`src/components/protokoll-editor/ProtokollLivePreview.tsx`:
+- `key={`buf#${pdfBuffer?.byteLength}#${loadAttempt}`}` → `key={`pdf-${loadAttempt}`}`
+  (nur bei echtem Detach-Retry remounten; sonst diffen lassen — `react-pdf` rendert dann die neue `file`-Prop in-place ohne Weißblitz).
 
-### 2. `src/lib/pdf/fieldMap.ts` erweitern
+### 2. `numPages` nur nach Swap setzen
 
-Zweite Lookup-Map für Protokoll-Felder + Helper `protokollMetaForId(id)`. Tabs: `stammdaten` | `inhalt` | `unterschriften` | `optionen`.
+- Im versteckten Pending-`<Document>` `setNumPages(numPages)` **entfernen**.
+- `setNumPages` ausschließlich im sichtbaren `onLoadSuccess` aufrufen, das nach dem Swap automatisch feuert (frische `file`-Prop).
+- `numPages` während des Swaps **nicht** zurücksetzen → keine Seiten verschwinden kurzzeitig.
 
-### 3. Neue Komponente `src/components/protokoll-editor/ProtokollHotspotEditor.tsx`
+### 3. Effekt-Dependencies semantisch machen
 
-Analog zu `HotspotInlineEditor`, aber für Protokolle. Pro Feld-ID rendert sie ein Mini-Form-Stück (Input/Textarea/RadioGroup, für `schluessel.tabelle` eine kompakte Zeilen-Editor-Liste mit „Zeile +"). Schreibt via `editor.set(key, value)`. Footer: „Erweitert" → öffnet zugehörigen Tab im rechten Panel.
+- Statt direkt `[draftKey, kunde, objekt, firma]` einen zweiten `semKey` für `{ kunde, objekt, firma }` bilden und nur den String in die Deps geben.
+- Verhindert PDF-Rebuilds bei React-Query-Refetches ohne Datenänderung.
 
-### 4. `ProtokollLivePreview.tsx` um Overlay erweitern
+### 4. Parallele Builds verhindern
 
-- Generator-Aufruf liefert jetzt `{ blob, hotspots }`. Hotspots in State halten und beim atomaren Swap mit-übernehmen.
-- Pro Seite (`<div>` um `<Page>`) zusätzlich `<PdfFieldOverlay hotspots={…} scale={…} openId/onOpenChange renderEditor={…}>` rendern — Komponente wird 1:1 wiederverwendet.
-- Fallback-Hotspots für Seite 1 ergänzen (eine zweite Konstante `FALLBACK_HOTSPOTS_PROTOKOLL`) für den Fall, dass der Tracker leer bleibt.
+- In den Build-Effekt einen `inFlightRef` einbauen: läuft schon ein Build, neuen erst nach `await` starten — das vermeidet zwei konkurrierende Swaps direkt hintereinander beim schnellen Tippen.
+- `DEBOUNCE_MS` von 350 → **450 ms** (ruhiger beim Tippen, kein spürbarer Lag).
 
-### 5. Flacker-Fix in `ProtokollLivePreview.tsx` (und gleicher Patch in `LivePdfPreview.tsx`)
+### 5. Pending-Document nur zeigen wenn nötig
 
-- `renderWidth` auf das nächste Vielfache von 20 runden:
-  ```ts
-  const renderWidth = useMemo(() => {
-    const raw = Math.min(Math.max(containerWidth - 16, 280), 900);
-    return Math.round(raw / 20) * 20;
-  }, [containerWidth]);
-  ```
-  → Scrollbar-Wackler ändern `renderWidth` nicht mehr → kein Re-Render der Seiten.
-- `<Page width={useDeferredValue(renderWidth)} …>` damit das erneute Rastern zudem entkoppelt von Eingaben passiert.
-- `key` der visiblen Seiten zusätzlich an `renderWidth` binden, damit nicht halb-skalierte Reste sichtbar bleiben.
+- Aktuell wird das versteckte `<Document>` jedes Mal gemountet, wenn `pendingBuffer !== pdfBuffer`. Beim ersten Build (`pdfBuffer === null`) den Pending-Pfad **überspringen** und direkt in `pdfBuffer` setzen — sonst dauert der initiale Sichtbar-Werden-Moment doppelt so lang.
 
-### 6. Rechtes Panel: Tabs statt Single-Form
+### 6. Konsistenz: identische Fixes auf `LivePdfPreview.tsx` anwenden
 
-`ProtokollEditorLayout` bekommt die Tab-Architektur des Beleg-Editors (`EditorPanel`-Muster). Vier Tabs, Active-Tab steuerbar von außen, damit die „Erweitert"-Buttons der Inline-Editoren direkt darauf springen können:
+Damit Angebot/Rechnung dasselbe ruhige Verhalten haben (Punkte 1–4). Verhalten/Click-to-Edit bleibt 1:1.
 
-| Tab | Inhalt |
-|---|---|
-| **Stammdaten** | Kunde/Objekt-Picker, Datum, Uhrzeit, Art bzw. Richtung |
-| **Inhalt** | Übergabe: Leistungsumfang, Bemerkungen · Schlüssel: Zeilen-Editor + Pfand |
-| **Unterschriften** | Vertreter AG/AN, „Ohne Vorbehalt" bzw. „Bestätigt" |
-| **Optionen** *(neu — geht über Beleg-Editor hinaus)* | • Eigener Titel-Override · • Untertitel-Zeile · • Zusatzklausel-Freitext (eigener Absatz im PDF) · • Logo im PDF ein/aus · • Footer-Firmendaten ein/aus · • Sektions-Titel umbenennen (Leistungsumfang/Mängel/Ergebnis bzw. Übergebene Schlüssel/Bestätigung) · • „Druckfreundlich" (Tabellen-Linien dünner) |
+### Bewusst NICHT geändert
 
-`Protokoll`-Type bekommt dafür ein optionales Feld `optionen?: { titelOverride?: string; untertitel?: string; zusatzKlausel?: string; logoSichtbar?: boolean; footerSichtbar?: boolean; sektionsTitel?: Partial<Record<"leistung"|"bemerkungen"|"ergebnis"|"schluessel"|"bestaetigung", string>>; druckfreundlich?: boolean }`. PDF-Generator wertet diese aus (defaultet auf heutige Werte → keine Migration nötig).
+- pdfmake-Pipeline / Inhalt der PDFs.
+- Hotspot-Logik, `ProtokollHotspotEditor`, Tabs, Abschluss-Button.
+- Datenmodell `ProtokollOptionen`.
+- Keine Umstellung auf `html2canvas`/`jsPDF` (würde Hotspots, scharfe Vektoren und Drive-Upload-Qualität kaputtmachen).
 
-### 7. Abschluss-Button & Header
+## Geänderte Dateien
 
-Bleibt wie heute, der Detail-Button „PDF bearbeiten" (Pencil-Icon) führt weiterhin auf `/protokolle/$id/bearbeiten`. Header verliert nichts.
+- `src/components/protokoll-editor/ProtokollLivePreview.tsx` — Punkte 1–5
+- `src/components/pdf-editor/LivePdfPreview.tsx` — Punkte 1–4 (Konsistenz)
 
-## Out of Scope
+## Akzeptanzkriterien
 
-- E-Mail-Versand des PDFs aus dem Editor (Mails nur per User-Klick aus dem bestehenden Versand-Dialog).
-- Skalierung des PDFs auf eine andere Seitengröße als A4.
-- Neue Protokoll-Typen.
-
-## Verifikation
-
-1. `/protokolle/$id/bearbeiten` öffnen — Felder im PDF zeigen beim Hover dünne, gestrichelte Outline + Pencil-Pille.
-2. Klick auf „Leistungsumfang" → Popover mit Textarea, Eingabe ändert das PDF debounced ohne Layout-Sprung.
-3. Klick auf den Titel → Inline-RadioGroup Übergabe/Abnahme/Beides; Wechsel ändert Überschrift im PDF.
-4. Schlüssel-Protokoll: Klick auf Tabelle → Mini-Zeilen-Editor mit Hinzufügen/Entfernen; Klick auf Pfand → kleines Eurofeld.
-5. Tab „Optionen" → eigene Klausel eintippen → erscheint im PDF als neuer Absatz unter „Ergebnis".
-6. Fenster schmaler/breiter ziehen, Scrollbar erscheinen/verschwinden → kein Aufblitzen mehr; die Seitenbreite springt nur in 20-px-Stufen.
-7. „Abschließen" → PDF wird gespeichert und in Dokumenten erzeugt wie vorher.
-
-## Hinweise
-
-- Keine Sparkles/Glitzer-Deko (Core-Regel) und keine Gradient-Backgrounds im Popover.
-- Keine automatischen E-Mails irgendwo in dem Flow.
-- `Protokoll.optionen`-Felder sind alle optional → bestehende Protokolle bleiben unverändert kompatibel.
+- Tippen in beiden Protokoll-Tabs (Übergabe + Schlüssel) erzeugt **keinen Weißblitz** mehr in der Vorschau; Seiten bleiben sichtbar bis die neue PDF tauscht.
+- Seitenanzahl springt nicht mehr kurz auf falsche Werte, wenn Schlüsselzeilen einen Umbruch verursachen.
+- Reine Hintergrund-Refetches (z. B. Kundenliste) lösen **keinen** Rebuild mehr aus.
+- Click-to-Edit, Tabs (Stammdaten/Inhalt/Unterschriften/Optionen) und Abschluss funktionieren unverändert.

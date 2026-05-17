@@ -29,7 +29,7 @@ type Props =
   | ({ kind: "angebot"; draft: Angebot } & CommonProps)
   | ({ kind: "rechnung"; draft: Rechnung } & CommonProps);
 
-const DEBOUNCE_MS = 300;
+const DEBOUNCE_MS = 450;
 const LOADER_DELAY_MS = 250;
 
 // Volatile Server-Felder aus Build-Trigger ausschließen, damit Server-Echos
@@ -76,6 +76,11 @@ export function LivePdfPreview(props: Props) {
 
   // Build-Trigger nur bei semantischer Änderung des Drafts (Timestamps egal).
   const draftKey = useMemo(() => semanticKey(draft), [draft]);
+  const ctxKey = useMemo(
+    () => semanticKey({ kunde, firma, ansprechpartner, kind }),
+    [kunde, firma, ansprechpartner, kind],
+  );
+  const inFlightRef = useRef(false);
 
   // Loader-Pille erst nach LOADER_DELAY_MS einblenden (kein Aufblitzen).
   useEffect(() => {
@@ -95,6 +100,8 @@ export function LivePdfPreview(props: Props) {
   useEffect(() => {
     let cancelled = false;
     const timer = setTimeout(async () => {
+      if (inFlightRef.current) return;
+      inFlightRef.current = true;
       setRendering(true);
       setBuildError(null);
       try {
@@ -109,18 +116,29 @@ export function LivePdfPreview(props: Props) {
         const buf = await result.blob.arrayBuffer();
         if (cancelled) return;
         const newUrl = URL.createObjectURL(result.blob);
-        setHotspots(result.hotspots);
-        setPendingBuffer(buf);
-        setPendingUrl((prev) => {
-          if (prev) URL.revokeObjectURL(prev);
-          return newUrl;
-        });
+        if (!pdfBuffer) {
+          // Erster Build → direkt anzeigen, keinen Pending-Umweg.
+          setHotspots(result.hotspots);
+          setPdfBuffer(buf);
+          setPdfUrl((prev) => {
+            if (prev) URL.revokeObjectURL(prev);
+            return newUrl;
+          });
+        } else {
+          setHotspots(result.hotspots);
+          setPendingBuffer(buf);
+          setPendingUrl((prev) => {
+            if (prev) URL.revokeObjectURL(prev);
+            return newUrl;
+          });
+        }
         setViewerError(null);
       } catch (e) {
         console.error(e);
         if (!cancelled)
           setBuildError(e instanceof Error ? e.message : "PDF konnte nicht erzeugt werden.");
       } finally {
+        inFlightRef.current = false;
         if (!cancelled) setRendering(false);
       }
     }, DEBOUNCE_MS);
@@ -129,7 +147,7 @@ export function LivePdfPreview(props: Props) {
       clearTimeout(timer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draftKey, kunde, firma, ansprechpartner, kind]);
+  }, [draftKey, ctxKey]);
 
   // URL-Cleanup bei Unmount
   useEffect(() => {
@@ -204,7 +222,7 @@ export function LivePdfPreview(props: Props) {
 
       {fileSource && containerWidth > 0 && !viewerError && (
         <Document
-          key={`buf#${pdfBuffer?.byteLength}#${loadAttempt}`}
+          key={`pdf-${loadAttempt}`}
           file={fileSource}
           onLoadSuccess={({ numPages }) => {
             setNumPages(numPages);
@@ -259,8 +277,8 @@ export function LivePdfPreview(props: Props) {
           <Document
             key={`pending#${pendingBuffer?.byteLength}`}
             file={pendingFileSource}
-            onLoadSuccess={({ numPages }) => {
-              setNumPages(numPages);
+            onLoadSuccess={() => {
+              // numPages erst nach dem Swap aus dem sichtbaren Document setzen.
               setPdfBuffer(pendingBuffer);
               setLoadAttempt(0);
               setPdfUrl((prev) => {
