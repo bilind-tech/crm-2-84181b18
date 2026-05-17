@@ -25,6 +25,7 @@ import {
 import { addZahlung, deleteZahlung } from "../belege/zahlungen.js";
 import { angebotInRechnungUmwandeln } from "../belege/umwandeln.js";
 import { getKunde } from "../kunden/repo.js";
+import { legeDauerauftragAusRechnungAn } from "../dauerauftrag/generator.js";
 
 const positionSchema = z.object({
   id: z.string().optional(),
@@ -202,8 +203,42 @@ export async function belegeRoutes(app: FastifyInstance): Promise<void> {
         return { error: "kunde-not-found" };
       }
       const r = createRechnung(parsed.data);
+
+      // Auto-Anlage: Wenn als wiederkehrend markiert und (noch) kein DA verknüpft,
+      // direkt einen Dauerauftrag aus dieser Rechnung ableiten.
+      const opt = (parsed.data.optionen ?? {}) as {
+        wiederkehrend?: boolean;
+        wiederkehrendDetails?: { rhythmus?: string };
+      };
+      let dauerauftragNeu: { id: string; nummer: string } | undefined;
+      if (opt.wiederkehrend === true && !r.dauerauftragId) {
+        const rh = opt.wiederkehrendDetails?.rhythmus;
+        const frequenz =
+          rh === "quartalsweise" || rh === "jaehrlich" || rh === "halbjaehrlich"
+            ? rh
+            : "monatlich";
+        const neu = legeDauerauftragAusRechnungAn({
+          rechnungId: r.id,
+          kundeId: r.kundeId,
+          rechnungsdatum: r.rechnungsdatum,
+          bezeichnung: r.titel || "Dauerauftrag",
+          positionen: r.positionen,
+          rabattGesamt: r.rabattGesamt,
+          steuersatz: r.steuersatz,
+          frequenz: frequenz as "monatlich" | "quartalsweise" | "halbjaehrlich" | "jaehrlich",
+          introText: r.introText,
+          outroText: r.outroText,
+          objektId: r.objektId ?? null,
+          ansprechpartnerId: r.ansprechpartnerId ?? null,
+        });
+        if (neu) {
+          dauerauftragNeu = neu;
+          (r as { dauerauftragId?: string }).dauerauftragId = neu.id;
+        }
+      }
+
       audit({ userId: req.user?.id, action: "rechnung.create", detail: { id: r.id, nummer: r.nummer }, ip: req.ip });
-      return r;
+      return dauerauftragNeu ? { ...r, dauerauftragNeu } : r;
     });
 
     scoped.patch<{ Params: { id: string } }>("/rechnungen/:id", async (req, reply) => {
