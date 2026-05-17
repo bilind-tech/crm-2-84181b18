@@ -81,7 +81,7 @@ export function ProtokollLivePreview({ draft, kunde, objekt, firma, renderEditor
   // Build-Queue: nur der jüngste Eingabe-Stand wird gerendert.
   // - inFlightRef verhindert parallele Builds
   // - latestKeyRef hält den zuletzt angeforderten Stand fest
-  // - hasFirstBufferRef vermeidet Re-Render-Loops über pdfBuffer-Dep
+  // - viewerSeq erzeugt nur neue PDF.js-Daten, ohne ein zweites Document zu mounten
   const inFlightRef = useRef(false);
   const latestKeyRef = useRef<string>("");
   const builtKeyRef = useRef<string>("");
