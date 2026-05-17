@@ -1,37 +1,33 @@
-# Protokoll-PDF-Vorschau zuverlässig machen
+## Plan
 
-## Ursache
+1. **Drucken-Button PDF-Blob-fähig machen**
+   - `PrintButton` so erweitern, dass er nicht nur `url`, sondern auch einen vorhandenen `Blob` direkt drucken kann.
+   - Wenn ein Blob vorhanden ist, wird er bevorzugt genutzt, damit kein instabiler `blob:`-URL-Fetch nötig ist.
 
-Bei Angebot/Rechnung funktioniert die Vorschau, weil die PDF dem PDF.js-Viewer **direkt als ArrayBuffer** (über `pdfBlob`) übergeben wird. Bei den Protokollen wird stattdessen nur die `blob:`-URL übergeben — PDF.js holt die per `fetch`. Auf dem Pi (`http://mycleancenter-pi.local:8787`) scheitert dieser Worker-Fetch reproduzierbar mit `Unexpected server response (0) while retrieving PDF "blob:..."`. Genau dasselbe Problem hatten wir bei Angebot/Rechnung, dort durch ArrayBuffer-Übergabe + `slice(0)`-Kopien gelöst.
+2. **Protokoll-Detailseite korrigieren**
+   - In `src/routes/protokolle.$id.tsx` den Drucken-Button wie bei der Vorschau auf die direkte PDF-Quelle umstellen.
+   - Entwürfe drucken dann über `pdf.blob`; abgeschlossene/archivierte Protokolle nutzen weiter die archivierte URL als Fallback.
+   - Button bleibt deaktiviert, solange weder Blob noch URL bereitsteht.
 
-Zwei Stellen sind betroffen:
+3. **PDF-Dialog konsistent machen**
+   - `PdfViewerDialog` ebenfalls so anpassen, dass Drucken bei vorhandener `pdfBlob` direkt über den Blob läuft.
+   - Dadurch profitieren Angebot/Rechnung/andere PDF-Dialoge mit, ohne das bestehende Verhalten zu verschlechtern.
 
-1. **Detailseite** `src/routes/protokolle.$id.tsx` → `<PdfPreviewCard … pdfUrl={pdf.url} />` (ohne `pdfBlob`).
-2. **Editor-Live-Preview** `src/components/protokoll-editor/ProtokollLivePreview.tsx` → übergibt blob-URL an `<Document file={pdfUrl}>`.
+4. **Druck-Fallback verbessern**
+   - Falls PDF.js das PDF nicht in Druckbilder rendern kann, bleibt der aktuelle Fallback erhalten: PDF in neuem Tab öffnen.
+   - Zielverhalten: Beim Klick auf „Drucken“ öffnet sich der Browser-Druckdialog mit korrekt gerenderter PDF, nicht nur ein leerer/neuer Tab.
 
-## Lösung
+## Technische Details
 
-### 1. `protokolle.$id.tsx` (1-Zeilen-Fix)
-`pdfBlob={pdf.blob}` an `PdfPreviewCard` zusätzlich weiterreichen — analog zu `angebote.$id.tsx` Zeile 318 und `rechnungen.$id.tsx` Zeile 316. Hook `useProtokollPdf` liefert das `blob` bereits. Damit nutzt `PdfCanvasViewer` den ArrayBuffer-Pfad mit Re-Mount-Schutz (Detach-Retry).
+- Ursache ist sehr wahrscheinlich dieselbe `blob:`-URL-Problematik wie bei der Vorschau: Drucken ruft aktuell `fetch(pdf.url)` auf, obwohl bei Protokoll-Entwürfen bereits ein stabiler `Blob` existiert.
+- Die bestehende `printPdfBlob(blob)`-Funktion kann den Blob direkt als `ArrayBuffer` an PDF.js geben und danach den Druckdialog öffnen.
+- Es sind voraussichtlich nur diese Dateien nötig:
+  - `src/components/pdf/PrintButton.tsx`
+  - `src/components/pdf/PdfViewerDialog.tsx`
+  - `src/routes/protokolle.$id.tsx`
 
-### 2. `ProtokollLivePreview.tsx` (Refactor analog zu `LivePdfPreview`)
-- ArrayBuffer-State (`pdfBuffer`) + `pendingBuffer` einführen, frische `slice(0)`-Kopie pro Document-Load (verhindert „ArrayBuffer detached").
-- `key={`buf#${size}#${attempt}`}` auf `<Document>` für sauberen Re-Mount.
-- `onLoadError`: bei `detached` einmal automatisch retryen, sonst Fehler anzeigen + Download-Fallback.
-- Atomarer Swap: alte Vorschau bleibt sichtbar, bis neue PDF geladen ist (hidden Pre-Loader-Document).
-- Loader-Pille erst nach ~250 ms zeigen, kein Flackern.
-- Blob-URL nur noch für den Download-Fallback-Link, nicht mehr als PDF.js-Quelle.
+## Prüfung
 
-Die bisherige Datei wird komplett ersetzt durch eine schlanke Variante (ohne Hotspots, da Protokolle keine haben).
-
-## Validierung
-
-- `bun run build` (TanStack typisiert alle Routen).
-- In der Preview: Detailseite eines Protokolls → Vorschau-Karte rendert Seite 1.
-- Editor-Route `/protokolle/:id/bearbeiten` → linke Vorschau zeigt PDF nach < 1 s, Tippen im rechten Editor löst stabil neue Vorschau ohne „Unexpected server response (0)" aus.
-- Konsole frei von „detached" und „server response (0)".
-
-## Betroffene Dateien
-
-- `src/routes/protokolle.$id.tsx` (eine zusätzliche Prop)
-- `src/components/protokoll-editor/ProtokollLivePreview.tsx` (Rewrite analog `LivePdfPreview` ohne Hotspots)
+- Code auf TypeScript-Kompatibilität prüfen.
+- Kontrollieren, dass Protokoll-Entwürfe, abgeschlossene Protokolle und bestehende Angebots-/Rechnungs-PDFs weiterhin eine Druckaktion haben.
+- Keine Änderung an PDF-Erzeugung, Daten oder Backend.

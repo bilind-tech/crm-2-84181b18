@@ -23,8 +23,9 @@ type Common = {
 };
 
 type Props =
-  | (Common & { url: string | null | undefined; getBlob?: never })
-  | (Common & { getBlob: () => Promise<Blob>; url?: never });
+  | (Common & { blob: Blob | null | undefined; url?: string | null | undefined; getBlob?: never })
+  | (Common & { url: string | null | undefined; blob?: never; getBlob?: never })
+  | (Common & { getBlob: () => Promise<Blob>; url?: never; blob?: never });
 
 export function PrintButton(props: Props) {
   const { label = "Drucken", variant = "outline", size = "sm", className, disabled } = props;
@@ -35,6 +36,11 @@ export function PrintButton(props: Props) {
     e.preventDefault();
     if (busy) return;
     try {
+      if ("blob" in props && props.blob) {
+        setBusy(true);
+        await printPdfBlob(props.blob);
+        return;
+      }
       if ("url" in props && props.url) {
         setBusy(true);
         await printPdfBlobUrl(props.url);
@@ -55,7 +61,11 @@ export function PrintButton(props: Props) {
     }
   };
 
-  const isDisabled = disabled || busy || ("url" in props && !props.url);
+  const isDisabled =
+    disabled ||
+    busy ||
+    ("blob" in props && !props.blob && !("url" in props && props.url)) ||
+    ("url" in props && !("blob" in props) && !props.url);
 
   return (
     <Button
