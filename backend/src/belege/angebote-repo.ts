@@ -195,18 +195,26 @@ export function updateAngebot(id: string, patch: Record<string, unknown>): ApiAn
   return getAngebot(id);
 }
 
-export function deleteAngebot(id: string): "soft" | "hard" | "missing" {
+export function deleteAngebot(
+  id: string,
+  opts: { force?: boolean } = {},
+): "soft" | "hard" | "missing" {
   const db = getDatabase();
   const cur = db.prepare(`SELECT versendet_am FROM angebot WHERE id = ?`).get(id) as
     | { versendet_am: string | null }
     | undefined;
   if (!cur) return "missing";
-  if (cur.versendet_am) {
+  if (!opts.force && cur.versendet_am) {
     db.prepare(`UPDATE angebot SET archiviert = 1 WHERE id = ?`).run(id);
     emitBelegMutated("angebot", id);
     return "soft";
   }
-  db.prepare(`DELETE FROM angebot WHERE id = ?`).run(id);
+  const tx = db.transaction(() => {
+    db.prepare(`DELETE FROM email_versand WHERE beleg_art='angebot' AND beleg_id = ?`).run(id);
+    db.prepare(`DELETE FROM drive_upload_queue WHERE beleg_art='angebot' AND beleg_id = ?`).run(id);
+    db.prepare(`DELETE FROM angebot WHERE id = ?`).run(id);
+  });
+  tx();
   emitBelegMutated("angebot", id);
   return "hard";
 }
