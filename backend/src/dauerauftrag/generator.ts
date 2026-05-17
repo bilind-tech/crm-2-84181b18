@@ -1,12 +1,14 @@
 // Erzeugt aus einem Dauerauftrag + Periode eine echte Rechnung (im DB).
 import { createRechnung, setRechnungDauerauftragId } from "../belege/rechnungen-repo.js";
 import { getKunde } from "../kunden/repo.js";
+import { getDatabase } from "../db/index.js";
 import {
+  createDauerauftrag,
+  createLauf,
+  findLauf,
   getDauerauftrag,
   listSonderpositionen,
   markSonderpositionenVerbraucht,
-  createLauf,
-  findLauf,
   type DauerauftragApi,
   type DauerauftragLaufApi,
   type DauerauftragPositionInput,
@@ -83,9 +85,8 @@ export function fuehreSofortLaufAus(daId: string, periode?: string): SofortLaufR
 
   const lauf = existierend
     ? (() => {
-        // gibt es einen Lauf ohne Rechnung → updaten
-        const db = (require("../db/index.js") as typeof import("../db/index.js")).getDatabase();
-        db.prepare(
+        // Bereits geplanter Lauf → mit Rechnung verknüpfen
+        getDatabase().prepare(
           `UPDATE dauerauftrag_lauf SET rechnung_id = ?, ausgefuehrt_am = datetime('now'), status = 'erzeugt' WHERE id = ?`,
         ).run(rechnung.id, existierend.id);
         return findLauf(daId, period)!;
@@ -126,7 +127,6 @@ export interface AnlageVorlage {
 }
 
 export function legeDauerauftragAusRechnungAn(v: AnlageVorlage): { id: string; nummer: string } | null {
-  const { createDauerauftrag, createLauf: makeLauf } = require("./repo.js") as typeof import("./repo.js");
   const stichtagDate = new Date(v.rechnungsdatum + "T00:00:00Z");
   const frequenz = v.frequenz ?? "monatlich";
   const da = createDauerauftrag({
@@ -146,7 +146,7 @@ export function legeDauerauftragAusRechnungAn(v: AnlageVorlage): { id: string; n
     status: "aktiv",
   });
   const periode = aktuellePeriode(frequenz, stichtagDate);
-  makeLauf({
+  createLauf({
     dauerauftragId: da.id,
     periode,
     geplantFuer: v.rechnungsdatum,
