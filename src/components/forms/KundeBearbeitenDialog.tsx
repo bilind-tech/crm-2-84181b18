@@ -59,6 +59,7 @@ export function KundeBearbeitenDialog({ kunde, open, onOpenChange }: Props) {
   const [kuerzel, setKuerzel] = useState(kunde.kuerzel ?? "");
   const [startNummer, setStartNummer] = useState<number>(1);
   const [startNummerTouched, setStartNummerTouched] = useState(false);
+  const [notizenTouched, setNotizenTouched] = useState(false);
 
   // Initial: aktueller nächster Stand aus Backend übernehmen
   useEffect(() => {
@@ -79,7 +80,11 @@ export function KundeBearbeitenDialog({ kunde, open, onOpenChange }: Props) {
       setPlz(kunde.plz ?? "");
       setOrt(kunde.ort ?? "");
       setStatus(kunde.status);
-      setNotizen(kunde.notizen ?? "");
+      // `kunde.notizen` kann in der Detail-API als Notiz-Objekt-Liste kommen.
+      // Das Freitext-Feld nur befüllen, wenn wir tatsächlich einen String haben,
+      // sonst leer initialisieren und beim Speichern nicht mitschicken.
+      setNotizen(typeof kunde.notizen === "string" ? kunde.notizen : "");
+      setNotizenTouched(false);
       setKuerzel(kunde.kuerzel ?? "");
       setStartNummerTouched(false);
     }
@@ -136,7 +141,9 @@ export function KundeBearbeitenDialog({ kunde, open, onOpenChange }: Props) {
         plz: plz || undefined,
         ort: ort || undefined,
         status,
-        notizen: notizen || undefined,
+        // Nur senden, wenn der User wirklich getippt hat. Verhindert, dass
+        // ein versehentlich initialisiertes Objekt zurück ans Backend geht.
+        notizen: notizenTouched ? notizen : undefined,
         kuerzel: kuerzel || undefined,
         startZaehlerAktuellerMonat:
           kuerzel && startNummerTouched ? Math.max(1, startNummer || 1) : undefined,
