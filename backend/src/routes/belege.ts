@@ -106,13 +106,14 @@ export async function belegeRoutes(app: FastifyInstance): Promise<void> {
       return a;
     });
 
-    scoped.delete<{ Params: { id: string } }>("/angebote/:id", async (req, reply) => {
-      const mode = deleteAngebot(req.params.id);
+    scoped.delete<{ Params: { id: string }; Querystring: { force?: string } }>("/angebote/:id", async (req, reply) => {
+      const force = req.query?.force === "1" || req.query?.force === "true";
+      const mode = deleteAngebot(req.params.id, { force });
       if (mode === "missing") {
         reply.status(404);
         return { error: "not-found" };
       }
-      audit({ userId: req.user?.id, action: "angebot.delete", detail: { id: req.params.id, mode }, ip: req.ip });
+      audit({ userId: req.user?.id, action: "angebot.delete", detail: { id: req.params.id, mode, force }, ip: req.ip });
       return { ok: true, mode };
     });
 
@@ -216,13 +217,14 @@ export async function belegeRoutes(app: FastifyInstance): Promise<void> {
       return r;
     });
 
-    scoped.delete<{ Params: { id: string } }>("/rechnungen/:id", async (req, reply) => {
-      const mode = deleteRechnung(req.params.id);
+    scoped.delete<{ Params: { id: string }; Querystring: { force?: string } }>("/rechnungen/:id", async (req, reply) => {
+      const force = req.query?.force === "1" || req.query?.force === "true";
+      const mode = deleteRechnung(req.params.id, { force });
       if (mode === "missing") {
         reply.status(404);
         return { error: "not-found" };
       }
-      audit({ userId: req.user?.id, action: "rechnung.delete", detail: { id: req.params.id, mode }, ip: req.ip });
+      audit({ userId: req.user?.id, action: "rechnung.delete", detail: { id: req.params.id, mode, force }, ip: req.ip });
       return { ok: true, mode };
     });
 
