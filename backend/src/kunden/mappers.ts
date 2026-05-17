@@ -105,6 +105,10 @@ export function kundeRowToApi(r: DbKunde): ApiKunde {
     tags: parseTags(r.tags),
     status: r.status,
     archiviert: r.archiviert === 1,
+    hasLogo: !!(r as unknown as { logo_blob?: Buffer | null }).logo_blob,
+    logoUpdatedAt: (r as unknown as { logo_updated_at?: string | null }).logo_updated_at
+      ? isoFromSqlite((r as unknown as { logo_updated_at: string }).logo_updated_at)
+      : undefined,
     erstelltAm: isoFromSqlite(r.erstellt_am),
     geaendertAm: isoFromSqlite(r.geaendert_am),
   };
