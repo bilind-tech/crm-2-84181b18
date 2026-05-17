@@ -1,72 +1,91 @@
 ## Ziel
 
-Alle „Löschen"-Buttons im CRM verhalten sich gleich:
-- Datensatz wird **soft-gelöscht** (`geloescht_am = jetzt`)
-- Erscheint nicht mehr in Listen/Details/Suche
-- Bleibt komplett wiederherstellbar in **Einstellungen → Datenbank**
-- **Hart-Löschen passiert nur noch dort** (mit Passwort)
+Beim Klick auf „Drucken" (Angebot, Rechnung, Übergabeprotokoll, Schlüsselübergabe, Dokument-Viewer) soll **direkt der Browser-Druckdialog** des aktuellen Tabs erscheinen — kein zusätzliches Fenster, kein Pop-up, kein zweiter Tab. Im Druckdialog muss das PDF (alle Seiten) sauber sichtbar/druckbar sein.
 
-`archiviert` bleibt unverändert — das ist eine eigene Funktion (Kunde inaktiv schalten, Beleg in Archiv legen) und hat nichts mit Löschen zu tun.
+## Was geändert wird
 
-## Backend-Änderungen
+Nur eine einzige Datei: `src/lib/pdf/printBlob.ts`.
 
-### `kunden/repo.ts`
-- `deleteKunde(id)` → setzt `geloescht_am`, statt zu archivieren oder zu kaskadieren. Kein `force`-Parameter mehr.
-- `deleteObjekt`, `deleteAnsprechpartner`, `deleteNotiz` → analog: `UPDATE … SET geloescht_am = datetime('now')`.
-- Alle `list…`/`get…`-Queries kriegen `WHERE geloescht_am IS NULL`.
-- `hasKundeReferences` bleibt — wird aber nicht mehr für „Soft vs. Hard" benutzt.
+Der Rest (`PrintButton`, alle Aufrufer in Angebot/Rechnung/Protokoll/Werkzeuge/Dokumente) bleibt unverändert — sie rufen weiter `printPdfBlob` / `printPdfBlobUrl` auf.
 
-### `belege/angebote-repo.ts` und `belege/rechnungen-repo.ts`
-- `deleteAngebot(id)` / `deleteRechnung(id)` → setzen `geloescht_am`. Kein `force`. Keine Cleanups in `email_versand`, `drive_upload_queue`, `mahn_lauf_eintraege`, `zahlung` — die räumt das Hart-Löschen in der DB-Seite via `hardDeleteExtra`.
-- `listAngebote` / `getAngebot` / `listRechnungen` / `getRechnung` + interne Lookups: `WHERE geloescht_am IS NULL`.
-- Belegnummern-Zähler bleibt unangetastet (gelöschte Nummern werden nicht recycelt).
+## Neue Druck-Strategie
 
-### `protokolle/repo.ts`
-- `deleteProtokoll(id)` → soft. Verknüpftes Dokument bleibt bestehen (auch soft-gelöscht?: nein, Dokument bleibt sichtbar — Protokoll ist separat).
-- `listProtokolle` / `getProtokoll` / `getProtokollByDokumentId` → `WHERE geloescht_am IS NULL`.
+1. PDF mit PDF.js zu Seiten-Canvases rendern (wie bisher, druckscharf).
+2. Aus den Bild-DataURLs eine kleine HTML-Seite mit `@page A4`-CSS bauen.
+3. **Verstecktes `<iframe>` im aktuellen Dokument** einfügen (off-screen, 0×0, `aria-hidden`), Inhalt per `srcdoc` setzen.
+4. Wenn alle Bilder im Iframe geladen sind → `iframe.contentWindow.focus(); iframe.contentWindow.print();` → Browser zeigt seinen nativen Druckdialog im aktuellen Tab.
+5. Nach `onafterprint` (bzw. Timeout-Fallback) Iframe wieder aus dem DOM entfernen und Blob-URLs aufräumen.
 
-### `steuern/repo.ts`
-- `removeManuellerPosten(id)` → soft.
-- `listManuellePosten` / `getManuellerPosten` → `WHERE geloescht_am IS NULL`.
-- `setBezahlt`/`removeBezahlt` bleiben unverändert (Markierungs-Tabelle, kein eigener Datensatz).
+Damit verschwindet `window.open(...)` komplett aus dem Erfolgs-Pfad. Es wird kein neues Fenster mehr geöffnet — der Druckdialog kommt direkt vom Browser.
 
-### `routes/belege.ts`, `routes/stammdaten.ts`, `routes/protokolle.ts`, `routes/steuern.ts`
-- `?force=1`-Pfad komplett raus. Route ruft nur noch das soft-delete-Repo auf, gibt `{ ok: true }` zurück.
-- Audit-Eintrag bleibt erhalten.
+## Warum Iframe und nicht direkt `window.print()` der Seite
 
-### Weitere Stellen, die gelöschte Daten ausblenden müssen
-- `aktivitaet`-Feeds / Dashboards / Mahnungs-Cron-Reads → `WHERE geloescht_am IS NULL` ergänzen, wo Belege/Kunden joinen.
-- Belegnummern-Eindeutigkeit / Kürzel-Live-Check ignorieren gelöschte Kunden (bewusst, damit Kürzel erst nach Hart-Löschen wieder frei wird — sonst Kollisionen beim Wiederherstellen).
+`window.print()` würde die komplette App drucken. Wir brauchen ein isoliertes Dokument mit nur den PDF-Seiten — das leistet das Iframe. Da der Iframe-Inhalt **gerenderte PNGs** sind (kein eingebettetes PDF mehr), greift das alte Problem mit dem nativen PDF-Plugin („leeres Blatt mit URL/Datum") nicht — die Bilder werden zuverlässig gedruckt.
 
-## Frontend-Änderungen
+## Fallback-Verhalten
 
-### `src/hooks/useApi.ts`
-- `force`-Parameter aus `deleteKunde` / `deleteAngebot` / `deleteRechnung` entfernen, URL ohne `?force=…`.
+Nur falls das Iframe-Rendern hart fehlschlägt (PDF.js-Fehler oder Iframe-`contentWindow` nicht verfügbar), wird als letztes Mittel die PDF-URL als Download angeboten — kein automatisches Pop-up mehr.
 
-### Toast-Texte (alle Lösch-Erfolgsmeldungen)
-Einheitlich: „… gelöscht. Wiederherstellbar in Einstellungen → Datenbank."
+## Technische Details
 
-### Lösch-Bestätigungsdialoge
-- Keine separate „endgültig löschen"-Option mehr im CRM. Nur noch ein Schritt: „Wirklich löschen?" → soft-delete.
-- Bestehende „kann nicht gelöscht werden, weil verknüpft"-Pfade entfallen (immer löschbar, immer wiederherstellbar).
+`printBlob.ts` (vereinfacht):
 
-### Datenbank-Seite (bereits da)
-- Bekommt automatisch alle neu soft-gelöschten Einträge zu sehen, inkl. Restore + Hart-Löschen mit Passwort. Keine Änderung nötig.
+```text
+async function printViaHiddenIframe(images: string[]) {
+  const iframe = document.createElement("iframe");
+  iframe.setAttribute("aria-hidden", "true");
+  iframe.style.cssText =
+    "position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden;";
+  document.body.appendChild(iframe);
 
-## Was bewusst NICHT angefasst wird
+  const html = `<!doctype html><html><head><meta charset="utf-8">
+    <style>
+      @page { size: A4; margin: 0; }
+      html,body{margin:0;padding:0;background:#fff;}
+      .page{page-break-after:always;}
+      .page:last-child{page-break-after:auto;}
+      .page img{width:100%;height:auto;display:block;}
+    </style></head><body>
+    ${images.map((s) => `<div class="page"><img src="${s}"></div>`).join("")}
+    </body></html>`;
+  iframe.srcdoc = html;
 
-- `archiviert` bleibt als eigenständige Funktion (Status-Wechsel, nicht „weg").
-- `dokumente.geloescht_am` (gab es schon) und der 30-Tage-Auto-Purge bleiben unverändert.
-- Belegnummern-Zähler — gelöschte Nummern werden NICHT freigegeben, damit beim Wiederherstellen keine Doppel-Nummern entstehen.
-- Mahn-Cron bleibt deaktiviert (Core-Regel).
+  await new Promise<void>((resolve) => {
+    iframe.onload = () => {
+      const win = iframe.contentWindow!;
+      const imgs = win.document.images;
+      let pending = imgs.length || 1;
+      const done = () => {
+        if (--pending > 0) return;
+        win.focus();
+        win.print();
+        resolve();
+      };
+      if (!imgs.length) done();
+      for (const img of Array.from(imgs)) {
+        if (img.complete) done();
+        else {
+          img.addEventListener("load", done);
+          img.addEventListener("error", done);
+        }
+      }
+    };
+  });
 
-## Reihenfolge der Umsetzung
+  const cleanup = () => iframe.remove();
+  iframe.contentWindow?.addEventListener("afterprint", () =>
+    setTimeout(cleanup, 200),
+  );
+  setTimeout(cleanup, 60_000); // Hard-Fallback
+}
+```
 
-1. Repos umstellen (Kunden, Angebote, Rechnungen, Protokolle, Steuern, Objekt, Ansprechpartner, Notiz).
-2. Alle SELECT-Queries auf `WHERE geloescht_am IS NULL` ergänzen.
-3. Routen entschlacken (`force` raus).
-4. Frontend-`useApi`-Aufrufe vereinfachen.
-5. Toast-Texte vereinheitlichen.
-6. Aktivitäts-/Dashboard-Joins prüfen und ggf. ausblenden.
+- `openPrintWindowWithImages` und `openInNewTab` aus dem Erfolgs-Pfad entfernen.
+- `printPdfBlob` / `printPdfBlobUrl` rufen intern nur noch `renderPdfToImages` + `printViaHiddenIframe` auf.
+- Bei hartem Fehler: einmaliger Toast („Drucken fehlgeschlagen") statt Pop-up-Versuch.
 
-Nichts an der Datenbank-Seite selbst ändert sich — sie spiegelt automatisch das neue Verhalten.
+## Out of Scope
+
+- Keine Änderungen am PDF-Inhalt, an PDF-Generierung, Layouts oder Datenfluss.
+- Keine Änderungen an Aufrufern (`angebote.$id.tsx`, `rechnungen.$id.tsx`, `protokolle.$id.tsx`, `werkzeuge.*`, `DokumentViewer`, `PdfViewerDialog`).
+- Keine zusätzlichen Dependencies (kein jsPDF/html2canvas — PDF.js liefert schon scharfe Seiten-Bilder).
