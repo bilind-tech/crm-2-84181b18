@@ -107,13 +107,23 @@ export const GoogleDriveSecretSchema = z.object({
   refreshToken: z.string().min(1).max(2000).optional(),
 });
 
-// Zahlungserinnerung — schmales Schema. Vorschlag-only, niemals Auto-Versand
-// (Memory-Regel). `tageNachFaelligkeit` steuert, ab welchem Tag nach Fälligkeit
-// das System eine Erinnerung vorschlägt. Default: 14 Tage.
-export const ErinnerungSchema = z.object({
-  tageNachFaelligkeit: cInt(1, 60, 14),
+export const MahnungSchema = z.object({
+  aktiv: z.coerce.boolean().default(true),
+  stufe1Tage: cInt(1, 180, 7),
+  stufe2Tage: cInt(1, 180, 14),
+  stufe3Tage: cInt(1, 180, 28),
+  gebuehrStufe2: cNum(0, 1000, 5),
+  gebuehrStufe3: cNum(0, 1000, 15),
+  // Step 13 — Mahn-Automatik:
+  modus: z.enum(["aus", "vorschlag", "auto"]).default("vorschlag"),
+  cronZeit: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).default("08:30"),
+  nurAnWerktagen: z.coerce.boolean().default(true),
+  benachrichtigungBeiVorschlag: z.coerce.boolean().default(true),
+  benachrichtigungBeiAutoversand: z.coerce.boolean().default(true),
+  emailVorlageStufe1: z.string().trim().max(64).optional().nullable(),
+  emailVorlageStufe2: z.string().trim().max(64).optional().nullable(),
+  emailVorlageStufe3: z.string().trim().max(64).optional().nullable(),
 });
-export type ErinnerungSettings = z.infer<typeof ErinnerungSchema>;
 
 export const DauerauftragSchema = z.object({
   laufzeitTagBeforeFaellig: cInt(0, 60, 7),
@@ -183,7 +193,7 @@ export const AREAS: Record<string, Area> = {
   erscheinung: { key: "erscheinung", schema: ErscheinungSchema, encrypted: false },
   backup: { key: "backup", schema: BackupPlanSchema, encrypted: false },
   googleDrive: { key: "googleDrive", schema: GoogleDriveSchema, encrypted: false },
-  erinnerung: { key: "erinnerung", schema: ErinnerungSchema, encrypted: false },
+  mahnung: { key: "mahnung", schema: MahnungSchema, encrypted: false },
   dauerauftrag: { key: "dauerauftrag", schema: DauerauftragSchema, encrypted: false },
   steuer: { key: "steuer", schema: SteuerSchema, encrypted: false },
   stundenzettel: { key: "stundenzettel", schema: StundenzettelSchema, encrypted: false },

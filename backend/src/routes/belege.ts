@@ -17,6 +17,8 @@ import {
   deleteRechnung,
   getRechnung,
   listRechnungen,
+  markiereInkasso,
+  pausiereMahnung,
   sendeRechnung,
   updateRechnung,
 } from "../belege/rechnungen-repo.js";
@@ -314,6 +316,33 @@ export async function belegeRoutes(app: FastifyInstance): Promise<void> {
         reply.status(204);
       },
     );
+
+    // ---- Mahnung pausieren / Inkasso ----
+    scoped.post<{ Params: { id: string } }>("/rechnungen/:id/mahnung-pausieren", async (req, reply) => {
+      const schema = z.object({ bis: z.string().min(1) });
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) {
+        reply.status(422);
+        return { error: "validation", detail: parsed.error.flatten() };
+      }
+      const r = pausiereMahnung(req.params.id, parsed.data.bis);
+      if (!r) {
+        reply.status(404);
+        return { error: "not-found" };
+      }
+      audit({ userId: req.user?.id, action: "rechnung.mahnung.pause", detail: { id: r.id, bis: parsed.data.bis }, ip: req.ip });
+      return r;
+    });
+
+    scoped.post<{ Params: { id: string } }>("/rechnungen/:id/inkasso-markieren", async (req, reply) => {
+      const r = markiereInkasso(req.params.id);
+      if (!r) {
+        reply.status(404);
+        return { error: "not-found" };
+      }
+      audit({ userId: req.user?.id, action: "rechnung.inkasso", detail: { id: r.id }, ip: req.ip });
+      return r;
+    });
 
     // ============================================================
     // BELEGNUMMERN — Reservierung & Import-Scan

@@ -37,6 +37,7 @@ import {
   EmailSignaturenTab,
   SmtpTab,
 } from "@/components/email/EmailEinstellungen";
+import { MahnwesenTab } from "@/components/mahnung/MahnwesenTab";
 import { DauerauftragTab } from "@/components/einstellungen/DauerauftragTab";
 
 import { NummernkreiseTab } from "@/components/einstellungen/NummernkreiseTab";
@@ -60,6 +61,7 @@ type TabId =
   | "email-signaturen"
   | "smtp"
   | "nummernkreise"
+  | "mahnwesen"
   | "dauerauftrag"
   | "vorlagen"
   | "steuern"
@@ -80,6 +82,7 @@ const tabs: { id: TabId; label: string; icon: typeof Building2; gruppe: string }
   { id: "email-signaturen", label: "E-Mail-Signaturen", icon: PenLine, gruppe: "E-Mail" },
   { id: "smtp", label: "SMTP-Server", icon: Server, gruppe: "E-Mail" },
 
+  { id: "mahnwesen", label: "Mahnwesen", icon: Bell, gruppe: "Belege" },
   { id: "dauerauftrag", label: "Daueraufträge", icon: Repeat, gruppe: "Belege" },
   { id: "steuern", label: "Steuern", icon: Calculator, gruppe: "Belege" },
 
@@ -242,6 +245,7 @@ function Page() {
           {tab === "email-signaturen" && <EmailSignaturenTab />}
           {tab === "smtp" && <SmtpTab />}
           {tab === "nummernkreise" && <NummernkreiseTab />}
+          {tab === "mahnwesen" && <MahnwesenTab />}
           {tab === "dauerauftrag" && <DauerauftragTab />}
           {tab === "vorlagen" && <VorlagenTab />}
           {tab === "steuern" && <SteuerTab />}

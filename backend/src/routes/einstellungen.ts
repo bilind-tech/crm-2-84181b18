@@ -18,6 +18,8 @@ import { emit } from "../events/bus.js";
 import { createConnection } from "node:net";
 import { resetTransport } from "../email/transport.js";
 import { resetImapClient } from "../email/imap-archive.js";
+import { flachZuUi, uiPatchZuFlach } from "../mahnung/settings-adapter.js";
+import { MahnungSchema } from "../settings/schemas.js";
 
 function loadArea(name: keyof typeof AREAS): unknown {
   const a = AREAS[name];
@@ -67,7 +69,7 @@ export async function einstellungenRoutes(app: FastifyInstance): Promise<void> {
     "sicherheit",
     "erscheinung",
     "backup",
-    "erinnerung",
+    // "mahnung" wird unten mit eigenem Mapper bedient
     "dauerauftrag",
     "steuer",
     "stundenzettel",
@@ -85,6 +87,23 @@ export async function einstellungenRoutes(app: FastifyInstance): Promise<void> {
       return r.value;
     });
   }
+
+  // -------- Mahnung — flach intern, nested für UI --------
+  app.get("/einstellungen/mahnung", async () => {
+    const flach = MahnungSchema.parse(getSetting("mahnung") ?? {});
+    return flachZuUi(flach);
+  });
+  app.patch("/einstellungen/mahnung", async (req, reply) => {
+    const patch = uiPatchZuFlach((req.body ?? {}) as Record<string, unknown>);
+    const r = patchArea("mahnung", patch);
+    if (!r.ok) {
+      reply.status(r.status);
+      return { error: r.error, issues: r.issues };
+    }
+    audit({ userId: req.user?.id, action: "settings.mahnung.patch", ip: req.ip });
+    emit("einstellung:geaendert", { key: "mahnung", userId: req.user?.id ?? null });
+    return flachZuUi(r.value as z.infer<typeof MahnungSchema>);
+  });
 
   // SMTP — akzeptiert UI-Aliasse (server/ssl/benutzer/absenderName/absenderEmail/passwort)
   // UND die internen Felder (host/secure/user/fromName/fromEmail/password).

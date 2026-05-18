@@ -6,7 +6,7 @@
 import crypto from "node:crypto";
 import { getDatabase } from "../db/index.js";
 
-export type EmailKontext = "rechnung" | "angebot" | "allgemein";
+export type EmailKontext = "rechnung" | "angebot" | "mahnung" | "allgemein";
 
 export interface EmailVorlage {
   id: string;
@@ -261,6 +261,47 @@ const DEFAULTS: DefaultVorlage[] = [
       P("{{anrede.zeile}}") +
       P("vielen Dank, wir haben Ihre Zahlung zu Rechnung <strong>{{rechnung.nummer}}</strong> über {{rechnung.summe}} erhalten. Der Vorgang ist damit für uns abgeschlossen.") +
       P("Wir freuen uns auf die weitere Zusammenarbeit. Sollten Sie weitere Anliegen haben, erreichen Sie uns gerne telefonisch unter {{firma.telefon}} oder per E-Mail.") +
+      P("Mit freundlichen Grüßen<br>Ihr Team von {{firma.name}}"),
+  },
+
+  // -------- Mahnung --------
+  {
+    seedKey: "mahnung.stufe1",
+    name: "Mahnung Stufe 1",
+    kontext: "mahnung",
+    betreff: "Zahlungserinnerung zu Rechnung {{rechnung.nummer}}",
+    bodyHtml:
+      P("{{anrede.zeile}}") +
+      P("die Rechnung <strong>{{rechnung.nummer}}</strong> vom {{rechnung.datum}} über {{rechnung.summe}} ist seit {{mahnung.tageUeberfaellig}} Tagen überfällig. Aktuell sind noch {{rechnung.offen}} offen.") +
+      P("Wir bitten Sie, den ausstehenden Betrag bis zum <strong>{{mahnung.neueFrist}}</strong> auf folgendes Konto zu überweisen:<br>" +
+        "Empfänger: {{firma.name}}<br>IBAN: {{firma.iban}}<br>BIC: {{firma.bic}}<br>Verwendungszweck: {{rechnung.nummer}}") +
+      P("Sollten Sie die Zahlung in den letzten Tagen bereits veranlasst haben, betrachten Sie dieses Schreiben bitte als gegenstandslos. Bei Rückfragen erreichen Sie uns unter {{firma.telefon}}.") +
+      P("Mit freundlichen Grüßen<br>Ihr Team von {{firma.name}}"),
+  },
+  {
+    seedKey: "mahnung.stufe2",
+    name: "Mahnung Stufe 2",
+    kontext: "mahnung",
+    betreff: "2. Mahnung zu Rechnung {{rechnung.nummer}}",
+    bodyHtml:
+      P("{{anrede.zeile}}") +
+      P("trotz unserer Erinnerung ist die Rechnung <strong>{{rechnung.nummer}}</strong> vom {{rechnung.datum}} weiterhin offen. Aktuell sind {{rechnung.offen}} ausstehend, dazu kommen Mahngebühren in Höhe von {{mahnung.gebuehr}}. Die Gesamtforderung beträgt damit <strong>{{mahnung.gesamtForderung}}</strong>.") +
+      P("Wir bitten Sie, den Gesamtbetrag bis spätestens <strong>{{mahnung.neueFrist}}</strong> auf folgendes Konto zu überweisen:<br>" +
+        "Empfänger: {{firma.name}}<br>IBAN: {{firma.iban}}<br>BIC: {{firma.bic}}<br>Verwendungszweck: {{rechnung.nummer}}") +
+      P("Bitte nehmen Sie diese Mahnung ernst. Sollte es Gründe geben, die einer fristgerechten Zahlung entgegenstehen, melden Sie sich bitte umgehend unter {{firma.telefon}}, damit wir gemeinsam eine Lösung finden können.") +
+      P("Mit freundlichen Grüßen<br>Ihr Team von {{firma.name}}"),
+  },
+  {
+    seedKey: "mahnung.stufe3",
+    name: "Mahnung Stufe 3 letzte",
+    kontext: "mahnung",
+    betreff: "Letzte Mahnung zu Rechnung {{rechnung.nummer}}",
+    bodyHtml:
+      P("{{anrede.zeile}}") +
+      P("zur Rechnung <strong>{{rechnung.nummer}}</strong> vom {{rechnung.datum}} ist trotz mehrfacher Erinnerung kein Zahlungseingang zu verzeichnen. Aktuell sind {{rechnung.offen}} offen, zuzüglich Mahngebühren von {{mahnung.gebuehr}}. Die Gesamtforderung beträgt <strong>{{mahnung.gesamtForderung}}</strong>.") +
+      P("Wir setzen Ihnen hiermit eine letzte Frist bis zum <strong>{{mahnung.neueFrist}}</strong>. Bitte überweisen Sie den vollständigen Betrag auf folgendes Konto:<br>" +
+        "Empfänger: {{firma.name}}<br>IBAN: {{firma.iban}}<br>BIC: {{firma.bic}}<br>Verwendungszweck: {{rechnung.nummer}}") +
+      P("Sollte bis zu diesem Termin kein Zahlungseingang erfolgen, sehen wir uns gezwungen, die Forderung an ein Inkassobüro abzugeben oder gerichtliche Schritte einzuleiten. Bitte vermeiden Sie diesen Weg, indem Sie zeitnah reagieren oder unter {{firma.telefon}} mit uns Kontakt aufnehmen.") +
       P("Mit freundlichen Grüßen<br>Ihr Team von {{firma.name}}"),
   },
 

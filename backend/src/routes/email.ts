@@ -33,7 +33,7 @@ function markBelegVersendet(
   }
 }
 
-const KONTEXTE = ["rechnung", "angebot", "allgemein"] as const;
+const KONTEXTE = ["rechnung", "angebot", "mahnung", "allgemein"] as const;
 
 const VorlageSchema = z.object({
   name: z.string().trim().min(1).max(200),
@@ -84,6 +84,7 @@ const VersandSchema = z.object({
   kundeId: z.string().max(64).optional(),
   vorlageId: z.string().max(64).optional(),
   signaturId: z.string().max(64).optional(),
+  mahnStufe: z.union([z.literal(1), z.literal(2), z.literal(3)]).optional(),
   // Anhänge: Frontend-Hinweis, hier nur tolerant ignoriert (PDF wird im sendNow gerendert).
   anhaenge: z.array(z.unknown()).optional(),
   idempotenzKey: z.string().min(1).max(200).optional(),
@@ -214,6 +215,7 @@ export async function emailRoutes(app: FastifyInstance): Promise<void> {
           betreff: d.betreff, bodyHtml,
           belegArt, belegId: d.belegId,
           vorlageId: d.vorlageId, signaturId: d.signaturId,
+          mahnStufe: d.mahnStufe,
           idempotenzKey,
           quelle: "manuell",
         }));
@@ -245,6 +247,7 @@ export async function emailRoutes(app: FastifyInstance): Promise<void> {
           versandId: row.id,
           belegArt: belegArt ?? null,
           belegId: d.belegId ?? null,
+          mahnStufe: d.mahnStufe ?? null,
           an: toList,
           messageId: result.messageId ?? null,
           errorCode: result.ok ? null : result.errorCode ?? null,

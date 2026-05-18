@@ -1,48 +1,31 @@
-## Stand jetzt
+**Problem**
+Im PDF-Header (Angebot / Rechnung / Protokolle) rendert die Code-Stelle bei fehlendem Logo einen großen fetten Firmennamen in Großbuchstaben (`"MY CLEAN CENTER"` bzw. `firma.firmenname.toUpperCase()` in 20pt, bold, rechts oben). Das ist hässlich und gewollt entfernt. Außerdem soll die Logo-Anzeige direkt funktionieren, sobald in Einstellungen → Firmendaten → Logo etwas hochgeladen wurde.
 
-Bereits erledigt:
-- Mahn-System komplett entfernt (Frontend + Backend-Dateien gelöscht, Imports bereinigt, Build grün).
-- Neue Bausteine vorhanden: `src/lib/erinnerung/regeln.ts`, `src/hooks/useErinnerungsKandidaten.ts`, `src/components/notifications/ErinnerungsPopup.tsx` (eingebunden in `__root.tsx`).
-- Backend-Vorlage `rechnung.erinnerung` ist als Seed vorhanden.
+**Recherche-Ergebnis**
 
-Was noch fehlt (das gehen wir Schritt für Schritt durch):
+1. Backend-PDF (Angebot/Rechnung) – `backend/src/pdf/layout.ts:83-86`: Fallback = `f.firmenname.toUpperCase()` bold 20pt.
+2. Frontend-PDF (Angebot/Rechnung – Fallback-Renderer) – `src/lib/pdf/belegPdf.ts:208-217`: gleicher Großbuchstaben-Fallback (greift, wenn weder Settings-Logo noch Asset-Logo geladen werden konnten).
+3. Protokolle – `src/lib/pdf/werkzeugePdf.ts:107-116`: identischer Fallback `"MY CLEAN CENTER"` bold 20pt.
+4. Logo aus Einstellungen wird korrekt durchgereicht:
+   - Settings speichern `firma.logoUrl` als data-URL (`src/routes/einstellungen.tsx:326`).
+   - Backend liest sie in `loadLogoDataUrl()` (`backend/src/pdf/firma.ts:55-58`) und übergibt sie an Header und Cache-Fingerprint.
+   - Es gibt also keinen Bug im Lade-Pfad – die User-Beobachtung „Logo wird nicht angezeigt" stammt nur daher, dass aktuell kein Logo gesetzt ist UND der Fallback eben den fetten Namen zeigt.
 
----
+**Änderungen (3 Dateien, nur Frontend/Backend-PDF-Layout)**
 
-### Schritt 1 — Backend-Setting „Tage nach Fälligkeit"
-- In `backend/src/settings/schemas.ts` neues schmales Schema `erinnerung` ergänzen: `{ tageNachFaelligkeit: number, min 1, max 60, default 14 }`.
-- In `backend/src/routes/einstellungen.ts` zwei Endpoints (`GET` und `PUT /einstellungen/erinnerung`) analog zu den anderen Settings.
-- Im Frontend `useApi.ts` Hooks `useErinnerungsEinstellungen` + `useErinnerungsEinstellungenSpeichern` ergänzen.
-- `useErinnerungsKandidaten` liest dann den Wert aus dem Hook statt Default.
+1. `backend/src/pdf/layout.ts` – `header()`:
+   - Bei `!logoDataUrl`: statt fetter Namens-Spalte ein leerer Platzhalter (`{ width: 270, text: "" }`), damit Layout/Spaltenbreite stabil bleibt.
 
-### Schritt 2 — Settings-UI im E-Mail-Tab
-- In `src/components/email/EmailEinstellungen.tsx` ganz unten neue Sektion „Zahlungserinnerungen":
-  - Slider/Input 1–60 Tage, Default 14, mit Live-Speicherung
-  - Klarer Hinweis: „Erinnerungen werden nur vorgeschlagen — nie automatisch gesendet."
+2. `src/lib/pdf/belegPdf.ts` – `header()`: gleicher leerer Platzhalter bei `!logo`.
 
-### Schritt 3 — Dashboard-Karte „Zahlungserinnerungen"
-- Neue Komponente `src/components/dashboard/ZahlungserinnerungenCard.tsx`:
-  - Zeigt Anzahl + Summe offen
-  - Listet bis zu 3 dringendste Kandidaten (Kunde, Rechnungsnummer, X Tage über fällig, offener Betrag)
-  - Jede Zeile mit Inline-Button „Erinnern" → öffnet `EmailVersandDialog`
-  - Wenn 0 Kandidaten: dezenter „Alles bezahlt"-Zustand
-- In `src/routes/index.tsx` an passender Stelle einsetzen (an der Position, wo vorher die Mahn-Karte saß).
+3. `src/lib/pdf/werkzeugePdf.ts` – Protokoll-Header (Zeile ~107): gleicher leerer Platzhalter bei `!(logo && logoSichtbar)`.
 
-### Schritt 4 — Rechnungsliste mit „Erinnern"-Button
-- In `src/routes/rechnungen.tsx`: pro Zeile, wenn `erinnerungsReif`, ein kleiner amberfarbener Pill „Erinnerung empfohlen" + Icon-Button „Erinnern" neben der E-Mail-Aktion.
-- Aggregation über `useErinnerungsKandidaten` + `indexKandidaten()`.
+Footer bleibt unangetastet – Firmenname/Adresse stehen weiterhin im Fuß. Wenn ein Logo gesetzt ist (heute schon funktionsfähig), wird es weiterhin oben rechts mit `fit: [270, 120]` gerendert.
 
-### Schritt 5 — Rechnungs-Detailseite mit Hinweisstreifen
-- Neue 30-Zeilen-Komponente `src/components/rechnungen/ErinnerungsHinweis.tsx`:
-  - Dezenter amberfarbener Streifen oben: „Seit X Tagen offen — Erinnerung empfohlen"
-  - Primary-Button „Erinnerung senden" → öffnet `EmailVersandDialog` mit der `rechnung.erinnerung`-Vorlage vorbelegt
-- In `src/routes/rechnungen.$id.tsx` an der Stelle einsetzen, wo vorher `<MahnSektion>` stand.
+**Nicht angefasst**
+- Backend-Routen, Cache-Hash (Logo-Fingerprint), Settings-UI, Upload-Pfad.
+- Drive-Sync, Druckfluss, übrige PDF-Inhalte.
 
-### Schritt 6 — Smoke-Test
-- Beim App-Start zeigt das Popup oben rechts genau dann etwas, wenn eine Rechnung erinnerungsreif ist.
-- Setting-Änderung wirkt sofort (Query-Invalidate).
-- Klick auf „Erinnern" überall öffnet den E-Mail-Dialog vollständig ausgefüllt mit der freundlichen Erinnerungs-Vorlage und PDF-Anhang. Versand nur per Klick (Memory-Regel).
-
----
-
-Sag „los" und ich fange mit **Schritt 1** an.
+**Akzeptanz**
+- Ohne hochgeladenes Logo: Kopfzeile rechts oben ist leer (kein „MYCLEANCENTER" mehr) – Angebot, Rechnung, Protokolle.
+- Nach Logo-Upload in Einstellungen: Logo erscheint rechts oben in allen drei PDF-Typen (Cache wird durch geänderten `logoFingerprint` automatisch invalidiert).

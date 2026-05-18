@@ -51,6 +51,18 @@ export function wireAktivitaet(): void {
     });
   });
 
+  on("mahnung:erstellt", (p) => {
+    const { titel, route } = belegLabel("rechnung", p.rechnungId);
+    record({
+      art: "mahnung.erstellt",
+      bezugArt: "rechnung", bezugId: p.rechnungId,
+      titel: `Mahnung Stufe ${p.stufe}: Rechnung ${titel}`,
+      beschreibung: `Mahnstufe ${p.stufe} erstellt`,
+      kontext: { stufe: p.stufe, route },
+      notify: { prioritaet: "warnung", titel: `Mahnung ${p.stufe}: Rechnung ${titel}`, aktionLabel: "Öffnen", aktionRoute: route },
+    });
+  });
+
   on("email:versand-changed", (p) => {
     if (p.status === "gesendet") {
       record({

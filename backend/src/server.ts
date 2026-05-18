@@ -27,6 +27,8 @@ import { steuernRoutes } from "./routes/steuern.js";
 import { dokumenteRoutes } from "./routes/dokumente.js";
 import { protokolleRoutes } from "./routes/protokolle.js";
 import { startFristenScheduler } from "./dokumente/fristen-cron.js";
+import { mahnungRoutes } from "./routes/mahnung.js";
+import { startMahnScheduler } from "./mahnung/cron.js";
 import { driveRoutes } from "./routes/drive.js";
 import { emailRoutes } from "./routes/email.js";
 import { externRoutes } from "./routes/extern.js";
@@ -250,6 +252,7 @@ async function main(): Promise<void> {
   await app.register(steuernRoutes);
   await app.register(dokumenteRoutes);
   await app.register(protokolleRoutes);
+  await app.register(mahnungRoutes);
   await app.register(driveRoutes);
   await app.register(emailRoutes);
   await app.register(externRoutes);
@@ -303,6 +306,7 @@ async function main(): Promise<void> {
       url.startsWith("/steuern") ||
       url.startsWith("/dokumente") ||
       url.startsWith("/protokolle") ||
+      url.startsWith("/mahnung") ||
       url.startsWith("/dashboard") ||
       url.startsWith("/extern");
 
@@ -386,6 +390,11 @@ async function main(): Promise<void> {
   });
   // Dokumente-Frist-Cron (täglich nach 07:00 Pi-Zeit)
   startFristenScheduler();
+  // Mahn-Automatik (Cron) STILLGELEGT — niemals automatischer Mail-Versand.
+  // Mahnungen werden nur manuell durch den User im Mahnwesen-Tab ausgelöst.
+  // startMahnScheduler();
+  void startMahnScheduler; // typecheck-Anker
+
   await app.listen({ port: config.port, host: config.host });
   app.log.info(
     {
