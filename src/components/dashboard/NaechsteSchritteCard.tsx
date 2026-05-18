@@ -1,22 +1,22 @@
 // Dashboard-Karte: priorisierte Aktionsliste mit Ein-Klick-CTAs.
-// Mahn-Vorschläge stammen aus dem letzten Backend-Lauf (/mahnung/status +
-// /mahnung/laeufe/:id), übrige Schritte werden clientseitig berechnet.
+// Zahlungserinnerungen werden clientseitig aus offenen Rechnungen + Versand-Historie
+// berechnet (siehe useErinnerungen).
 
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { CheckCircle2, Mail, FileCheck2, Bell, ArrowRight, ChevronRight } from "lucide-react";
+import { CheckCircle2, Mail, FileCheck2, MailWarning, ArrowRight, ChevronRight } from "lucide-react";
 import {
   useAngebote,
   useRechnungen,
   useKunden,
   useKunde,
   useAngebotInRechnung,
-  useMahnStatus,
-  useMahnLauf,
 } from "@/hooks/useApi";
 import { useRechnungPdf } from "@/hooks/useBelegPdf";
 import { EmailVersandDialog } from "@/components/email/EmailVersandDialog";
 import { berechneNaechsteSchritte, type NaechsterSchritt } from "@/lib/dashboard/naechsteSchritte";
+import { useErinnerungen } from "@/hooks/useErinnerungen";
+import { useErinnerungVorlageId } from "@/lib/erinnerung/seedVorlage";
 import { toast } from "sonner";
 import type { Angebot, Kunde, Rechnung } from "@/lib/api/types";
 
@@ -33,46 +33,38 @@ export function NaechsteSchritteCard() {
   const { data: angebote = [] } = useAngebote();
   const { data: rechnungen = [] } = useRechnungen();
   const { data: kunden = [] } = useKunden();
-  const { data: status } = useMahnStatus();
-  const { data: lauf } = useMahnLauf(status?.letzterLauf?.id ?? null);
+  const erinnerungen = useErinnerungen();
 
   const schritte = useMemo(() => {
-    // Nicht-Mahn-Schritte clientseitig
-    const nichtMahn = berechneNaechsteSchritte(angebote, rechnungen, kunden).filter(
-      (s) => s.typ !== "mahnung_senden",
-    );
-
-    // Mahn-Schritte aus Backend-Lauf (Vorschläge + auto-Versendete = Aktion-Indikator)
+    const basis = berechneNaechsteSchritte(angebote, rechnungen, kunden);
     const kundeMap = new Map(kunden.map((k) => [k.id, k]));
     const rechnungMap = new Map(rechnungen.map((r) => [r.id, r]));
-    const mahnSchritte: NaechsterSchritt[] = [];
-    if (lauf) {
-      for (const e of lauf.eintraege) {
-        if (e.aktion !== "vorschlag") continue;
-        const r = rechnungMap.get(e.rechnungId);
-        if (!r) continue;
-        const k = kundeMap.get(r.kundeId);
-        mahnSchritte.push({
-          id: `mahnung-${e.rechnungId}`,
-          typ: "mahnung_senden",
-          prioritaet: 95 + e.stufe * 5,
-          kundeId: r.kundeId,
-          kundeName: kundeName(k),
-          belegNummer: e.rechnungNr ?? r.nummer,
-          belegId: e.rechnungId,
-          ueberschrift: `Mahnung an ${kundeName(k)}`,
-          detail: `${e.rechnungNr ?? r.nummer} — Backend empfiehlt Stufe ${e.stufe}.`,
-          ctaLabel: "Mahnung öffnen",
-        });
-      }
+    const erinnerungSchritte: NaechsterSchritt[] = [];
+    for (const e of erinnerungen.eintraege) {
+      const r = rechnungMap.get(e.id);
+      if (!r) continue;
+      const k = kundeMap.get(r.kundeId);
+      erinnerungSchritte.push({
+        id: `erinnerung-${r.id}`,
+        typ: "erinnerung_senden",
+        prioritaet: 95 + Math.min(e.tageUeber, 30),
+        kundeId: r.kundeId,
+        kundeName: kundeName(k),
+        belegNummer: r.nummer,
+        belegId: r.id,
+        ueberschrift: `Zahlungserinnerung an ${kundeName(k)}`,
+        detail: `${r.nummer} · ${e.tageUeber} Tage überfällig${e.anzahlBisher > 0 ? ` · ${e.anzahlBisher}. Erinnerung` : ""}`,
+        ctaLabel: "Erinnerung senden",
+      });
     }
 
-    return [...mahnSchritte, ...nichtMahn].sort((a, b) => b.prioritaet - a.prioritaet);
-  }, [angebote, rechnungen, kunden, lauf]);
+    return [...erinnerungSchritte, ...basis].sort((a, b) => b.prioritaet - a.prioritaet);
+  }, [angebote, rechnungen, kunden, erinnerungen]);
 
   const sichtbar = schritte.slice(0, MAX_SICHTBAR);
 
   const [emailRechnung, setEmailRechnung] = useState<Rechnung | null>(null);
+  const [emailMitErinnerung, setEmailMitErinnerung] = useState(false);
 
   return (
     <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
@@ -113,7 +105,14 @@ export function NaechsteSchritteCard() {
       )}
 
       {emailRechnung && (
-        <RechnungEmailLauncher rechnung={emailRechnung} onClose={() => setEmailRechnung(null)} />
+        <RechnungEmailLauncher
+          rechnung={emailRechnung}
+          mitErinnerung={emailMitErinnerung}
+          onClose={() => {
+            setEmailRechnung(null);
+            setEmailMitErinnerung(false);
+          }}
+        />
       )}
     </div>
   );
@@ -152,8 +151,8 @@ function SchrittRow({
       case "rechnung_versenden":
         if (rechnung) onSendRechnung(rechnung);
         break;
-      case "mahnung_senden":
-        if (rechnung) navigate({ to: "/rechnungen/$id", params: { id: rechnung.id } });
+      case "erinnerung_senden":
+        if (rechnung) onSendRechnung(rechnung, true);
         break;
       case "angebot_nachfassen":
         if (angebot) navigate({ to: "/angebote/$id", params: { id: angebot.id } });
@@ -191,8 +190,8 @@ function ikonFuer(typ: NaechsterSchritt["typ"]) {
       return FileCheck2;
     case "rechnung_versenden":
       return Mail;
-    case "mahnung_senden":
-      return Bell;
+    case "erinnerung_senden":
+      return MailWarning;
     case "angebot_nachfassen":
       return Mail;
   }
@@ -200,8 +199,8 @@ function ikonFuer(typ: NaechsterSchritt["typ"]) {
 
 function toneFuer(typ: NaechsterSchritt["typ"]) {
   switch (typ) {
-    case "mahnung_senden":
-      return { bg: "bg-destructive/10", fg: "text-destructive" };
+    case "erinnerung_senden":
+      return { bg: "bg-warning/10", fg: "text-warning" };
     case "rechnung_erstellen":
       return { bg: "bg-primary/10", fg: "text-primary" };
     case "rechnung_versenden":
@@ -211,9 +210,18 @@ function toneFuer(typ: NaechsterSchritt["typ"]) {
   }
 }
 
-function RechnungEmailLauncher({ rechnung, onClose }: { rechnung: Rechnung; onClose: () => void }) {
+function RechnungEmailLauncher({
+  rechnung,
+  mitErinnerung,
+  onClose,
+}: {
+  rechnung: Rechnung;
+  mitErinnerung?: boolean;
+  onClose: () => void;
+}) {
   const { data: kunde } = useKunde(rechnung.kundeId);
   const pdf = useRechnungPdf(rechnung);
+  const erinnerungVorlageId = useErinnerungVorlageId();
   return (
     <EmailVersandDialog
       open
@@ -226,6 +234,7 @@ function RechnungEmailLauncher({ rechnung, onClose }: { rechnung: Rechnung; onCl
       pdfBlobUrl={pdf.url}
       pdfDateiname={`${rechnung.nummer}.pdf`}
       pdfStatus={pdf.status}
+      vorbelegteVorlageId={mitErinnerung ? erinnerungVorlageId : undefined}
     />
   );
 }
