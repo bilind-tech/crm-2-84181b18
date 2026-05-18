@@ -7,6 +7,7 @@ import {
   Building2,
   Euro,
   FileText,
+  CheckCircle2,
   ArrowRight,
   Inbox,
   Hourglass,
