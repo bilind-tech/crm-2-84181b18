@@ -22,10 +22,11 @@ type Common = {
   disabled?: boolean;
 };
 
-type Props =
-  | (Common & { blob: Blob | null | undefined; url?: string | null | undefined; getBlob?: never })
-  | (Common & { url: string | null | undefined; blob?: never; getBlob?: never })
-  | (Common & { getBlob: () => Promise<Blob>; url?: never; blob?: never });
+type Props = Common & {
+  blob?: Blob | null;
+  url?: string | null;
+  getBlob?: () => Promise<Blob>;
+};
 
 export function PrintButton(props: Props) {
   const { label = "Drucken", variant = "outline", size = "sm", className, disabled } = props;
@@ -36,17 +37,19 @@ export function PrintButton(props: Props) {
     e.preventDefault();
     if (busy) return;
     try {
-      if ("blob" in props && props.blob) {
+      // Blob bevorzugen — vermeidet fetch(blobUrl), das in WebKit/Safari mit
+      // „Load failed" abbricht, sobald die Blob-URL revoked wurde.
+      if (props.blob) {
         setBusy(true);
         await printPdfBlob(props.blob);
         return;
       }
-      if ("url" in props && props.url) {
+      if (props.url) {
         setBusy(true);
         await printPdfBlobUrl(props.url);
         return;
       }
-      if ("getBlob" in props && props.getBlob) {
+      if (props.getBlob) {
         setBusy(true);
         const blob = await props.getBlob();
         await printPdfBlob(blob);
@@ -55,17 +58,15 @@ export function PrintButton(props: Props) {
       toast.error("PDF ist noch nicht bereit.");
     } catch (err) {
       console.error(err);
-      toast.error(err instanceof Error ? err.message : "Drucken fehlgeschlagen");
+      const msg = err instanceof Error ? err.message : String(err);
+      toast.error(`Drucken fehlgeschlagen: ${msg}`);
     } finally {
       setBusy(false);
     }
   };
 
-  const isDisabled =
-    disabled ||
-    busy ||
-    ("blob" in props && !props.blob && !("url" in props && props.url)) ||
-    ("url" in props && !("blob" in props) && !props.url);
+  const hasSource = !!props.blob || !!props.url || !!props.getBlob;
+  const isDisabled = disabled || busy || !hasSource;
 
   return (
     <Button

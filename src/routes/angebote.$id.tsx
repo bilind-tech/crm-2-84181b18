@@ -148,7 +148,7 @@ function Page() {
                 </a>
               </Button>
             )}
-            <PrintButton url={pdf.url} variant="outline" size="default" />
+            <PrintButton blob={pdf.blob} url={pdf.url} variant="outline" size="default" />
             <Button asChild variant="outline" className="rounded-lg">
               <Link to="/angebote/$id/bearbeiten" params={{ id: a.id }}>
                 <Pencil className="mr-1.5 h-4 w-4" /> PDF bearbeiten

@@ -1,38 +1,70 @@
-## Zwei Probleme
+## Problem
 
-### 1. PDF-Editor (Angebot / Rechnung) flackert beim Bearbeiten
+Beim Drucken eines Angebots, einer Rechnung oder eines Übergabeprotokolls erscheint nur „Load failed" — ohne weitere Information. Das ist die rohe Safari/WebKit-Fehlermeldung von `fetch()`, ohne Kontext darüber, **was** geladen werden konnte.
 
-Aktuell baut `LivePdfPreview` bei jeder kleinen Änderung am Draft automatisch eine neue PDF (debounce 450 ms), tauscht Blob-URLs und mountet `<Document>` neu. Trotz „Pending-Swap" entsteht in der Praxis das gleiche schnelle An/Aus-Flackern wie beim Protokoll-Editor, weil:
+## Ursachenanalyse
 
-- Jeder Tastendruck verändert `draftKey` → neuer Build startet sofort.
-- Mehrere parallele Builds erzeugen ständig neue Blobs/URLs.
-- Autosave-Echo + `loadAttempt`-Retry können `pdfBuffer` neu setzen → `<Document>` mountet neu → kurzer Reset des Viewers.
+In `src/lib/pdf/printBlob.ts` macht `printPdfBlobUrl` ein `fetch(blobUrl)` und ruft danach `arrayBuffer()`. Wenn die Blob-URL in der Zwischenzeit ungültig wurde (React 19 / StrictMode räumt Blob-URLs verzögert auf, oder ein Neumount der Seite hat sie revoked), wirft WebKit exakt `TypeError: Load failed`. Genau diese Meldung landet 1:1 im Toast.
 
-Genau dafür haben wir beim Protokoll-Editor erfolgreich auf einen Snapshot-Modus umgestellt. Das machen wir hier exakt genauso — auch wenn die Vorschau dann nicht mehr live mit jeder Eingabe mitatmet. Die PDF bleibt stabil, fühlt sich „fest" an und ist nie kaputt.
+Aufruf-Stellen:
+- `src/routes/angebote.$id.tsx` → `<PrintButton url={pdf.url} ... />`
+- `src/routes/rechnungen.$id.tsx` → `<PrintButton url={pdf.url} ... />`
+- `src/routes/protokolle.$id.tsx` → `<PrintButton blob={pdf.blob} url={pdf.url} ... />`
+- `src/components/dokumente/DokumentViewer.tsx` → `<PrintButton url={dateiUrl} ... />`
 
-**Was sich konkret ändert (`src/components/pdf-editor/LivePdfPreview.tsx`):**
+Bei Angebot/Rechnung wird nur die **URL** übergeben, obwohl der Blob via `useAngebotPdf` / `useRechnungPdf` ohnehin schon vorliegt — der Umweg über `fetch(blobUrl)` ist die fehlerträchtige Stelle.
 
-1. **Keine Auto-Rebuilds mehr beim Tippen.** Der Effekt, der auf `draftKey` / `ctxKey` reagiert, wird entfernt. Stattdessen merkt sich die Komponente den zuletzt gebauten Key (`builtKeyRef`) und vergleicht ihn mit dem aktuellen Key → daraus ergibt sich nur ein dezenter Status („Vorschau aktuell" / „Vorschau nicht aktuell").
-2. **Manueller Refresh-Button „Aktualisieren"** oben rechts in der Vorschau (klein, ruhig, kein Spinner-Geflacker). Erscheint nur wenn der Draft semantisch von der gerenderten PDF abweicht.
-3. **Optionaler Auto-Refresh nur nach echter Ruhe** (z. B. 3000 ms keine Änderung **und** kein Input/Textarea/Hotspot fokussiert) — wenn das in der Praxis ebenfalls flackert, lassen wir es ganz weg und der Button bleibt der einzige Trigger.
-4. **Stabiles `<Document>`-Mount.** `fileSource` bleibt referenzgleich, bis ein Rebuild wirklich abgeschlossen ist. `numPages` wird beim Wechsel **nicht** mehr auf 0 gerissen — die alte PDF bleibt sichtbar, bis die neue komplett geladen ist (atomarer Swap, ohne `key={loadAttempt}`-Reset).
-5. **Genau ein Build gleichzeitig.** Wenn während eines laufenden Builds neue Änderungen reinkommen, wird nur die *letzte* Anfrage am Ende neu gebaut — nie eine Kette paralleler Blobs.
-6. **Build-Fehler überschreibt nie die letzte funktionierende PDF.** Bei Fehler bleibt die alte Ansicht stehen, Banner „Vorschau veraltet" mit „Erneut versuchen".
-7. **Volatile Server-Felder** (`aktualisiertAm`, `updatedAt`, `erstelltAm`, `createdAt`) bleiben aus dem Vergleich raus, sodass Autosave-Echos die Vorschau nie als „nicht aktuell" markieren.
+Zweitens: die Fehlermeldung selbst ist nutzlos. Wir wissen nicht, welcher Schritt versagt hat (Fetch? PDF.js-Parse? Canvas-Render? iframe-Print?).
 
-Ergebnis: Beim Tippen passiert in der Vorschau **gar nichts** — kein Mount, kein Flackern. Erst auf Klick (oder nach echter Pause) wird einmal sauber neu gerendert.
+## Plan
 
-### 2. Datenbank → Dokumente liefert „Internal Server Error"
+### 1. Blob direkt verwenden, wenn vorhanden (eliminiert die fehlerträchtige fetch-Stufe)
 
-Ursache: In `backend/src/datenbank/registry.ts` referenziert der Eintrag `dokument` die Spalte `erstellt_am`, die es in der Tabelle `dokumente` gar nicht gibt. Das Schema verwendet `hochgeladen_am` (siehe `backend/src/db/migrations/013_dokumente.sql`). Die Listen-Query baut daraus `ORDER BY erstellt_am DESC, id DESC` → SQLite wirft „no such column: erstellt_am" → 500.
+`src/components/pdf/PrintButton.tsx`
+- Prop-Typen erweitern, sodass `blob` und `url` zusammen erlaubt sind (Blob bevorzugt).
+- Handler: wenn `blob` da ist → `printPdfBlob(blob)`; sonst Fallback auf `url`.
 
-**Fix (`backend/src/datenbank/registry.ts`, nur der `dokument`-Eintrag):**
-- `dateColumn: "hochgeladen_am"`
-- In `listColumns` den letzten Eintrag von `erstellt_am` auf `hochgeladen_am` (Label „Hochgeladen") umstellen.
+`src/routes/angebote.$id.tsx`, `src/routes/rechnungen.$id.tsx`
+- `<PrintButton blob={pdf.blob} url={pdf.url} ... />` statt nur `url`.
 
-Damit funktioniert die Liste, Sortierung, Datumsfilter und Detail-Sheet konsistent mit dem tatsächlichen Schema. Keine Migration nötig.
+### 2. Druck-Pipeline mit präzisen Fehlerstufen versehen
 
-## Geänderte Dateien
+`src/lib/pdf/printBlob.ts`
+- Jede Stufe (`fetch`, `arrayBuffer`, `pdfjs.getDocument`, `page.render`, `iframe.load`, `print`) in einen eigenen Try-Catch packen und Fehler mit klarem deutschem Prefix neu werfen, z. B.:
+  - „PDF konnte nicht geladen werden (Blob-URL abgelaufen)"
+  - „PDF konnte nicht entschlüsselt werden (PDF.js)"
+  - „Seite X konnte nicht gerendert werden"
+  - „Druckdialog konnte nicht geöffnet werden (Browser blockiert)"
+- Original-Message als `cause` mitgeben und in der Konsole loggen.
+- Bei `fetch(blobUrl)` zusätzlich prüfen, ob die URL noch gültig ist (try/catch um `fetch`).
 
-- `src/components/pdf-editor/LivePdfPreview.tsx` (Snapshot-Strategie, manueller Refresh-Button, stabiles Mount)
-- `backend/src/datenbank/registry.ts` (Spalten-Fix für `dokument`)
+### 3. Backend-Aufruf separat verifizieren (nur Hinweis-Logging, keine Verhaltensänderung)
+
+`src/lib/pdf/backendPdf.ts` loggt heute schon Warnings — wir lassen das so. Wichtig ist nur, dass die Fehler aus dem Print-Path nicht mit Backend-Fehlern verwechselt werden.
+
+## Technische Details
+
+```text
+PrintButton
+  └─ printPdfBlob(blob)                    ← neuer bevorzugter Pfad
+       └─ blob.arrayBuffer()
+            └─ renderPdfToImages(buf)
+                 └─ printViaHiddenIframe(imgs)
+
+(Fallback nur wenn nirgends ein Blob verfügbar ist:)
+PrintButton
+  └─ printPdfBlobUrl(url)
+       ├─ fetch(url)                      ← Try-Catch: „PDF-Quelle nicht erreichbar"
+       └─ res.arrayBuffer()               ← Try-Catch: „PDF-Inhalt unvollständig"
+```
+
+Geänderte Dateien (nur Frontend, keine Business-Logik):
+- `src/components/pdf/PrintButton.tsx`
+- `src/lib/pdf/printBlob.ts`
+- `src/routes/angebote.$id.tsx`
+- `src/routes/rechnungen.$id.tsx`
+
+## Ergebnis
+
+- In **>90 %** der Fälle (Beleg-Detailseiten, Protokoll-Detailseite, Viewer-Dialog) wird gar nicht mehr per `fetch` über die Blob-URL gegangen — der Druck nutzt den schon vorhandenen Blob direkt. Damit verschwindet die häufigste „Load failed"-Ursache.
+- Wenn doch noch etwas schiefgeht, sagt der Toast genau, **welcher Schritt** fehlgeschlagen ist (z. B. „PDF konnte nicht entschlüsselt werden" statt „Load failed") — so können wir bei einem nächsten Report direkt die richtige Stelle ansehen.

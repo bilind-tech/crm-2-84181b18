@@ -18,22 +18,39 @@ configurePdfWorker();
 
 const PRINT_DPI = 2; // ~144 dpi — gutes Verhältnis Schärfe ↔ Größe
 
+function wrapError(stage: string, err: unknown): Error {
+  const original = err instanceof Error ? err : new Error(String(err));
+  const msg = original.message || String(err) || "unbekannt";
+  const wrapped = new Error(`${stage} (${msg})`);
+  (wrapped as Error & { cause?: unknown }).cause = original;
+  return wrapped;
+}
+
 async function renderPdfToImages(data: ArrayBuffer): Promise<string[]> {
-  const loadingTask = pdfjs.getDocument({ data: new Uint8Array(data) });
-  const doc = await loadingTask.promise;
+  let doc;
+  try {
+    const loadingTask = pdfjs.getDocument({ data: new Uint8Array(data) });
+    doc = await loadingTask.promise;
+  } catch (err) {
+    throw wrapError("PDF konnte nicht gelesen werden", err);
+  }
   const images: string[] = [];
   try {
     for (let i = 1; i <= doc.numPages; i++) {
-      const page = await doc.getPage(i);
-      const viewport = page.getViewport({ scale: PRINT_DPI });
-      const canvas = document.createElement("canvas");
-      canvas.width = Math.ceil(viewport.width);
-      canvas.height = Math.ceil(viewport.height);
-      const ctx = canvas.getContext("2d");
-      if (!ctx) throw new Error("Canvas-Context nicht verfügbar");
-      await page.render({ canvasContext: ctx, viewport, canvas }).promise;
-      images.push(canvas.toDataURL("image/png"));
-      page.cleanup();
+      try {
+        const page = await doc.getPage(i);
+        const viewport = page.getViewport({ scale: PRINT_DPI });
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.ceil(viewport.width);
+        canvas.height = Math.ceil(viewport.height);
+        const ctx = canvas.getContext("2d");
+        if (!ctx) throw new Error("Canvas-Context nicht verfügbar");
+        await page.render({ canvasContext: ctx, viewport, canvas }).promise;
+        images.push(canvas.toDataURL("image/png"));
+        page.cleanup();
+      } catch (err) {
+        throw wrapError(`Seite ${i} konnte nicht gerendert werden`, err);
+      }
     }
   } finally {
     try {
@@ -138,25 +155,46 @@ async function printViaHiddenIframe(images: string[]): Promise<void> {
 
     iframe.addEventListener("error", () => {
       cleanup();
-      reject(new Error("Iframe-Laden fehlgeschlagen"));
+      reject(new Error("Druck-Vorschau konnte nicht geladen werden (Iframe-Fehler)"));
     });
   });
 }
 
 async function printPdfFromArrayBuffer(data: ArrayBuffer): Promise<void> {
+  if (!data || data.byteLength === 0) {
+    throw new Error("PDF-Inhalt ist leer");
+  }
   const images = await renderPdfToImages(data);
   await printViaHiddenIframe(images);
 }
 
 /** Druckt eine vorhandene Blob-URL. URL wird NICHT freigegeben (gehört dem Caller). */
 export async function printPdfBlobUrl(url: string): Promise<void> {
-  const res = await fetch(url);
-  const buf = await res.arrayBuffer();
+  let res: Response;
+  try {
+    res = await fetch(url);
+  } catch (err) {
+    throw wrapError("PDF-Quelle nicht erreichbar (Blob-URL evtl. abgelaufen)", err);
+  }
+  if (!res.ok) {
+    throw new Error(`PDF-Quelle antwortete HTTP ${res.status}`);
+  }
+  let buf: ArrayBuffer;
+  try {
+    buf = await res.arrayBuffer();
+  } catch (err) {
+    throw wrapError("PDF-Inhalt konnte nicht gelesen werden", err);
+  }
   await printPdfFromArrayBuffer(buf);
 }
 
 /** Druckt einen frischen Blob. */
 export async function printPdfBlob(blob: Blob): Promise<void> {
-  const buf = await blob.arrayBuffer();
+  let buf: ArrayBuffer;
+  try {
+    buf = await blob.arrayBuffer();
+  } catch (err) {
+    throw wrapError("PDF-Blob konnte nicht gelesen werden", err);
+  }
   await printPdfFromArrayBuffer(buf);
 }
