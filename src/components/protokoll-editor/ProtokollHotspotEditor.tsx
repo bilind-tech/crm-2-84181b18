@@ -2,7 +2,7 @@
 // via `set(key, value)`. Pro Feld passende UI-Komponenten. Button „Erweitert"
 // öffnet den passenden Tab im rechten Panel.
 
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Copy, Pencil, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -231,14 +231,33 @@ export function ProtokollHotspotEditor({ fieldId, draft, set, onOpenAdvanced, on
       ]);
     const delZeile = (i: number) =>
       set("schluessel", zeilen.length > 1 ? zeilen.filter((_, idx) => idx !== i) : zeilen);
+    const moveZeile = (i: number, dir: -1 | 1) => {
+      const j = i + dir;
+      if (j < 0 || j >= zeilen.length) return;
+      const next = [...zeilen];
+      [next[i], next[j]] = [next[j], next[i]];
+      set("schluessel", next);
+    };
+    const dupZeile = (i: number) => {
+      const next = [...zeilen];
+      next.splice(i + 1, 0, { ...zeilen[i] });
+      set("schluessel", next);
+    };
     return (
-      <div className="w-[480px]">
+      <div className="w-[520px] max-w-[92vw]">
         {Header}
-        <div className="max-h-[300px] space-y-1.5 overflow-y-auto pr-1">
+        <div className="mb-1 grid grid-cols-[1fr_60px_100px_1fr_auto] gap-1.5 px-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+          <span>Bezeichnung</span>
+          <span className="text-center">Anz.</span>
+          <span>Schlüssel-Nr.</span>
+          <span>Bemerkung</span>
+          <span />
+        </div>
+        <div className="max-h-[340px] space-y-1 overflow-y-auto pr-1">
           {zeilen.map((z, i) => (
             <div
               key={i}
-              className="grid grid-cols-[1fr_60px_100px_1fr_auto] gap-1.5 rounded-md border bg-muted/20 p-1.5"
+              className="group/row grid grid-cols-[1fr_60px_100px_1fr_auto] items-center gap-1.5 rounded-md border bg-background p-1.5 hover:bg-muted/30"
             >
               <Input
                 className="h-8"
@@ -265,23 +284,62 @@ export function ProtokollHotspotEditor({ fieldId, draft, set, onOpenAdvanced, on
                 value={z.bemerkung}
                 onChange={(e) => updZeile(i, { bemerkung: e.target.value })}
               />
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8"
-                onClick={() => delZeile(i)}
-                disabled={zeilen.length === 1}
-                aria-label="Zeile löschen"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </Button>
+              <div className="flex items-center gap-0.5 opacity-60 transition group-hover/row:opacity-100">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={() => moveZeile(i, -1)}
+                  disabled={i === 0}
+                  aria-label="Nach oben"
+                >
+                  <ArrowUp className="h-3.5 w-3.5" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={() => moveZeile(i, 1)}
+                  disabled={i === zeilen.length - 1}
+                  aria-label="Nach unten"
+                >
+                  <ArrowDown className="h-3.5 w-3.5" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={() => dupZeile(i)}
+                  aria-label="Duplizieren"
+                >
+                  <Copy className="h-3.5 w-3.5" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 text-destructive hover:bg-destructive/10"
+                  onClick={() => delZeile(i)}
+                  disabled={zeilen.length === 1}
+                  aria-label="Zeile löschen"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </div>
             </div>
           ))}
         </div>
-        <Button type="button" variant="outline" size="sm" onClick={addZeile} className="mt-2">
-          <Plus className="mr-1 h-3.5 w-3.5" /> Zeile hinzufügen
-        </Button>
+        <div className="mt-2 flex items-center justify-between gap-2">
+          <Button type="button" variant="outline" size="sm" onClick={addZeile}>
+            <Plus className="mr-1 h-3.5 w-3.5" /> Zeile hinzufügen
+          </Button>
+          <Button type="button" size="sm" onClick={onClose}>
+            Fertig
+          </Button>
+        </div>
       </div>
     );
   }
