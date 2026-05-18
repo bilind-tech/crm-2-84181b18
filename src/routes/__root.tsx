@@ -21,7 +21,7 @@ import { AppSidebar } from "@/components/layout/AppSidebar";
 import { AppHeader } from "@/components/layout/AppHeader";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { Toaster } from "@/components/ui/sonner";
-import { UeberfaelligPopup } from "@/components/notifications/UeberfaelligPopup";
+import { ErinnerungsPopup } from "@/components/notifications/ErinnerungsPopup";
 import { GlobalDropZone } from "@/components/dokumente/GlobalDropZone";
 import { useLiveEvents } from "@/hooks/useLiveEvents";
 import { installChunkErrorReload, clearChunkReloadFlag } from "@/lib/chunkErrorReload";
@@ -202,7 +202,7 @@ function Shell() {
           </main>
         </div>
       </div>
-      <UeberfaelligPopup />
+      <ErinnerungsPopup />
 
       <GlobalDropZone />
     </SidebarProvider>
