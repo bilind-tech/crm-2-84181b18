@@ -93,9 +93,26 @@ export async function uploadFile(opts: {
   name: string;
   data: Buffer;
   mimeType?: string;
+  /** Wenn gesetzt, wird der Datei-Inhalt dieser bestehenden Drive-Datei überschrieben
+   *  (gleiche fileId + webViewLink bleiben erhalten). */
+  replaceFileId?: string;
 }): Promise<{ id: string; webViewLink?: string }> {
   const drive = getClient();
   const { Readable } = await import("node:stream");
+  if (opts.replaceFileId) {
+    try {
+      const updated = await drive.files.update({
+        fileId: opts.replaceFileId,
+        media: { mimeType: opts.mimeType ?? "application/pdf", body: Readable.from(opts.data) },
+        fields: "id, webViewLink",
+      });
+      return { id: updated.data.id ?? opts.replaceFileId, webViewLink: updated.data.webViewLink ?? undefined };
+    } catch (e) {
+      // Datei existiert evtl. nicht mehr → Fallback: neu anlegen.
+      const msg = e instanceof Error ? e.message : String(e);
+      if (!/404|notFound|not found/i.test(msg)) throw e;
+    }
+  }
   const res = await drive.files.create({
     requestBody: { name: opts.name, parents: [opts.parentFolderId] },
     media: { mimeType: opts.mimeType ?? "application/pdf", body: Readable.from(opts.data) },
