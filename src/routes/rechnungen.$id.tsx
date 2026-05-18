@@ -15,7 +15,6 @@ import { rechnungFlow } from "@/lib/flow/flows";
 import { ZahlungErfassenDialog } from "@/components/forms/ZahlungErfassenDialog";
 import { EmailVersandDialog } from "@/components/email/EmailVersandDialog";
 import { EmailVersandHistorie } from "@/components/email/EmailVersandHistorie";
-import { MahnSektion } from "@/components/mahnung/MahnSektion";
 import { PdfViewButton } from "@/components/pdf/PdfViewButton";
 import { PdfPreviewCard } from "@/components/pdf/PdfPreviewCard";
 import { PrintButton } from "@/components/pdf/PrintButton";
@@ -319,9 +318,6 @@ function Page() {
           }
         />
       </div>
-
-      {/* Mahnverfahren — eigene Sektion unter den Beträgen */}
-      <MahnSektion rechnung={r} />
 
       <ZahlungErfassenDialog open={zahlungOpen} onOpenChange={setZahlungOpen} rechnung={r} />
       <EmailVersandDialog
