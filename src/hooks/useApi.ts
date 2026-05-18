@@ -345,6 +345,7 @@ export const useUpdateAngebot = (id: string) => {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["angebote"] });
       qc.invalidateQueries({ queryKey: qk.angebot(id) });
+      qc.invalidateQueries({ queryKey: ["drive", "aktuell", "angebot", id] });
     },
   });
 };
@@ -446,6 +447,7 @@ export const useUpdateRechnung = (id: string) => {
       invalidateRechnungScope(qc, id);
       qc.invalidateQueries({ queryKey: ["dauerauftraege"] });
       qc.invalidateQueries({ queryKey: ["dauerauftrag-laeufe"] });
+      qc.invalidateQueries({ queryKey: ["drive", "aktuell", "rechnung", id] });
     },
   });
 };
@@ -1268,9 +1270,35 @@ export const useEnqueueDriveUpload = () => {
   return useMutation({
     mutationFn: (vars: { belegArt: DriveBelegArt; belegId: string }) =>
       api.post<{ ok: true }>(`/drive/uploads/enqueue`, vars),
-    onSuccess: () => qc.invalidateQueries({ queryKey: qkDriveUploads }),
+    onSuccess: (_d, vars) => {
+      qc.invalidateQueries({ queryKey: qkDriveUploads });
+      qc.invalidateQueries({ queryKey: ["drive", "aktuell", vars.belegArt, vars.belegId] });
+    },
   });
 };
+
+export interface DriveAktuellResponse {
+  verbunden: boolean;
+  inSync: boolean;
+  currentSha: string;
+  latestErfolg: {
+    sha: string;
+    driveFileId: string | null;
+    driveWebLink: string | null;
+    abgeschlossenAm: string | null;
+  } | null;
+}
+
+export const useDriveAktuell = (belegArt: DriveBelegArt, belegId: string) =>
+  useQuery({
+    queryKey: ["drive", "aktuell", belegArt, belegId] as const,
+    queryFn: () =>
+      api.get<DriveAktuellResponse>(
+        `/drive/uploads/aktuell?belegArt=${encodeURIComponent(belegArt)}&belegId=${encodeURIComponent(belegId)}`,
+      ),
+    enabled: !!belegId && (belegArt === "angebot" || belegArt === "rechnung"),
+    staleTime: 5_000,
+  });
 
 export interface DriveBackfillResult {
   ok: true;

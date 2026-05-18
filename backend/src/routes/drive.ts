@@ -7,9 +7,11 @@ import {
   getGoogleOAuthRedirectUri,
 } from "../drive/oauth.js";
 import { ensureRootFolder, createTextFile, resetDriveClient } from "../drive/folders.js";
-import { listUploads, retry, type DriveUploadStatus, type BelegArt } from "../drive/upload-repo.js";
+import { getLatestErfolg, listUploads, retry, type DriveUploadStatus, type BelegArt } from "../drive/upload-repo.js";
 import { tickDriveQueue } from "../drive/upload-worker.js";
 import { backfillAll, backfillOne } from "../drive/backfill.js";
+import crypto from "node:crypto";
+import { renderAngebotPdf, renderRechnungPdf } from "../pdf/belegPdf.server.js";
 import { getSetting, setSetting } from "../settings/store.js";
 import { GoogleDriveSchema, SENSITIVE_KEYS, type GoogleDriveSettings } from "../settings/schemas.js";
 import { emit } from "../events/bus.js";
@@ -285,6 +287,42 @@ export async function driveRoutes(app: FastifyInstance): Promise<void> {
         limit: q.limit, offset: q.offset,
       });
     });
+
+    // Prüft, ob die aktuelle PDF eines Belegs noch der zuletzt in Drive
+    // gesicherten Version entspricht. Liefert SHA + letzten Erfolg-Eintrag.
+    scoped.get("/drive/uploads/aktuell", async (req, reply) => {
+      const q = z.object({
+        belegArt: z.enum(["angebot", "rechnung"]),
+        belegId: z.string().min(1).max(64),
+      }).safeParse(req.query ?? {});
+      if (!q.success) { reply.status(422); return { error: "validation", issues: q.error.issues }; }
+      const s = loadDriveSettings();
+      const verbunden = s.refreshTokenIsSet;
+      try {
+        const pdf = q.data.belegArt === "angebot"
+          ? await renderAngebotPdf(q.data.belegId)
+          : await renderRechnungPdf(q.data.belegId);
+        if (!pdf) { reply.status(404); return { error: "not-found" }; }
+        const currentSha = crypto.createHash("sha256").update(pdf.buffer).digest("hex");
+        const latest = getLatestErfolg(q.data.belegArt as BelegArt, q.data.belegId);
+        const inSync = !!latest && latest.pdfSha256 === currentSha;
+        return {
+          verbunden,
+          inSync,
+          currentSha,
+          latestErfolg: latest ? {
+            sha: latest.pdfSha256,
+            driveFileId: latest.driveFileId ?? null,
+            driveWebLink: latest.driveWebLink ?? null,
+            abgeschlossenAm: latest.abgeschlossenAm ?? null,
+          } : null,
+        };
+      } catch (e) {
+        reply.status(500);
+        return { error: "render-failed", message: e instanceof Error ? e.message : String(e) };
+      }
+    });
+
     scoped.post<{ Params: { id: string } }>("/drive/uploads/:id/retry", async (req, reply) => {
       const s = loadDriveSettings();
       if (!s.refreshTokenIsSet) {

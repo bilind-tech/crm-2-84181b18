@@ -74,6 +74,7 @@ export function useLiveEvents(enabled: boolean): void {
           qc.invalidateQueries({ queryKey: ["drive", "uploads"] });
           qc.invalidateQueries({ queryKey: ["einstellungen", "google-drive"] });
           qc.invalidateQueries({ queryKey: ["aktivitaeten"] });
+          qc.invalidateQueries({ queryKey: ["drive", "aktuell"] });
           break;
 
         case "drive:fehler": {

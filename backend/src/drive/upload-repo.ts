@@ -72,6 +72,16 @@ export function getById(id: string): DriveUpload | null {
   return r ? map(r) : null;
 }
 
+/** Letzter erfolgreicher Upload für (belegArt, belegId), oder null. */
+export function getLatestErfolg(belegArt: BelegArt, belegId: string): DriveUpload | null {
+  const r = getDatabase().prepare(
+    `SELECT * FROM drive_upload_queue
+     WHERE beleg_art = ? AND beleg_id = ? AND status = 'erfolg'
+     ORDER BY abgeschlossen_am DESC LIMIT 1`,
+  ).get(belegArt, belegId) as Row | undefined;
+  return r ? map(r) : null;
+}
+
 export interface ListFilter { status?: DriveUploadStatus; belegId?: string; belegArt?: BelegArt; limit?: number; offset?: number }
 export function listUploads(f: ListFilter = {}): DriveUpload[] {
   const where: string[] = []; const params: unknown[] = [];

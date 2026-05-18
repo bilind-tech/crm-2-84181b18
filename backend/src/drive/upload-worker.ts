@@ -1,7 +1,7 @@
 // Drive-Worker: pollt drive_upload_queue und lädt PDFs / Dokumente hoch.
 import cron from "node-cron";
 import crypto from "node:crypto";
-import { claimDue, markErfolg, markFehler, type DriveUpload } from "./upload-repo.js";
+import { claimDue, getLatestErfolg, markErfolg, markFehler, type DriveUpload } from "./upload-repo.js";
 import { renderAngebotPdf, renderRechnungPdf } from "../pdf/belegPdf.server.js";
 import { ensureFolderPath, uploadFile } from "./folders.js";
 import { getAngebot } from "../belege/angebote-repo.js";
@@ -95,11 +95,15 @@ async function processBeleg(row: DriveUpload): Promise<void> {
   const fileName = `${baseName}.pdf`;
 
   const folderId = await (hooks.ensureFolder ?? ensureFolderPath)(folderPath);
+  // Wenn für denselben Beleg bereits ein erfolgreicher Upload existiert, dieselbe
+  // Drive-Datei überschreiben (gleiche fileId/Link, kein Duplikat).
+  const prev = getLatestErfolg(row.belegArt, row.belegId);
   const out = await (hooks.uploadFn ?? uploadFile)({
     parentFolderId: folderId,
     name: fileName,
     data: pdf.buffer,
     mimeType: "application/pdf",
+    replaceFileId: prev?.driveFileId ?? undefined,
   });
   markErfolg(row.id, out.id, out.webViewLink);
   setStatusOk();
