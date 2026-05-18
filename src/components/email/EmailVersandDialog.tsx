@@ -378,12 +378,6 @@ export function EmailVersandDialog({
                       <span className="font-mono text-xs">{rechnung.nummer}</span>
                     </>
                   )}
-                  {mahnStufe && (
-                    <>
-                      {" · "}
-                      <span className="text-warning">Mahnstufe {mahnStufe}</span>
-                    </>
-                  )}
                 </DialogDescription>
               </DialogHeader>
             </div>
