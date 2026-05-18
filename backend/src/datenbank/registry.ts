@@ -242,10 +242,10 @@ export const REGISTRY: DbTableDef[] = [
       { column: "dateiname", label: "Datei" },
       { column: "kunde_id", label: "Kunde" },
       { column: "groesse_bytes", label: "Größe", type: "number" },
-      { column: "erstellt_am", label: "Erstellt", type: "datetime" },
+      { column: "hochgeladen_am", label: "Hochgeladen", type: "datetime" },
     ],
     searchColumns: ["titel", "dateiname"],
-    dateColumn: "erstellt_am",
+    dateColumn: "hochgeladen_am",
     kundeColumn: "kunde_id",
     editable: [
       { column: "titel", label: "Titel", type: "text" },
