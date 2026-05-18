@@ -568,7 +568,7 @@ export function EmailVersandDialog({
                 <div
                   className="prose prose-sm max-w-none text-sm text-foreground/80"
                   dangerouslySetInnerHTML={{
-                    __html: replacePlaceholders(signatur.html, ctx),
+                    __html: replacePlaceholders(signaturHtmlGerendert, ctx),
                   }}
                 />
               </div>
