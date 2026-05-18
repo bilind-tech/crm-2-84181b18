@@ -278,6 +278,8 @@ export function EmailVersandDialog({
     const belegId = angebot?.id ?? rechnung?.id;
 
     setPhase("sending");
+    // Nach oben scrollen, damit die Versand-Animation im Viewport landet.
+    scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
 
     // Idempotenz-Key pro Klick — Backend erkennt Doppelklicks und sendet nicht zweimal.
     const idempotenzKey = createClientId("mail");
