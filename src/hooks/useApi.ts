@@ -447,6 +447,7 @@ export const useUpdateRechnung = (id: string) => {
       invalidateRechnungScope(qc, id);
       qc.invalidateQueries({ queryKey: ["dauerauftraege"] });
       qc.invalidateQueries({ queryKey: ["dauerauftrag-laeufe"] });
+      qc.invalidateQueries({ queryKey: ["drive", "aktuell", "rechnung", id] });
     },
   });
 };
