@@ -579,8 +579,9 @@ export function EmailVersandDialog({
           {pdfDateiname && (
             <Field label="Anhänge">
               {pdfAnhangAktiv ? (
-                <div className="flex items-center justify-between rounded-xl border border-border bg-muted/30 px-4 py-3 text-sm">
-                  <span className="flex items-center gap-3">
+                <div className="overflow-hidden rounded-xl border border-border bg-muted/30">
+                  <div className="flex items-center justify-between px-4 py-3 text-sm">
+                    <span className="flex items-center gap-3">
                     <span className="grid h-9 w-9 place-content-center rounded-lg bg-destructive/10 text-destructive">
                       {pdfStatus === "loading" ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
@@ -601,14 +602,41 @@ export function EmailVersandDialog({
                       </span>
                     </span>
                   </span>
-                  <button
-                    type="button"
-                    onClick={() => setPdfAnhangAktiv(false)}
-                    className="rounded-full p-1.5 text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive"
-                    aria-label="Anhang entfernen"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
+                    <div className="flex items-center gap-1">
+                      {pdfBlobUrl && pdfStatus === "ready" && (
+                        <button
+                          type="button"
+                          onClick={() => setPdfPreviewOffen((v) => !v)}
+                          className="rounded-full p-1.5 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                          aria-label={pdfPreviewOffen ? "Vorschau schließen" : "PDF Vorschau"}
+                          aria-expanded={pdfPreviewOffen}
+                        >
+                          {pdfPreviewOffen ? (
+                            <ChevronUp className="h-4 w-4" />
+                          ) : (
+                            <ChevronDown className="h-4 w-4" />
+                          )}
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setPdfAnhangAktiv(false)}
+                        className="rounded-full p-1.5 text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive"
+                        aria-label="Anhang entfernen"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                  {pdfPreviewOffen && pdfBlobUrl && pdfStatus === "ready" && (
+                    <div className="border-t border-border bg-background">
+                      <iframe
+                        title="PDF-Vorschau"
+                        src={pdfBlobUrl}
+                        className="block h-[480px] w-full border-0"
+                      />
+                    </div>
+                  )}
                 </div>
               ) : (
                 <button
