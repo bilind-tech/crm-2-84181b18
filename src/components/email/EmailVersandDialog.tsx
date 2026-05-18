@@ -51,7 +51,6 @@ import {
   useEmailVorlagen,
   useFirmendaten,
   useKunde,
-  useMahnEinstellungen,
   useSendEmail,
   useSmtp,
 } from "@/hooks/useApi";
@@ -77,11 +76,9 @@ interface Props {
   /** PDF-Status (loading/ready/error). Wenn "loading", wird Senden deaktiviert mit Hinweis. */
   pdfStatus?: "idle" | "loading" | "ready" | "error";
   onSent?: () => void;
-  /** Wenn gesetzt: Versand wird im Backend als Mahnung dieser Stufe protokolliert. */
-  mahnStufe?: 1 | 2 | 3;
-  /** Optional: Vorlagen-ID, die per Default ausgewählt wird (z.B. aus Mahn-Konfig). */
+  /** Optional: Vorlagen-ID, die per Default ausgewählt wird (z.B. „Zahlungserinnerung"). */
   vorbelegteVorlageId?: string;
-  /** Optional: zusätzliche Platzhalter-Variablen (z.B. mahnung.gebuehr). */
+  /** Optional: zusätzliche Platzhalter-Variablen. */
   zusatzPlaceholder?: Record<string, string>;
 }
 
@@ -99,13 +96,11 @@ export function EmailVersandDialog({
   pdfDateiname,
   pdfStatus = "ready",
   onSent,
-  mahnStufe,
   vorbelegteVorlageId,
 }: Props) {
   const { data: vorlagen = [] } = useEmailVorlagen();
   const { data: signaturen = [] } = useEmailSignaturen();
   const { data: firma } = useFirmendaten();
-  const { data: mahnEinstellungen } = useMahnEinstellungen();
   const { data: smtp } = useSmtp();
   const send = useSendEmail();
   // Ansprechpartner des Kunden laden, um die Empfänger-Mail
@@ -149,7 +144,6 @@ export function EmailVersandDialog({
   const [mode, setMode] = useState<EditorMode>("visuell");
   const [zeigeCcBcc, setZeigeCcBcc] = useState(false);
   const [phase, setPhase] = useState<SendPhase>("idle");
-  const [mahnConfirm, setMahnConfirm] = useState(false);
   const visuellRef = useRef<HTMLDivElement>(null);
 
   // Ausgewählten Ansprechpartner für Platzhalter ({{ansprechpartner.*}},
@@ -170,9 +164,8 @@ export function EmailVersandDialog({
       angebot,
       rechnung,
       firma,
-      mahnung: mahnStufe ? { stufe: mahnStufe, einstellungen: mahnEinstellungen ?? null } : null,
     }),
-    [kunde, ansprechpartnerFuerCtx, angebot, rechnung, firma, mahnStufe, mahnEinstellungen],
+    [kunde, ansprechpartnerFuerCtx, angebot, rechnung, firma],
   );
 
   // Vorbelegen beim Öffnen
@@ -185,16 +178,9 @@ export function EmailVersandDialog({
     setPdfAnhangAktiv(true);
     setMode("visuell");
     setPhase("idle");
-    setMahnConfirm(false);
 
     let standardVorlage: EmailVorlage | undefined;
-    if (mahnStufe && mahnEinstellungen) {
-      const config = mahnEinstellungen.stufen.find((s) => s.stufe === mahnStufe);
-      if (config?.emailVorlageId) {
-        standardVorlage = vorlagen.find((v) => v.id === config.emailVorlageId);
-      }
-    }
-    if (!standardVorlage && vorbelegteVorlageId) {
+    if (vorbelegteVorlageId) {
       standardVorlage = vorlagen.find((v) => v.id === vorbelegteVorlageId);
     }
     if (!standardVorlage) {
@@ -277,13 +263,8 @@ export function EmailVersandDialog({
       toast.error("Bitte mindestens einen Empfänger angeben.");
       return;
     }
-    // Zweistufige Bestätigung für Mahnungen
-    if (mahnStufe && !mahnConfirm) {
-      setMahnConfirm(true);
-      return;
-    }
     const belegTyp =
-      kontext === "rechnung" || kontext === "mahnung"
+      kontext === "rechnung"
         ? "rechnung"
         : kontext === "angebot"
           ? "angebot"
@@ -311,7 +292,6 @@ export function EmailVersandDialog({
           pdfAnhangAktiv && pdfDateiname
             ? [{ name: pdfDateiname, sizeBytes: 0, kind: "pdf-beleg" }]
             : [],
-        mahnStufe,
         idempotenzKey,
       } as Parameters<typeof send.mutate>[0],
       {
@@ -396,12 +376,6 @@ export function EmailVersandDialog({
                     <>
                       {" · Rechnung "}
                       <span className="font-mono text-xs">{rechnung.nummer}</span>
-                    </>
-                  )}
-                  {mahnStufe && (
-                    <>
-                      {" · "}
-                      <span className="text-warning">Mahnstufe {mahnStufe}</span>
                     </>
                   )}
                 </DialogDescription>
@@ -638,29 +612,6 @@ export function EmailVersandDialog({
           )}
         </div>
 
-        {mahnStufe && mahnConfirm && (
-          <div className="mx-6 mb-3 flex items-start gap-2 rounded-xl border border-warning/40 bg-warning/10 p-3 text-sm">
-            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
-            <div className="space-y-0.5">
-              <p className="font-medium text-foreground">
-                Mahnstufe {mahnStufe} wirklich versenden?
-              </p>
-              <p className="text-xs text-muted-foreground">
-                An {anChips.join(", ") || an}. Klicke nochmal auf „E-Mail senden", um den Versand zu
-                bestätigen.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setMahnConfirm(false)}
-              className="ml-auto rounded-full p-1 text-muted-foreground hover:bg-muted/40"
-              aria-label="Bestätigung abbrechen"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-        )}
-
         <DialogFooter className="gap-2 border-t border-border bg-muted/20 px-6 py-4 sm:gap-2">
           <Button
             variant="outline"
@@ -697,10 +648,6 @@ export function EmailVersandDialog({
             ) : pdfAnhangAktiv && pdfStatus === "loading" ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" /> PDF wird vorbereitet …
-              </>
-            ) : mahnStufe && mahnConfirm ? (
-              <>
-                <AlertCircle className="h-4 w-4" /> Mahnung bestätigen & senden
               </>
             ) : (
               <>

@@ -1055,7 +1055,7 @@ export const useEmailVersand = (filter?: { belegId?: string; belegTyp?: string }
 export const useSendEmail = () => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: Partial<EmailVersand> & { mahnStufe?: 1 | 2 | 3 }) =>
+    mutationFn: (data: Partial<EmailVersand>) =>
       api.post<EmailVersand>("/email/versand", data),
     onSuccess: (_, vars) => {
       qc.invalidateQueries({ queryKey: ["email", "versand"] });
@@ -1068,105 +1068,6 @@ export const useSendEmail = () => {
         qc.invalidateQueries({ queryKey: qk.rechnung(vars.belegId) });
         qc.invalidateQueries({ queryKey: ["rechnungen"] });
       }
-    },
-  });
-};
-
-// ---------- Mahnwesen ----------
-export const useMahnEinstellungen = () =>
-  useQuery({
-    queryKey: ["einstellungen", "mahnung"] as const,
-    queryFn: () => api.get<import("@/lib/api/types").MahnEinstellungen>("/einstellungen/mahnung"),
-  });
-
-export const useUpdateMahnEinstellungen = () => {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (data: Partial<import("@/lib/api/types").MahnEinstellungen>) =>
-      api.patch<import("@/lib/api/types").MahnEinstellungen>("/einstellungen/mahnung", data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["einstellungen", "mahnung"] }),
-  });
-};
-
-export const useMahnStatus = () =>
-  useQuery({
-    queryKey: ["mahnung", "status"] as const,
-    queryFn: () => api.get<import("@/lib/api/types").MahnStatus>("/mahnung/status"),
-    staleTime: 15_000,
-  });
-
-export const useMahnLaeufe = () =>
-  useQuery({
-    queryKey: ["mahnung", "laeufe"] as const,
-    queryFn: () => api.get<import("@/lib/api/types").MahnLauf[]>("/mahnung/laeufe"),
-    staleTime: 15_000,
-  });
-
-export const useMahnLauf = (id: string | null | undefined) =>
-  useQuery({
-    queryKey: ["mahnung", "laeufe", id] as const,
-    queryFn: () => api.get<import("@/lib/api/types").MahnLaufDetail>(`/mahnung/laeufe/${id}`),
-    enabled: !!id,
-  });
-
-export const useMahnungVersenden = (rechnungId: string) => {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (stufe: import("@/lib/api/types").MahnStufe) =>
-      api.post<{ ok: true; emailVersandId?: string }>(
-        `/rechnungen/${rechnungId}/mahnung-versenden`,
-        { stufe },
-      ),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: qk.rechnung(rechnungId) });
-      qc.invalidateQueries({ queryKey: ["rechnungen"] });
-      qc.invalidateQueries({ queryKey: ["mahnung"] });
-      qc.invalidateQueries({ queryKey: ["email"] });
-      qc.invalidateQueries({ queryKey: qk.aktivitaeten });
-      qc.invalidateQueries({ queryKey: qk.benachrichtigungen });
-    },
-  });
-};
-
-export const useMahnJetztPruefen = () => {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (modus?: import("@/lib/api/types").MahnModus) =>
-      api.post<{
-        laufId: string;
-        modus: import("@/lib/api/types").MahnModus;
-        geprueft: number;
-        vorschlaege: number;
-        versendet: number;
-        uebersprungen: number;
-        fehler: number;
-      }>("/mahnung/jetzt-pruefen", modus ? { modus } : {}),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["mahnung"] });
-      qc.invalidateQueries({ queryKey: ["rechnungen"] });
-    },
-  });
-};
-
-export const useMahnungPausieren = (rechnungId: string) => {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (bis: string | null) =>
-      api.post<Rechnung>(`/rechnungen/${rechnungId}/mahnung-pausieren`, { bis }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: qk.rechnung(rechnungId) });
-      qc.invalidateQueries({ queryKey: ["rechnungen"] });
-    },
-  });
-};
-
-export const useInkassoMarkieren = (rechnungId: string) => {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: () => api.post<Rechnung>(`/rechnungen/${rechnungId}/inkasso-markieren`),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: qk.rechnung(rechnungId) });
-      qc.invalidateQueries({ queryKey: ["rechnungen"] });
     },
   });
 };

@@ -241,12 +241,6 @@ export interface Rechnung {
   archiviert: boolean;
   zahlungen: Zahlung[];
   optionen?: BelegOptionen;
-  /** Versendete Mahnungen, chronologisch (älteste zuerst). */
-  mahnungen?: MahnVorgang[];
-  /** Mahnverfahren bis zu diesem Datum pausieren (z.B. mündliche Zahlungszusage). */
-  mahnPausiertBis?: ISODate;
-  /** True wenn manuell „inkasso-reif" markiert (nach Stufe 3). */
-  inkassoMarkiert?: boolean;
   /** Status der Drive-Synchronisation des PDFs. */
   drive?: DriveSyncInfo;
   /** Vom Backend gesetzt: ID des Dauerauftrags, zu dem diese Rechnung gehört (Auto-Verknüpfung). */
@@ -255,84 +249,6 @@ export interface Rechnung {
   dauerauftragNeu?: { id: ID; nummer: string };
   erstelltAm: ISODateTime;
   geaendertAm: ISODateTime;
-}
-
-// ---------- Mahnwesen ----------
-
-export type MahnStufe = 1 | 2 | 3;
-
-export interface MahnVorgang {
-  id: ID;
-  rechnungId: ID;
-  stufe: MahnStufe;
-  versendetAm: ISODateTime;
-  /** Neue Zahlungsfrist, die in dieser Mahnung gesetzt wurde. */
-  neueFrist: ISODate;
-  /** Mahngebühr in EUR (separat von der Rechnungssumme). */
-  gebuehr: number;
-  /** Verknüpfung zu EmailVersand-Eintrag für Audit-Trail. */
-  emailVersandId?: ID;
-}
-
-export interface MahnStufeConfig {
-  stufe: MahnStufe;
-  bezeichnung: string;
-  /** Tage nach Vorgänger (Stufe 1: Tage nach Fälligkeit). */
-  tageNachVorgaenger: number;
-  gebuehr: number;
-  /** Neue Frist in Tagen ab Versand. */
-  fristTage: number;
-  /** Optional zugeordnete E-Mail-Vorlage. */
-  emailVorlageId?: ID;
-}
-
-export type MahnModus = "aus" | "vorschlag" | "auto";
-
-export interface MahnEinstellungen {
-  autoVorschlagAktiv: boolean;
-  /** Genau drei Stufen, sortiert nach stufe asc. */
-  stufen: MahnStufeConfig[];
-  // Step 13 — Automatik:
-  modus: MahnModus;
-  cronZeit: string;
-  nurAnWerktagen: boolean;
-  benachrichtigungBeiVorschlag: boolean;
-  benachrichtigungBeiAutoversand: boolean;
-}
-
-export interface MahnLauf {
-  id: ID;
-  gestartetAm: ISODateTime;
-  beendetAm?: ISODateTime | null;
-  ausgeloestDurch: "cron" | "manuell";
-  modus: MahnModus;
-  geprueft: number;
-  vorschlaege: number;
-  versendet: number;
-  uebersprungen: number;
-  fehler: number;
-  notiz?: string | null;
-}
-
-export interface MahnLaufEintrag {
-  id: ID;
-  laufId: ID;
-  rechnungId: ID;
-  rechnungNr?: string | null;
-  stufe: MahnStufe;
-  aktion: "vorschlag" | "versendet" | "uebersprungen" | "fehler";
-  grund?: string | null;
-  emailVersandId?: ID | null;
-  erstelltAm: ISODateTime;
-}
-
-export interface MahnLaufDetail extends MahnLauf {
-  eintraege: MahnLaufEintrag[];
-}
-
-export interface MahnStatus {
-  einstellungen: MahnEinstellungen;
-  letzterLauf: MahnLauf | null;
 }
 
 // ---------- Dokumente ----------
@@ -565,7 +481,7 @@ export interface SmtpEinstellungen {
 
 // ---------- E-Mail (Vorlagen, Signaturen, Versand) ----------
 
-export type EmailKontext = "angebot" | "rechnung" | "mahnung" | "allgemein";
+export type EmailKontext = "angebot" | "rechnung" | "allgemein";
 
 export interface EmailVorlage {
   id: ID;

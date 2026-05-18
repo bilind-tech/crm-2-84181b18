@@ -1,5 +1,5 @@
 // Platzhalter-System für E-Mail-Vorlagen.
-// Syntax: {{kunde.firmenname}}, {{rechnung.offen}}, {{mahnung.gebuehr}} …
+// Syntax: {{kunde.firmenname}}, {{rechnung.offen}}, {{rechnung.tageUeber}} …
 // Wird auf Betreff UND HTML-Body angewendet.
 
 import type {
@@ -7,13 +7,10 @@ import type {
   Ansprechpartner,
   Firmendaten,
   Kunde,
-  MahnEinstellungen,
-  MahnStufe,
   Rechnung,
 } from "@/lib/api/types";
 import { formatDate, formatEUR } from "@/lib/format";
 import { summenRechnung } from "@/lib/belege/summen";
-import { berechneNeueFrist, bestimmeMahnZustand, stufenLabel } from "@/lib/mahnung/regeln";
 
 export interface PlaceholderContext {
   kunde?: Kunde | null;
@@ -21,11 +18,6 @@ export interface PlaceholderContext {
   angebot?: Angebot | null;
   rechnung?: Rechnung | null;
   firma?: Firmendaten | null;
-  /** Optional — wenn gesetzt, werden {{mahnung.*}} Platzhalter aufgelöst. */
-  mahnung?: {
-    stufe: MahnStufe;
-    einstellungen?: MahnEinstellungen | null;
-  } | null;
 }
 
 const ANREDE_LABELS: Record<string, string> = {
@@ -109,6 +101,13 @@ function flatten(ctx: PlaceholderContext): Record<string, string> {
     out["rechnung.netto"] = formatEUR(s.netto);
     out["rechnung.bezahlt"] = formatEUR(bezahlt);
     out["rechnung.offen"] = formatEUR(offen);
+    // Tage seit Fälligkeit (negative Werte → 0 für Vorlagen-Lesbarkeit).
+    const heuteMs = Date.now();
+    const faelligMs = Date.parse(r.faelligkeitsdatum + "T00:00:00");
+    const tageUeber = Number.isFinite(faelligMs)
+      ? Math.max(0, Math.floor((heuteMs - faelligMs) / 86_400_000))
+      : 0;
+    out["rechnung.tageUeber"] = String(tageUeber);
   }
 
   if (ctx.firma) {
@@ -126,22 +125,6 @@ function flatten(ctx: PlaceholderContext): Record<string, string> {
       [f.plz, f.ort].filter(Boolean).join(" "),
     ].filter((s) => s && s.trim().length > 0);
     out["firma.adresse"] = adressTeile.join(", ");
-  }
-
-  if (ctx.mahnung && ctx.rechnung && ctx.mahnung.einstellungen) {
-    const stufeConfig = ctx.mahnung.einstellungen.stufen.find(
-      (s) => s.stufe === ctx.mahnung!.stufe,
-    );
-    if (stufeConfig) {
-      const z = bestimmeMahnZustand(ctx.rechnung, ctx.mahnung.einstellungen);
-      const neueFrist = berechneNeueFrist(stufeConfig);
-      const gesamt = z.offenEUR + stufeConfig.gebuehr;
-      out["mahnung.stufe"] = stufenLabel(ctx.mahnung.stufe, ctx.mahnung.einstellungen);
-      out["mahnung.gebuehr"] = formatEUR(stufeConfig.gebuehr);
-      out["mahnung.neueFrist"] = formatDate(neueFrist);
-      out["mahnung.gesamtForderung"] = formatEUR(gesamt);
-      out["mahnung.tageUeberfaellig"] = String(Math.max(0, z.tageUeberfaellig));
-    }
   }
 
   return out;
@@ -190,6 +173,7 @@ export const ALLE_PLATZHALTER = [
   "rechnung.faellig",
   "rechnung.offen",
   "rechnung.bezahlt",
+  "rechnung.tageUeber",
   "firma.name",
   "firma.telefon",
   "firma.email",
