@@ -5,6 +5,7 @@
 import { useEffect, useState } from "react";
 import { LoadingPlaceholder } from "@/components/layout/LoadingPlaceholder";
 import { toast } from "sonner";
+import { autoLinkifyImages } from "@/lib/email/signature";
 import {
   Plus,
   Trash2,
