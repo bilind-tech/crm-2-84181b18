@@ -1,11 +1,13 @@
 import { createFileRoute, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useState, useMemo } from "react";
-import { CheckCircle2, Trash2, ChevronRight, Mail, Repeat } from "lucide-react";
+import { CheckCircle2, Trash2, ChevronRight, Mail, Repeat, MailWarning } from "lucide-react";
 import { PdfViewButton } from "@/components/pdf/PdfViewButton";
 import { Button } from "@/components/ui/button";
 import { useRechnungen, useDeleteRechnung, useKunde } from "@/hooks/useApi";
 import { useRechnungPdf } from "@/hooks/useBelegPdf";
 import { EmailVersandDialog } from "@/components/email/EmailVersandDialog";
+import { useErinnerungen } from "@/hooks/useErinnerungen";
+import { useErinnerungVorlageId } from "@/lib/erinnerung/seedVorlage";
 import { formatEUR, formatDate } from "@/lib/format";
 import { PageHeader, KpiCard } from "@/components/layout/PageHeader";
 import { PrimaryAction } from "@/components/layout/PrimaryAction";
@@ -97,7 +99,11 @@ function Page() {
   const [daDialog, setDaDialog] = useState(false);
   const [zahlungFuer, setZahlungFuer] = useState<Rechnung | null>(null);
   const [emailFuer, setEmailFuer] = useState<Rechnung | null>(null);
+  const [erinnerungFuer, setErinnerungFuer] = useState<Rechnung | null>(null);
   const { confirm, dialog: confirmDialog } = useConfirm();
+
+  const { eintraege: erinnerungen } = useErinnerungen();
+  const erinnerungIds = useMemo(() => new Set(erinnerungen.map((e) => e.id)), [erinnerungen]);
 
   const heute = new Date().toISOString().slice(0, 10);
   const monat = heute.slice(0, 7);
@@ -142,7 +148,7 @@ function Page() {
     <div className="space-y-6">
       <PageHeader
         title="Rechnungen"
-        subtitle="Rechnungen erstellen, Zahlungen erfassen, Mahnungen senden."
+        subtitle="Rechnungen erstellen, Zahlungen erfassen, Erinnerungen versenden."
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <Button
