@@ -1,47 +1,60 @@
-## Was wir ändern und warum
+## Ziel
 
-Du hast drei Punkte zu Daueraufträgen genannt — alle drei werden gefixt.
+Alle Jahres-Auswahlen sollen sich **automatisch mit dem Kalender mitbewegen** — kein hartcodiertes Startjahr, keine sinnlose Zukunft, keine leere Vergangenheit.
 
-### 1. Rechnungs-Detailseite: keine destruktiven Aktionen mehr
+Regel überall gleich:
+- **Default-Anzeige:** aktuelles Jahr.
+- **Auswählbare Jahre:** alle Jahre, in denen tatsächlich Daten existieren (Rechnungen/Läufe/Posten/Dokumente) — plus aktuelles Jahr — plus die nächsten N zukünftigen Jahre nur dort, wo Zukunft sinnvoll ist (Dauerauftrag-Erzeugung).
+- **Keine Phantasie-Vergangenheit:** 2024/2025 erscheinen nur, wenn auch 2024er/2025er Daten vorhanden sind.
 
-Unten links auf einer Rechnungs-Detailseite zeigt der Bereich „Dauerauftrag" aktuell die Buttons **Pausieren · Sofort erzeugen · Beenden**. Du willst dort nichts „wegschießen" können — und genau das tun diese Buttons im Moment.
+---
 
-**Neu auf der Detailseite:**
-- Info bleibt: Frequenz, Status-Badge, nächster Lauftermin, Anzahl bisheriger Läufe, letzte 3 Läufe als klickbare Liste.
-- Einziger Button: **„Dauerauftrag bearbeiten"** — öffnet denselben Bearbeiten-Dialog, den du auch über die Listen-Seite erreichst (Bezeichnung, Frequenz, Status, Steuersatz, Rabatt, Notizen).
-- **Pausieren / Sofort erzeugen / Beenden** werden auf der Rechnungs-Detailseite vollständig entfernt. Beenden / Pausieren bleibt im Bearbeiten-Dialog erreichbar (über das Status-Feld), versehentliches Klicken auf einen Button schießt aber nichts mehr ab.
+## Konkrete Änderungen
 
-### 2. „Aus Dauerauftrag" auf der Rechnungs-Liste: jeder Monat wählbar
+### 1. Dauerauftrag „Aus Dauerauftrag" Dialog
+`src/components/dauerauftrag/RechnungAusDauerauftragDialog.tsx` (Zeile 67–73)
 
-Aktuell bietet der Dialog nur die Auswahl „letzter / dieser / nächste 2 / nächste 3 Monate" — vergangene Perioden weiter zurück oder ein Monat vor einem Jahr sind nicht erreichbar.
+Aktuell: fest `[heute-2 … heute+2]` → zeigt 2024 obwohl es keine Daten gibt.
 
-**Neu im Dialog:**
-- Statt fester Offset-Liste: zwei klare Selects **Monat (Januar … Dezember)** und **Jahr** (heutiges Jahr ±2, also 5 Jahre Spannweite — reicht für ein ganzes Geschäftsjahr rückwärts und etwas Puffer nach vorn).
-- Aus dem gewählten Monat/Jahr leitet sich pro Dauerauftrag automatisch die passende Periode ab — also bei einem Quartals-DA z. B. „Q2 2026", bei einem Jahres-DA „2026", bei monatlichen DAs der Monat selbst (genau wie heute, nur eben für jeden beliebigen Monat).
-- Pro Zeile bleibt sichtbar, **welche Periode** die Rechnung bekommt und ob für diese Periode bereits eine Rechnung erzeugt wurde (Warnhinweis bleibt).
+Neu — dynamische Jahresliste aus drei Quellen, dedupliziert + sortiert:
+- aktuelles Jahr (immer)
+- aktuelles Jahr + 1 und + 2 (Zukunft für Voraus-Erstellung)
+- jedes Jahr, in dem bereits ein Dauerauftrag-Lauf existiert (`alleLaeufe[].periode`) → erlaubt Rückblick auf real erzeugte Monate, ohne leere 2024er anzubieten
 
-### 3. Nach dem Erzeugen direkt zur Rechnung springen
+### 2. Steuern-Seite
+`src/routes/steuern.tsx` (Zeile 73–82)
 
-Wenn du im Dialog **eine** Vorlage auswählst und auf „Erzeugen" klickst, wirst du sofort auf die Detailseite der eben erzeugten Rechnung weitergeleitet (`/rechnungen/{id}`). Bei Mehrfach-Auswahl bleibt das Verhalten wie heute (Toast mit Anzahl, zurück zur Liste) — alles andere wäre verwirrend, weil nicht klar ist, zu welcher Rechnung gesprungen werden sollte.
+`STEUER_STARTJAHR = 2026` entfernen. Stattdessen:
+- erstes vorhandenes Jahr aus `rechnungen[].rechnungsdatum`, `dokumente[].dokumentdatum`, `manuellePosten[].zeitraum.jahr`
+- bis `max(aktuellesJahr, frühestesJahr)`
+- Default-Auswahl bleibt `aktuellesJahr` → bei Jahreswechsel automatisch 2027 etc.
 
-### 4. Aufgeräumt, ohne unnötige Erklär-Texte
+### 3. Gemeinsamer Helper
+Neu: `src/lib/zeitraum/jahre.ts`
 
-- Hinweiszeile „Quartals-/Jahres-DA bekommen die passende Periode automatisch" bleibt knapp drin (gehört zur Bedienung), die längliche Fußzeile „Jeder Monat ist eine eigene Rechnung …" auf der Detailseite verschwindet.
-- Edit-Button und Bearbeiten-Dialog werden zu einer geteilten Komponente (`DauerauftragEditDialog`), damit Detailseite und Listen-Dialog exakt dieselbe Maske öffnen — gleiche Beschriftung, gleiches Verhalten.
+```text
+verfuegbareJahre(daten: Iterable<string|number|undefined>, opts?: {
+  zukunftJahre?: number,   // wie viele zukünftige Jahre zusätzlich (Default 0)
+  inklAktuelles?: boolean, // Default true
+}): number[]
+```
 
-## Was bleibt unverändert
+Sortiert absteigend, dedupliziert. Wird genutzt von Steuern und Dauerauftrag-Dialog. (Bestehender `jahreAusDaten` in `ZeitraumFilter.tsx` bleibt, erfüllt das Muster bereits korrekt für Rechnungen/Angebote/Kunden-Filter — keine Änderung nötig, weil er schon „aktuelles Jahr + tatsächliche Datenjahre" liefert.)
 
-- Backend (`/dauerauftraege/:id/sofort-lauf`, `PATCH /dauerauftraege/:id`) unterstützt all das bereits — keine Schema-/Migrations-Änderungen, keine neuen Endpunkte, keine Auto-Mails.
-- Logik in `periodeFuer` / `periodeBezeichnung` / `periodeBereich` bleibt 1:1. Wir bauen nur einen anderen UI-Aufsatz drumherum, der ein beliebiges `Date` reinreicht statt eines kleinen Offsets.
-- Status-Lifecycle der erzeugten Rechnung, Belegnummern, Drive-Upload, Teilzahlungen — nichts daran wird angefasst.
+### 4. Verifikation (kein Code-Change, nur Sichtprüfung)
+Diese Stellen nutzen `jahreAusDaten` bereits korrekt und bleiben unverändert:
+- `src/routes/angebote.tsx` (zweimal)
+- `src/components/filters/ZeitraumSelect.tsx` (Rechnungen, Kunden, …)
+- `UmsatzChartCard` zeigt nur aktuelles + letztes Jahr → bleibt.
 
-## Technische Details
+---
 
-- **Neue Datei** `src/components/dauerauftrag/DauerauftragEditDialog.tsx` — der bereits vorhandene `DauerauftragEditDialog` wird aus `RechnungAusDauerauftragDialog.tsx` extrahiert, exportiert und in beiden Stellen importiert.
-- **`DauerauftragVerwaltungCard.tsx`** — Buttons Pausieren/Sofort/Beenden raus, neuer „Bearbeiten"-Button, der den Dialog öffnet. Import von `usePausiereDauerauftrag`, `useBeendeDauerauftrag`, `useSofortLauf`, `useConfirm` entfällt.
-- **`RechnungAusDauerauftragDialog.tsx`** — Offset-Select wird zu Monat-/Jahr-Select; `periodeMitOffset(frequenz, offset)` ersetzt durch `periodeFuerDatum(frequenz, date)` (lokale Helper, ruft die bestehenden `periodeFuer`/`periodeBezeichnung` mit `new Date(jahr, monat, 1)` auf). Nach `bulk.mutate(...)`: wenn `rechnungIds.length === 1`, mit `useNavigate({ to: "/rechnungen/$id", params: { id } })` springen.
-- Keine neuen Dependencies. Keine Tests müssen geändert werden (bestehende Test-Suites prüfen Backend-Verhalten, das hier nicht angefasst wird).
+## Nicht im Scope
+- Backend-Änderungen.
+- Belegnummern-Format (`RE-{YYYY}-…` ist bereits dynamisch via `getFullYear()`).
+- Datentyp-Migrationen.
 
-## Risiko / Rollback
-
-Reine Frontend-Änderung in 3 Dateien. Wenn etwas hakt, Komponenten auf vorherigen Stand setzen — keine Datenmigration, keine API-Verträge berührt.
+## Akzeptanzkriterien
+- Im DA-Dialog erscheint heute (2026) kein 2024. Nach Erzeugung eines Laufs für 2025 erscheint 2025 in der Liste.
+- Auf der Steuern-Seite ist 2026 vorausgewählt; am 01.01.2027 wechselt der Default automatisch auf 2027, 2026 bleibt wählbar.
+- Keine fest verdrahtete Jahreszahl mehr außerhalb von Beispieltexten/Placeholders.
