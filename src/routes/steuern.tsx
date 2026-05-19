@@ -36,6 +36,7 @@ import { SteuerDetailDialog } from "@/components/steuern/SteuerDetailDialog";
 import { SteuerZahlungDialog } from "@/components/steuern/SteuerZahlungDialog";
 import { ManuellerPostenDialog } from "@/components/steuern/ManuellerPostenDialog";
 import { SteuerExportDialog } from "@/components/steuern/SteuerExportDialog";
+import { verfuegbareJahre } from "@/lib/zeitraum/jahre";
 
 export const Route = createFileRoute("/steuern")({
   head: () => ({
@@ -71,15 +72,17 @@ function Page() {
   const [exportOpen, setExportOpen] = useState(false);
 
   const aktuellesJahr = new Date().getFullYear();
-  // Erfassung startet 2026. Jedes neue Jahr wird automatisch ergänzt; alte Jahre bleiben einsehbar.
-  const STEUER_STARTJAHR = 2026;
+  // Jahresliste dynamisch: alle Jahre mit realen Daten (Rechnungen, Belege,
+  // manuelle Posten) + aktuelles Jahr. Bei Jahreswechsel automatisch neu.
   const [jahr, setJahr] = useState(aktuellesJahr);
   const jahreOptionen = useMemo(() => {
-    const bis = Math.max(aktuellesJahr, STEUER_STARTJAHR);
-    const arr: number[] = [];
-    for (let j = STEUER_STARTJAHR; j <= bis; j++) arr.push(j);
-    return arr;
-  }, [aktuellesJahr]);
+    const quellen: (string | number | undefined)[] = [
+      ...rechnungen.map((r) => r.rechnungsdatum),
+      ...dokumente.map((d) => d.dokumentdatum),
+      ...manuellePosten.map((p) => p.zeitraum.jahr),
+    ];
+    return verfuegbareJahre(quellen, { sort: "asc" });
+  }, [rechnungen, dokumente, manuellePosten]);
 
   // Automatisch generierte Posten + manuelle Posten + Bezahlt-Overlay
   const allePosten = useMemo<SteuerPosten[]>(() => {
