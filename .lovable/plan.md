@@ -1,54 +1,62 @@
-## Vier Änderungen am E-Mail-Versand
+## Ziel
+Drei UX-Probleme im Beleg-/E-Mail-Flow beheben.
 
-### 1. PDF-Vorschau direkt im Anhang ausklappen
+## 1. „PDF bearbeiten" nach Versand sperren
 
-In `src/components/email/EmailVersandDialog.tsx` bekommt die Anhang-Zeile rechts neben dem X einen Chevron-Button (`ChevronDown`/`ChevronUp`). Klick togglet einen ausklappbaren Bereich darunter mit einem `<iframe src={pdfBlobUrl}>` (ca. 480 px hoch, gerundete Border, neutraler `bg-muted/20`-Rahmen).
+**Wo:** `src/routes/rechnungen.$id.tsx` und `src/routes/angebote.$id.tsx`
 
-- Nur sichtbar wenn `pdfBlobUrl` vorhanden und `pdfStatus === "ready"` ist.
-- State `pdfPreviewOffen` lokal in der Komponente, default `false`.
-- Keine zusätzlichen Requests — `pdfBlobUrl` ist bereits geladen.
+Sobald der Beleg nicht mehr im Status `entwurf` ist (also bereits versendet, bezahlt, teilbezahlt, überfällig, storniert, angenommen, abgelehnt), wird der Button „PDF bearbeiten" deaktiviert.
 
-### 2. Vorlagen-Inhalte säubern (Grußformel & Fragen-Satz)
+- `<Button asChild>` → ersetzt durch `<Button>` mit `disabled={!istEntwurf}` (kein `asChild`+`Link` wenn disabled — Link würde sonst trotzdem navigierbar bleiben).
+- Wenn disabled, `<Link>` weglassen; bei `istEntwurf` wie bisher mit `<Link>`.
+- Tooltip via `title=` (kein neues Popover-Konstrukt):
+  - Rechnung: `"PDF kann nicht mehr bearbeitet werden — die Rechnung wurde bereits versendet."`
+  - Angebot: `"PDF kann nicht mehr bearbeitet werden — das Angebot wurde bereits versendet."`
+- Optisch: weiterhin `variant="outline"`, gedimmt via `disabled:opacity-50`.
 
-Alle Default-Vorlagen werden so umgeschrieben, dass sie **keinen** Schlussgruß (`Mit freundlichen Grüßen…`) und **keinen** Standard-Fragen-Satz (`Bei Fragen erreichen Sie uns…`) mehr enthalten — das übernimmt ausschließlich die Signatur.
+Logik:
+```ts
+const istEntwurf = r.status === "entwurf";
+```
+(Angebot analog mit `a.status === "entwurf"`.)
 
-**Backend** (`backend/src/email/templates.ts`):
-- Letzten `P("Mit freundlichen Grüßen…")`-Absatz aus jedem Default entfernen.
-- Sätze wie „Bei Fragen … erreichen Sie uns telefonisch unter {{firma.telefon}} oder per Antwort …" / „Sie erreichen uns telefonisch unter …" entfernen.
-- Schlusssatz auf eine knappe Bedank/Abschluss-Zeile reduzieren („Vielen Dank für Ihr Vertrauen.", „Wir freuen uns auf Ihre Rückmeldung." etc.).
-- Damit bestehende DB-Einträge (über `seed_key` schon eingespielt) ebenfalls aktualisiert werden, bekommt jeder Eintrag einen neuen `seed_key`-Suffix `.v2`. Die alten `.v1`-Vorlagen werden **nicht** gelöscht (User könnte sie bearbeitet haben), die neuen `.v2` werden zusätzlich eingespielt und — falls für den Kontext noch kein Standard existiert — als Standard markiert. Falls bereits eine User-Standard-Vorlage existiert, bleibt sie unverändert.
+## 2. Visuell-Editor zeigt Inhalt sofort beim Öffnen
 
-**Frontend-Seed** (`src/lib/erinnerung/seedVorlage.ts`):
-- Letzten `<p>Mit freundlichen Grüßen…</p>` und den Fragen-Satz entfernen.
-- Konstante `NAME` auf `"Zahlungserinnerung (freundlich) v2"` ziehen, damit die saubere Variante neu angelegt wird. `useErinnerungVorlageId` sucht zukünftig auf den neuen Namen.
+**Wo:** `src/components/email/EmailVersandDialog.tsx`
 
-### 3. Auto-Scroll nach oben beim Absenden
+**Ursache:** Das contentEditable-`<div>` wird beim Öffnen mit leerem Inhalt gemountet. Der bestehende `useEffect` setzt `innerHTML` zwar nach, läuft aber in einem Render-Zyklus, in dem der Ref bei manchen Renderpfaden noch nicht das endgültige Body-HTML (aus dem Vorlagen-Reset) sieht — sichtbar bleibt: leer. Erst durch Tab-Wechsel wird das Div neu gemountet und der Effect läuft wieder.
 
-`handleSend` in `EmailVersandDialog.tsx` scrollt den scrollbaren `DialogContent`-Container vor dem Versand auf 0:
+**Fix:** Beim Mount direkt im Ref-Callback initialisieren, statt sich auf den Effect zu verlassen.
+
+- Ref auf Callback-Ref umstellen:
+  ```tsx
+  const setVisuellNode = (node: HTMLDivElement | null) => {
+    visuellRef.current = node;
+    if (node && node.innerHTML === "") {
+      node.innerHTML = replacePlaceholders(bodyHtml, ctx);
+    }
+  };
+  ```
+- `<div ref={setVisuellNode} contentEditable …>` benutzen.
+- Bestehenden Sync-`useEffect` für spätere Updates (Vorlagenwechsel, ctx-Update) beibehalten — er greift dann nur noch bei tatsächlichen Änderungen.
+
+## 3. Auto-Scroll beim Absenden zuverlässig
+
+`scrollRef.current?.scrollTo(...)` existiert bereits in `handleSend`. Das `<DialogContent>` hat `overflow-y-auto`, also funktioniert es prinzipiell. Sicherstellen, dass der Scroll **vor** `setPhase("sending")` ausgeführt wird ist bereits der Fall — kein Bug erkennbar. Falls in der Praxis trotzdem nicht oben: zusätzlich nach `setPhase("sending")` per `requestAnimationFrame` erneut scrollen, damit das Overlay garantiert sichtbar landet:
 
 ```ts
-const scrollContainerRef = useRef<HTMLDivElement>(null);
-// im handleSend, vor setPhase("sending"):
-scrollContainerRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+setPhase("sending");
+requestAnimationFrame(() => {
+  scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+});
 ```
 
-Dazu wird ein `ref` an das äußere `<DialogContent>` gehängt (oder ein zusätzlicher Wrapper-Div innerhalb), so dass das bereits absolut positionierte `SendOverlay` (z. 412) im sichtbaren Viewport landet.
-
-### 4. Bild-URL in Signatur automatisch als `<img>` rendern
-
-Aktuell speichert der User die Signatur als HTML-Textarea. Wenn dort nur die reine URL `https://mycleancenter.de/logo.png` steht (statt `<img src="…">`), zeigt der Browser nichts an — weder im Editor noch beim Empfänger.
-
-**Lösung** — neue Hilfsfunktion `autoLinkifyImages(html: string)` in `src/lib/email/signature.ts`:
-- Erkennt nackte URLs (`https?://…\.(png|jpg|jpeg|gif|webp|svg)(\?…)?`) außerhalb bestehender HTML-Tags und wickelt sie in `<img src="…" alt="" style="max-width:240px;height:auto;display:inline-block">` ein.
-- Wird **nur lesend** angewandt:
-  - in der Signatur-Live-Vorschau (`EmailVersandDialog.tsx` Zeile ≈ 557–562),
-  - im finalen `finaleBody`, der ans Backend geschickt wird (Zeile ≈ 233–235),
-  - in der `EmailEinstellungen.tsx`-Signatur-Vorschau (`SignaturDialog`),
-  - und in der „Vorschau"-Iframe-Vorlage des Versand-Dialogs (Zeile ≈ 530–538).
-- Im DB-Wert der Signatur wird nichts verändert (User-Eingabe bleibt unangetastet); die Transformation passiert nur beim Rendern/Senden.
-
 ## Out of Scope
+- Keine Backend-Änderungen.
+- Kein Eingriff in `useBelegEditor`/PDF-Renderer — die Route bleibt erreichbar via Direkt-URL, der Button ist nur das UI-Gate.
+- Anhang-PDF-Vorschau-Pfeil ist bereits implementiert (siehe `ChevronDown`-Toggle in `EmailVersandDialog`), keine Änderung nötig.
 
-- Keine Änderung am SMTP-Versand, an `useSendEmail`, an Idempotenz oder Mahnwesen.
-- Bestehende User-eigene Vorlagen (mit `seed_key = NULL` oder User-editierte Defaults) bleiben unverändert — nur die neuen `.v2`-Seeds kommen additiv dazu.
-- Kein Rich-Text-Editor — Signatur bleibt HTML-Textarea + Vorschau.
+## Geänderte Dateien
+- `src/routes/rechnungen.$id.tsx`
+- `src/routes/angebote.$id.tsx`
+- `src/components/email/EmailVersandDialog.tsx`
