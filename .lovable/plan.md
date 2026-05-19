@@ -1,62 +1,49 @@
 ## Ziel
-Drei UX-Probleme im Beleg-/E-Mail-Flow beheben.
+Zwei sichtbare Defekte im E-Mail-Versand-Dialog beheben.
 
-## 1. „PDF bearbeiten" nach Versand sperren
+## 1. Logo-URL in der Signatur als Bild rendern
 
-**Wo:** `src/routes/rechnungen.$id.tsx` und `src/routes/angebote.$id.tsx`
+**Problem:** Aktuell zeigt die Signatur einen leeren „Logo"-Platzhalter statt des Bildes von `https://mycleancenter.de/logo.png`. Grund: `autoLinkifyImages` ersetzt nur **nackte URLs** (Negative-Lookbehind `(?<!["'=>])`). In der gespeicherten Signatur ist die URL aber als HTML-Link hinterlegt (`<a href="https://mycleancenter.de/logo.png">Logo</a>`), daher greift die Regex nicht und es bleibt der Linktext „Logo" sichtbar.
 
-Sobald der Beleg nicht mehr im Status `entwurf` ist (also bereits versendet, bezahlt, teilbezahlt, überfällig, storniert, angenommen, abgelehnt), wird der Button „PDF bearbeiten" deaktiviert.
+**Fix in `src/lib/email/signature.ts`:** `autoLinkifyImages` so erweitern, dass es **zwei** Muster ersetzt:
 
-- `<Button asChild>` → ersetzt durch `<Button>` mit `disabled={!istEntwurf}` (kein `asChild`+`Link` wenn disabled — Link würde sonst trotzdem navigierbar bleiben).
-- Wenn disabled, `<Link>` weglassen; bei `istEntwurf` wie bisher mit `<Link>`.
-- Tooltip via `title=` (kein neues Popover-Konstrukt):
-  - Rechnung: `"PDF kann nicht mehr bearbeitet werden — die Rechnung wurde bereits versendet."`
-  - Angebot: `"PDF kann nicht mehr bearbeitet werden — das Angebot wurde bereits versendet."`
-- Optisch: weiterhin `variant="outline"`, gedimmt via `disabled:opacity-50`.
+1. `<a ... href="...image.ext...">irgendwas</a>` → komplett durch `<img>` ersetzen (Anchor entfernen, Bild rein).
+2. weiterhin nackte URLs (bestehender Pfad).
 
-Logik:
+Regex-Skizze:
 ```ts
-const istEntwurf = r.status === "entwurf";
+const ANCHOR_IMG_RE =
+  /<a\b[^>]*\bhref=["'](https?:\/\/[^"']+?\.(?:png|jpe?g|gif|webp|svg)(?:\?[^"']*)?)["'][^>]*>[\s\S]*?<\/a>/gi;
 ```
-(Angebot analog mit `a.status === "entwurf"`.)
+Beide Ersetzungen schreiben dasselbe `<img …>`-Markup wie bisher, sodass der Bestand (nackte URLs, neue Eingaben) konsistent bleibt.
 
-## 2. Visuell-Editor zeigt Inhalt sofort beim Öffnen
+Gilt automatisch überall, wo `autoLinkifyImages` schon eingesetzt wird (Dialog-Body, Signatur-Live-Vorschau, Einstellungen-Vorschau, finaleBody für Versand) — also: sofort sichtbar im CRM **und** sauber im Versand-HTML.
 
-**Wo:** `src/components/email/EmailVersandDialog.tsx`
+Reine Render-Transformation — DB-Wert der Signatur bleibt unverändert.
 
-**Ursache:** Das contentEditable-`<div>` wird beim Öffnen mit leerem Inhalt gemountet. Der bestehende `useEffect` setzt `innerHTML` zwar nach, läuft aber in einem Render-Zyklus, in dem der Ref bei manchen Renderpfaden noch nicht das endgültige Body-HTML (aus dem Vorlagen-Reset) sieht — sichtbar bleibt: leer. Erst durch Tab-Wechsel wird das Div neu gemountet und der Effect läuft wieder.
+## 2. PDF-Vorschau im Anhang zeigt nichts
 
-**Fix:** Beim Mount direkt im Ref-Callback initialisieren, statt sich auf den Effect zu verlassen.
+**Problem:** In der Lovable-Preview (und Browsern ohne PDF-Plugin) liefert ein nacktes `<iframe src={blobUrl}>` eine weiße Fläche. Genau dafür existiert bereits `PdfCanvasViewer` (siehe Kommentar dort), der die Seiten via PDF.js auf Canvas zeichnet.
 
-- Ref auf Callback-Ref umstellen:
-  ```tsx
-  const setVisuellNode = (node: HTMLDivElement | null) => {
-    visuellRef.current = node;
-    if (node && node.innerHTML === "") {
-      node.innerHTML = replacePlaceholders(bodyHtml, ctx);
-    }
-  };
-  ```
-- `<div ref={setVisuellNode} contentEditable …>` benutzen.
-- Bestehenden Sync-`useEffect` für spätere Updates (Vorlagenwechsel, ctx-Update) beibehalten — er greift dann nur noch bei tatsächlichen Änderungen.
+**Fix in `src/components/email/EmailVersandDialog.tsx`:**
+- Neue optionale Prop `pdfBlob?: Blob | null` zum Dialog hinzufügen.
+- Beim Aufklappen der Vorschau statt `<iframe>` `<PdfCanvasViewer pdfUrl={pdfBlobUrl} pdfBlob={pdfBlob} fileName={pdfDateiname} maxWidth={760} className="max-h-[480px] overflow-auto" />` rendern.
+- Der bisherige `ChevronDown/Up`-Toggle bleibt unverändert.
 
-## 3. Auto-Scroll beim Absenden zuverlässig
+**Aufrufer angleichen (drei Stellen):**
+- `src/routes/rechnungen.$id.tsx` (2× `<EmailVersandDialog … pdfBlobUrl={pdf.url}>` → zusätzlich `pdfBlob={pdf.blob}`)
+- `src/routes/angebote.$id.tsx` (1× analog)
+- `src/components/notifications/ErinnerungPopup.tsx` (1× analog)
 
-`scrollRef.current?.scrollTo(...)` existiert bereits in `handleSend`. Das `<DialogContent>` hat `overflow-y-auto`, also funktioniert es prinzipiell. Sicherstellen, dass der Scroll **vor** `setPhase("sending")` ausgeführt wird ist bereits der Fall — kein Bug erkennbar. Falls in der Praxis trotzdem nicht oben: zusätzlich nach `setPhase("sending")` per `requestAnimationFrame` erneut scrollen, damit das Overlay garantiert sichtbar landet:
-
-```ts
-setPhase("sending");
-requestAnimationFrame(() => {
-  scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
-});
-```
+`pdf.blob` ist in allen vier Stellen bereits über den `useAngebotPdf` / `useRechnungPdf`-Hook verfügbar.
 
 ## Out of Scope
-- Keine Backend-Änderungen.
-- Kein Eingriff in `useBelegEditor`/PDF-Renderer — die Route bleibt erreichbar via Direkt-URL, der Button ist nur das UI-Gate.
-- Anhang-PDF-Vorschau-Pfeil ist bereits implementiert (siehe `ChevronDown`-Toggle in `EmailVersandDialog`), keine Änderung nötig.
+- Keine Änderung an Vorlagen, Signaturen-Schema oder Backend.
+- Keine Base64-Konvertierung des Logos: Die Lovable-Stack-Empfehlung ist hier nicht passend, weil der Versand über den lokalen Pi-SMTP läuft und der Mail-Client das Bild direkt von `mycleancenter.de` lädt. Die UI-Darstellung im CRM funktioniert ebenfalls direkt über die URL, sobald der Anchor zu `<img>` wird.
 
 ## Geänderte Dateien
+- `src/lib/email/signature.ts`
+- `src/components/email/EmailVersandDialog.tsx`
 - `src/routes/rechnungen.$id.tsx`
 - `src/routes/angebote.$id.tsx`
-- `src/components/email/EmailVersandDialog.tsx`
+- `src/components/notifications/ErinnerungPopup.tsx`
