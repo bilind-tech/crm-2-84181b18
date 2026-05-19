@@ -130,11 +130,22 @@ function Page() {
                 <MailWarning className="mr-1.5 h-4 w-4" /> Erinnerung senden
               </Button>
             )}
-            <Button asChild variant="outline" className="rounded-lg">
-              <Link to="/rechnungen/$id/bearbeiten" params={{ id: r.id }}>
+            {r.status === "entwurf" ? (
+              <Button asChild variant="outline" className="rounded-lg">
+                <Link to="/rechnungen/$id/bearbeiten" params={{ id: r.id }}>
+                  <Pencil className="mr-1.5 h-4 w-4" /> PDF bearbeiten
+                </Link>
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                className="rounded-lg disabled:opacity-50"
+                disabled
+                title="PDF kann nicht mehr bearbeitet werden — die Rechnung wurde bereits versendet."
+              >
                 <Pencil className="mr-1.5 h-4 w-4" /> PDF bearbeiten
-              </Link>
-            </Button>
+              </Button>
+            )}
             <Button
               variant="outline"
               className="rounded-lg text-destructive hover:bg-destructive/10 hover:text-destructive"

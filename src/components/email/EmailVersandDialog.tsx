@@ -279,7 +279,12 @@ export function EmailVersandDialog({
 
     setPhase("sending");
     // Nach oben scrollen, damit die Versand-Animation im Viewport landet.
+    // Doppelt ausführen: einmal sofort, einmal nach dem Re-Render mit Overlay,
+    // damit der Scroll garantiert greift (Overlay vergrößert den Inhalt).
     scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+    requestAnimationFrame(() => {
+      scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+    });
 
     // Idempotenz-Key pro Klick — Backend erkennt Doppelklicks und sendet nicht zweimal.
     const idempotenzKey = createClientId("mail");
@@ -523,7 +528,14 @@ export function EmailVersandDialog({
 
             {mode === "visuell" && (
               <div
-                ref={visuellRef}
+                ref={(node) => {
+                  visuellRef.current = node;
+                  // Beim allerersten Mount sofort befüllen, damit der Editor
+                  // nicht leer erscheint, bis ein Effekt nachzieht.
+                  if (node && node.innerHTML === "") {
+                    node.innerHTML = replacePlaceholders(bodyHtml, ctx);
+                  }
+                }}
                 contentEditable
                 suppressContentEditableWarning
                 onBlur={(e) => setBodyHtml(e.currentTarget.innerHTML)}
