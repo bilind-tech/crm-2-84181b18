@@ -19,6 +19,7 @@ import {
   Package,
   Calculator,
   Clock,
+  FileSpreadsheet,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -49,6 +50,7 @@ import { VerlaufTab } from "@/components/einstellungen/VerlaufTab";
 import { SteuerTab } from "@/components/einstellungen/SteuerTab";
 import { StundenzettelTab } from "@/components/einstellungen/StundenzettelTab";
 import { BackendVerbindungTab } from "@/components/einstellungen/BackendVerbindungTab";
+import { ExportTab } from "@/components/einstellungen/ExportTab";
 import type { Firmendaten } from "@/lib/api/types";
 import { cn } from "@/lib/utils";
 
@@ -64,6 +66,7 @@ type TabId =
   | "vorlagen"
   | "steuern"
   | "stundenzettel"
+  | "export"
   | "drive"
   | "backup"
   | "system-update"
@@ -82,6 +85,7 @@ const tabs: { id: TabId; label: string; icon: typeof Building2; gruppe: string }
 
   { id: "dauerauftrag", label: "Daueraufträge", icon: Repeat, gruppe: "Belege" },
   { id: "steuern", label: "Steuern", icon: Calculator, gruppe: "Belege" },
+  { id: "export", label: "Excel-Export", icon: FileSpreadsheet, gruppe: "Belege" },
 
   { id: "stundenzettel", label: "Stundenzettel", icon: Clock, gruppe: "Externe Apps" },
 
@@ -246,6 +250,7 @@ function Page() {
           {tab === "vorlagen" && <VorlagenTab />}
           {tab === "steuern" && <SteuerTab />}
           {tab === "stundenzettel" && <StundenzettelTab />}
+          {tab === "export" && <ExportTab />}
           {tab === "drive" && <GoogleDriveTab />}
           {tab === "backend" && <BackendVerbindungTab />}
           {tab === "backup" && <BackupTab />}
