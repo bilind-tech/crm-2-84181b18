@@ -11,7 +11,7 @@ const cNum = (min: number, max: number, def: number) =>
   z.coerce.number().min(min).max(max).default(def);
 
 export const FirmaSchema = z.object({
-  name: z.string().trim().min(1).max(200).default("MyCleanCenter GmbH"),
+  name: z.string().trim().min(1).max(200).default("My Clean Center GmbH"),
   inhaber: optStr.default(""),
   rechtsform: optStr.default(""),
   slogan: optStr.default(""),

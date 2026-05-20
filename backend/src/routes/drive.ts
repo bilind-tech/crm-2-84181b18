@@ -256,7 +256,7 @@ export async function driveRoutes(app: FastifyInstance): Promise<void> {
         const out = await createTextFile({
           parentFolderId: root,
           name: `verbindungstest-${new Date().toISOString().slice(0, 10)}.txt`,
-          content: "MyCleanCenter — Verbindungstest erfolgreich.",
+          content: "My Clean Center — Verbindungstest erfolgreich.",
         });
         return {
           erfolg: true,

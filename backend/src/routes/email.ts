@@ -328,8 +328,8 @@ export async function emailRoutes(app: FastifyInstance): Promise<void> {
         const info = await t.sendMail({
           from: { name: from.name, address: from.address },
           to: p.data.an,
-          subject: "MyCleanCenter — Test-Mail",
-          html: "<p>Diese Test-Mail wurde von Ihrem MyCleanCenter-System erfolgreich versendet.</p>",
+          subject: "My Clean Center — Test-Mail",
+          html: "<p>Diese Test-Mail wurde von Ihrem My Clean Center-System erfolgreich versendet.</p>",
         });
         return { ok: true, messageId: info.messageId };
       } catch (e) {

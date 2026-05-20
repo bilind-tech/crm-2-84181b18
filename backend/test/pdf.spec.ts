@@ -28,7 +28,7 @@ beforeAll(() => {
   openDatabase(config.dbPath);
   wirePdfCacheInvalidation();
   setSetting("firma", {
-    name: "MyCleanCenter GmbH", strasse: "Hauptstr. 1", plz: "53757", ort: "Sankt Augustin",
+    name: "My Clean Center GmbH", strasse: "Hauptstr. 1", plz: "53757", ort: "Sankt Augustin",
     telefon: "02241/000000", email: "info@mcc.de", web: "https://mcc.de",
     ustId: "DE123456789", geschaeftsfuehrer: "Max Mustermann",
     bankName: "Sparkasse", iban: "DE12...", bic: "WELADEDD",

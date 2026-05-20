@@ -28,7 +28,7 @@ interface FirmaSettings {
 export function loadFirmaForPdf(): FirmaForPdf {
   const f = getSetting<FirmaSettings>("firma") ?? {};
   return {
-    firmenname: f.name?.trim() || "MyCleanCenter GmbH",
+    firmenname: f.name?.trim() || "My Clean Center GmbH",
     strasse: f.strasse ?? null,
     plz: f.plz ?? null,
     ort: f.ort ?? null,

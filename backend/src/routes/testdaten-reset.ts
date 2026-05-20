@@ -69,6 +69,8 @@ export async function testdatenResetRoutes(app: FastifyInstance): Promise<void> 
     }
 
     const db = getDatabase();
+    // Sicherstellen, dass FK-Checks aktiv sind — sonst können stille Inkonsistenzen entstehen.
+    db.pragma("foreign_keys = ON");
 
     // 5. Storage-Pfade einsammeln (vor DELETE)
     const storagePaths = (db
@@ -92,6 +94,9 @@ export async function testdatenResetRoutes(app: FastifyInstance): Promise<void> 
 
         // Kinder zuerst
         db.exec(`
+          DELETE FROM dauerauftrag_sonderposition;
+          DELETE FROM dauerauftrag_lauf;
+          DELETE FROM dauerauftrag;
           DELETE FROM zahlung;
           DELETE FROM mahn_lauf_eintraege;
           DELETE FROM mahn_laeufe;
@@ -103,6 +108,7 @@ export async function testdatenResetRoutes(app: FastifyInstance): Promise<void> 
           DELETE FROM protokolle;
           DELETE FROM rechnung;
           DELETE FROM angebot;
+          DELETE FROM notiz;
           DELETE FROM ansprechpartner;
           DELETE FROM objekt;
           DELETE FROM kunde;
@@ -110,6 +116,8 @@ export async function testdatenResetRoutes(app: FastifyInstance): Promise<void> 
           DELETE FROM benachrichtigung;
           DELETE FROM belegnummer_zaehler_v2;
           DELETE FROM belegnummer_reserviert;
+          DELETE FROM kunde_nummer_zaehler;
+          DELETE FROM objekt_nummer_zaehler;
         `);
 
         // Sentinel setzen
