@@ -258,6 +258,7 @@ async function main(): Promise<void> {
   await app.register(emailRoutes);
   await app.register(externRoutes);
   await app.register(datenbankRoutes);
+  await app.register(testdatenResetRoutes);
   await app.register(dauerauftragRoutes);
   await app.register(dashboardRoutes);
 
