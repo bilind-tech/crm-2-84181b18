@@ -10,6 +10,7 @@ import { Field, Section, StickySaveBar } from "./_shared";
 import { LoadingPlaceholder } from "@/components/layout/LoadingPlaceholder";
 import { PasswortAendernDialog } from "./PasswortAendernDialog";
 import { RecoveryRotateDialog } from "./RecoveryRotateDialog";
+import { TestdatenResetCard } from "./TestdatenResetCard";
 
 export function SicherheitTab() {
   const { data, isLoading } = useSicherheit();
@@ -64,6 +65,8 @@ export function SicherheitTab() {
 
       <PasswortAendernDialog open={pwOpen} onOpenChange={setPwOpen} />
       <RecoveryRotateDialog open={recOpen} onOpenChange={setRecOpen} />
+
+      <TestdatenResetCard />
 
       <StickySaveBar
         dirty={dirty}
