@@ -110,6 +110,8 @@ export const ProtokollLivePreview = forwardRef<ProtokollLivePreviewHandle, Props
     const builtKeyRef = useRef<string>("");
     const latestKeyRef = useRef<string>("");
     const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const commitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const lastSwapAtRef = useRef(0);
     const typingTsRef = useRef(0);
     const openIdRef = useRef<string | null>(null);
     openIdRef.current = openHotspotId;
@@ -135,6 +137,7 @@ export const ProtokollLivePreview = forwardRef<ProtokollLivePreviewHandle, Props
       return () => {
         mountedRef.current = false;
         if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+        if (commitTimerRef.current) clearTimeout(commitTimerRef.current);
       };
     }, []);
 
@@ -171,6 +174,8 @@ export const ProtokollLivePreview = forwardRef<ProtokollLivePreviewHandle, Props
       [draft, kunde, objekt, firma],
     );
     latestKeyRef.current = currentKey;
+
+    const scheduleBuildRef = useRef<() => void>(() => {});
 
     const runBuild = useCallback(async () => {
       if (inFlightRef.current) return;
@@ -209,9 +214,26 @@ export const ProtokollLivePreview = forwardRef<ProtokollLivePreviewHandle, Props
           rendered: 0,
           buildId,
         };
-        if (target === "A") setSlotA(next);
-        else setSlotB(next);
+        const commit = () => {
+          if (!mountedRef.current) return;
+          if (target === "A") setSlotA(next);
+          else setSlotB(next);
+        };
+        // Wenn der Ziel-Slot gerade noch sichtbar ausfadet (Swap < FADE_MS her),
+        // verschieben wir den Commit bis nach dem Fade. Sonst würde der noch
+        // sichtbare Inhalt schlagartig durch numPages=0 verschwinden = Flackern.
+        const sinceSwap = Date.now() - lastSwapAtRef.current;
+        const wait = !isFirstBuild ? Math.max(0, FADE_MS + 60 - sinceSwap) : 0;
         builtKeyRef.current = targetKey;
+        if (wait > 0) {
+          if (commitTimerRef.current) clearTimeout(commitTimerRef.current);
+          commitTimerRef.current = setTimeout(() => {
+            commitTimerRef.current = null;
+            commit();
+          }, wait);
+        } else {
+          commit();
+        }
       } catch (e) {
         // eslint-disable-next-line no-console
         console.error("[ProtokollLivePreview] build failed", e);
@@ -222,10 +244,11 @@ export const ProtokollLivePreview = forwardRef<ProtokollLivePreviewHandle, Props
         inFlightRef.current = false;
         if (mountedRef.current) {
           setBuilding(false);
+          // Folge-Builds gehen IMMER durch den Debounce — sonst feuern
+          // mehrere Updates (Query-Refetches, Autosave-Roundtrips) in
+          // schneller Folge ein Build/Swap nach dem anderen = Flackern.
           if (latestKeyRef.current !== builtKeyRef.current) {
-            queueMicrotask(() => {
-              if (mountedRef.current) void runBuild();
-            });
+            scheduleBuildRef.current();
           }
         }
       }
@@ -250,6 +273,7 @@ export const ProtokollLivePreview = forwardRef<ProtokollLivePreviewHandle, Props
         void runBuild();
       }, delay);
     }, [runBuild]);
+    scheduleBuildRef.current = scheduleBuild;
 
     const flush = useCallback(() => {
       if (debounceTimerRef.current) {
@@ -307,6 +331,7 @@ export const ProtokollLivePreview = forwardRef<ProtokollLivePreviewHandle, Props
     useEffect(() => {
       if (!backReady) return;
       if (openHotspotId !== null) return; // Swap aufschieben — Popover offen
+      lastSwapAtRef.current = Date.now();
       setFront((f) => (f === "A" ? "B" : "A"));
     }, [backReady, openHotspotId]);
 
