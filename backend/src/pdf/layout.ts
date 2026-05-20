@@ -77,7 +77,7 @@ function header(f: FirmaForPdf, logoDataUrl: string | null) {
       {
         width: "*",
         stack: [
-          { text: absenderzeile(f), fontSize: 8, color: COLOR_TEXT, decoration: "underline", margin: [0, 50, 0, 0] },
+          { text: absenderzeile(f), fontSize: 7, color: COLOR_TEXT, decoration: "underline", margin: [0, 50, 0, 0], noWrap: true },
         ],
       },
       logoDataUrl

@@ -212,7 +212,7 @@ function RecoveryAnzeige({
       year: "numeric",
     });
     w.document.write(`<!doctype html><html lang="de"><head><meta charset="utf-8">
-<title>MyCleanCenter Recovery-Code</title>
+<title>My Clean Center Recovery-Code</title>
 <style>
   body { font-family: system-ui, sans-serif; padding: 48px; color: #111; }
   h1 { font-size: 22px; margin: 0 0 8px; }
@@ -223,7 +223,7 @@ function RecoveryAnzeige({
   .hint { background: #fffbe6; border: 1px solid #d4b400; border-radius: 8px; padding: 12px 16px; font-size: 13px; }
   .meta { margin-top: 32px; font-size: 12px; color: #555; }
 </style></head><body>
-<h1>MyCleanCenter — Recovery-Code</h1>
+<h1>My Clean Center — Recovery-Code</h1>
 <p class="sub">${titel}</p>
 <div class="box">
   <div class="label">Recovery-Code</div>

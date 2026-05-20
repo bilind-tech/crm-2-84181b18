@@ -95,7 +95,7 @@ export function RechnungenExcelExportDialog({ open, onOpenChange }: Props) {
     setBusy(true);
     try {
       const wb = new ExcelJS.Workbook();
-      wb.creator = "MyCleanCenter";
+      wb.creator = "My Clean Center";
       wb.created = new Date();
 
       const jahreSortiert = [...auswahl].sort((a, b) => a - b);
