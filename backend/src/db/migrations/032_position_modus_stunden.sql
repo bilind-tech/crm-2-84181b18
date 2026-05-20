@@ -1,7 +1,10 @@
 -- Erweitert CHECK-Constraint für modus von angebot_position und rechnung_position
 -- um den Wert 'stunden'. SQLite kann CHECK nicht per ALTER ändern → Tabelle neu aufbauen.
 
-PRAGMA foreign_keys = OFF;
+-- foreign_keys = OFF wirkt innerhalb einer Transaktion NICHT (SQLite-Limitation).
+-- defer_foreign_keys verschiebt FK-Checks ans Transaktionsende und ist in
+-- Transaktionen erlaubt — perfekt für Table-Rebuilds.
+PRAGMA defer_foreign_keys = ON;
 
 -- ---------------------------------------------------------------------------
 -- angebot_position
@@ -69,4 +72,19 @@ ALTER TABLE rechnung_position_new RENAME TO rechnung_position;
 
 CREATE INDEX IF NOT EXISTS ix_rechnung_pos_rechnung ON rechnung_position(rechnung_id, sort);
 
-PRAGMA foreign_keys = ON;
+-- ---------------------------------------------------------------------------
+-- FTS-/Touch-Trigger, die durch DROP TABLE mit verschwunden sind, neu anlegen
+-- (Spiegel von Migration 008_fts_belege.sql, Abschnitt Positionen).
+-- ---------------------------------------------------------------------------
+CREATE TRIGGER IF NOT EXISTS angebot_pos_ai AFTER INSERT ON angebot_position BEGIN
+  UPDATE angebot SET geaendert_am = datetime('now') WHERE id = NEW.angebot_id;
+END;
+CREATE TRIGGER IF NOT EXISTS angebot_pos_ad AFTER DELETE ON angebot_position BEGIN
+  UPDATE angebot SET geaendert_am = datetime('now') WHERE id = OLD.angebot_id;
+END;
+CREATE TRIGGER IF NOT EXISTS rechnung_pos_ai AFTER INSERT ON rechnung_position BEGIN
+  UPDATE rechnung SET geaendert_am = datetime('now') WHERE id = NEW.rechnung_id;
+END;
+CREATE TRIGGER IF NOT EXISTS rechnung_pos_ad AFTER DELETE ON rechnung_position BEGIN
+  UPDATE rechnung SET geaendert_am = datetime('now') WHERE id = OLD.rechnung_id;
+END;
