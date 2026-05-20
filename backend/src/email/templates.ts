@@ -195,32 +195,28 @@ const BANK_BLOCK =
 const DEFAULTS: DefaultVorlage[] = [
   // -------- Angebot --------
   {
-    seedKey: "angebot.versand.v3",
+    seedKey: "angebot.versand.v4",
     name: "Angebot Versand",
     kontext: "angebot",
     betreff: "Angebot {{angebot.nummer}}",
     bodyHtml:
       P("{{anrede.zeile}}") +
-      P("im Anhang erhalten Sie unser Angebot {{angebot.nummer}} vom {{angebot.datum}} über {{angebot.summe}} brutto. Das Angebot ist gültig bis zum {{angebot.gueltigBis}}.") +
-      P("Bei Fragen oder Anpassungswünschen melden Sie sich gerne.") +
-      P("Mit freundlichen Grüßen"),
+      P("im Anhang erhalten Sie unser Angebot {{angebot.nummer}} vom {{angebot.datum}} über {{angebot.summe}} brutto. Das Angebot ist gültig bis zum {{angebot.gueltigBis}}."),
   },
 
   // -------- Rechnung --------
   {
-    seedKey: "rechnung.versand.v3",
+    seedKey: "rechnung.versand.v4",
     name: "Rechnung Versand",
     kontext: "rechnung",
     betreff: "Rechnung {{rechnung.nummer}}",
     bodyHtml:
       P("{{anrede.zeile}}") +
       P("im Anhang erhalten Sie unsere Rechnung {{rechnung.nummer}} vom {{rechnung.datum}} über {{rechnung.summe}} brutto.") +
-      P("Bitte überweisen Sie den Betrag bis zum {{rechnung.faellig}} auf folgendes Konto:<br>" + BANK_BLOCK) +
-      P("Vielen Dank für die Zusammenarbeit.") +
-      P("Mit freundlichen Grüßen"),
+      P("Bitte überweisen Sie den Betrag bis zum {{rechnung.faellig}} auf folgendes Konto:<br>" + BANK_BLOCK),
   },
   {
-    seedKey: "rechnung.erinnerung.v3",
+    seedKey: "rechnung.erinnerung.v4",
     name: "Zahlungserinnerung",
     kontext: "rechnung",
     betreff: "Zahlungserinnerung zu Rechnung {{rechnung.nummer}}",
@@ -228,13 +224,12 @@ const DEFAULTS: DefaultVorlage[] = [
       P("{{anrede.zeile}}") +
       P("die Rechnung {{rechnung.nummer}} vom {{rechnung.datum}} über {{rechnung.summe}} ist seit dem {{rechnung.faellig}} fällig. Bislang konnten wir keinen Zahlungseingang feststellen.") +
       P("Wir bitten Sie, den offenen Betrag von {{rechnung.offen}} auf folgendes Konto zu überweisen:<br>" + BANK_BLOCK) +
-      P("Sollte die Zahlung bereits erfolgt sein, ist diese Nachricht gegenstandslos.") +
-      P("Mit freundlichen Grüßen"),
+      P("Sollte die Zahlung bereits erfolgt sein, ist diese Nachricht gegenstandslos."),
   },
 
   // -------- Mahnung --------
   {
-    seedKey: "mahnung.stufe2.v3",
+    seedKey: "mahnung.stufe2.v4",
     name: "Mahnung Stufe 2",
     kontext: "mahnung",
     betreff: "2. Mahnung zu Rechnung {{rechnung.nummer}}",
@@ -242,11 +237,10 @@ const DEFAULTS: DefaultVorlage[] = [
       P("{{anrede.zeile}}") +
       P("die Rechnung {{rechnung.nummer}} vom {{rechnung.datum}} ist trotz unserer Erinnerung weiterhin offen. Aktuell sind {{rechnung.offen}} ausstehend, dazu kommen Mahngebühren in Höhe von {{mahnung.gebuehr}}. Die Gesamtforderung beträgt {{mahnung.gesamtForderung}}.") +
       P("Wir bitten Sie, den Gesamtbetrag bis spätestens {{mahnung.neueFrist}} auf folgendes Konto zu überweisen:<br>" + BANK_BLOCK) +
-      P("Sollte die Zahlung in den letzten Tagen bereits erfolgt sein, betrachten Sie dieses Schreiben bitte als gegenstandslos.") +
-      P("Mit freundlichen Grüßen"),
+      P("Sollte die Zahlung in den letzten Tagen bereits erfolgt sein, betrachten Sie dieses Schreiben bitte als gegenstandslos."),
   },
   {
-    seedKey: "mahnung.stufe3.v3",
+    seedKey: "mahnung.stufe3.v4",
     name: "Letzte Mahnung",
     kontext: "mahnung",
     betreff: "Letzte Mahnung zu Rechnung {{rechnung.nummer}}",
@@ -254,21 +248,18 @@ const DEFAULTS: DefaultVorlage[] = [
       P("{{anrede.zeile}}") +
       P("zur Rechnung {{rechnung.nummer}} vom {{rechnung.datum}} liegt uns trotz mehrfacher Erinnerung kein Zahlungseingang vor. Offen sind {{rechnung.offen}} zuzüglich Mahngebühren von {{mahnung.gebuehr}}. Die Gesamtforderung beträgt {{mahnung.gesamtForderung}}.") +
       P("Wir setzen Ihnen hiermit eine letzte Frist bis zum {{mahnung.neueFrist}}. Bitte überweisen Sie den vollständigen Betrag auf folgendes Konto:<br>" + BANK_BLOCK) +
-      P("Sollte bis zu diesem Termin kein Zahlungseingang erfolgen, behalten wir uns weitere Schritte vor.") +
-      P("Mit freundlichen Grüßen"),
+      P("Sollte bis zu diesem Termin kein Zahlungseingang erfolgen, behalten wir uns weitere Schritte vor."),
   },
 
   // -------- Protokoll --------
   {
-    seedKey: "protokoll.versand.v3",
+    seedKey: "protokoll.versand.v4",
     name: "Protokoll Versand",
     kontext: "protokoll",
     betreff: "Protokoll {{protokoll.nummer}}",
     bodyHtml:
       P("{{anrede.zeile}}") +
-      P("im Anhang erhalten Sie das unterzeichnete Protokoll {{protokoll.nummer}} vom {{protokoll.datum}} zu Ihrer Ablage.") +
-      P("Bei Rückfragen melden Sie sich gerne.") +
-      P("Mit freundlichen Grüßen"),
+      P("im Anhang erhalten Sie das unterzeichnete Protokoll {{protokoll.nummer}} vom {{protokoll.datum}} zu Ihrer Ablage."),
   },
 ];
 
