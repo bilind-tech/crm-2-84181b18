@@ -1,37 +1,39 @@
-# Fix: Rechnung mit „Stundenweise"-Position → Internal Server Error
+## Drei PDF-Korrekturen (Angebot + Rechnung)
 
-## Ursache
+Alle Änderungen betreffen den PDF-Renderer. Da Frontend (`src/lib/pdf/belegPdf.ts`) und Backend (`backend/src/pdf/layout.ts`) identische Logik haben, werden beide Dateien parallel angepasst.
 
-In Migration `007_angebote_rechnungen.sql` haben die Tabellen `angebot_position` und `rechnung_position` einen CHECK-Constraint:
+### 1. „Std." statt „h" bei Stunden-Positionen
+In `stundenText()` die Ausgabe von `"${menge} h"` auf `"${menge} Std."` ändern.
 
-```sql
-modus TEXT NOT NULL DEFAULT 'einzel' CHECK (modus IN ('einzel','pauschal'))
-```
+### 2. Beschreibungstext nicht mehr automatisch als Bullet-Liste
+Aktuell macht `beschreibungBlock()` aus jeder Zeile nach der ersten automatisch einen Bullet-Punkt — auch ohne `•`/`-`/`*`. Beispiel: „Büro Grundreinigung\nAm Grauen Stein 27, Köln" → „Köln-Zeile" bekommt einen Punkt davor.
 
-Code, API-Schema (`positionSchema`) und PDF-Layout kennen aber bereits den dritten Wert `'stunden'`. Beim Insert einer Stunden-Position bricht SQLite mit „CHECK constraint failed" ab → das Backend antwortet 500 „Internal Server Error" → Frontend zeigt „Rechnung konnte nicht angelegt werden".
+Neue Regel:
+- Erste nicht-leere Zeile = fetter Titel (wie bisher).
+- Folgezeilen werden **nur dann** als Bullets gerendert, wenn sie mit `•`, `-` oder `*` beginnen.
+- Folgezeilen ohne Marker werden als normale Textzeilen (Stack) untereinander gerendert — kein Bullet-Punkt.
+- Mischung erlaubt (z. B. Adresse + danach 3 Bullet-Punkte funktioniert).
 
-SQLite kann CHECK-Constraints nicht per `ALTER TABLE` ändern — die Tabellen müssen neu aufgebaut werden.
+### 3. Ansprechpartner im Empfänger-Adressblock anzeigen
+Aktuell zeigt der große Adressblock links nur: Firmenname, Person (aus Kunde-Stammdaten), Straße, PLZ Ort. Der explizit am Beleg gewählte **Ansprechpartner** (`ap`) wird ignoriert.
 
-## Lösung
+Neu in `kundeAdresse(k, ap)`:
+- Zeile 1: Firmenname (falls vorhanden)
+- Zeile 2: Ansprechpartner-Name (`ap.vorname ap.nachname`), Fallback auf Kunde `vorname nachname`
+- Zeile 3: Straße
+- Zeile 4: PLZ + Ort
+- Zeile 5: Land (falls ≠ Deutschland)
 
-Neue Migration `032_position_modus_stunden.sql` anlegen, die für beide Positions-Tabellen den CHECK-Constraint auf `('einzel','pauschal','stunden')` erweitert. Schritte je Tabelle (Standard-SQLite-Pattern):
+Signatur wird um `ap?: Ansprechpartner` erweitert und beide Aufrufstellen (Angebot/Rechnung) übergeben den vorhandenen Ansprechpartner.
 
-1. `PRAGMA defer_foreign_keys = ON;` — funktioniert innerhalb der Migrations-Transaktion.
-2. Bestehende FTS-/Touch-Trigger, die `angebot_position`/`rechnung_position` referenzieren, vor dem Rebuild droppen.
-3. Neue Tabelle `*_position_new` mit identischem Schema, aber erweitertem CHECK anlegen.
-4. Daten 1:1 per `INSERT INTO ..._new SELECT * FROM ...` kopieren.
-5. Alte Tabelle droppen, neue umbenennen.
-6. Bestehende Indizes (`ix_angebot_pos_angebot`, `ix_rechnung_pos_rechnung`) neu erstellen.
-7. FTS-/Touch-Trigger aus Migration `008_fts_belege.sql` neu anlegen.
+### Technische Details
 
-Alle Spalten, Defaults, NOT-NULL-Regeln und FK-Verweise (`angebot_id`/`rechnung_id` → `angebot`/`rechnung` ON DELETE CASCADE) bleiben unverändert. Keine Datenverluste — bestehende Positionen haben modus `einzel` oder `pauschal` und passen weiter in den erweiterten CHECK.
+Dateien:
+- `src/lib/pdf/belegPdf.ts` — Funktionen `stundenText`, `beschreibungBlock`, `kundeAdresse` + Aufruf in `baseContent`
+- `backend/src/pdf/layout.ts` — gleiche drei Funktionen spiegeln
 
-## Betroffene Datei
+Nicht betroffen:
+- Datenmodell, Validierung, Belegnummern, Tabellenspalten, Summen
+- Backend-Migration (Schema unverändert)
 
-- `backend/src/db/migrations/032_position_modus_stunden.sql` (neu)
-
-Kein Code- oder Frontend-Change nötig — Mapper, API-Validator und PDF-Renderer kennen `stunden` bereits.
-
-## Verifikation
-
-Nach Migration: Rechnung mit Position-Modus „Stunden" anlegen → 200/201 statt 500, Position wird gespeichert, PDF rendert die Stunden-Spalte.
+Tests: bestehende `backend/test/pdf.spec.ts` läuft weiter (Smoke-Test prüft nur Header/Buffer, kein Pixel-Diff).
