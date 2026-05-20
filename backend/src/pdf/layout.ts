@@ -35,28 +35,32 @@ function beschreibungBlock(text: string): unknown {
   const zeilen = (text || "").split("\n");
   const items: unknown[] = [];
   const bullets: string[] = [];
+  const plainLines: string[] = [];
   let titel: string | null = null;
   for (const z of zeilen) {
     const t = z.trim();
     if (!t) continue;
     const bm = t.match(/^[•\-*]\s+(.*)$/);
     if (bm) bullets.push(bm[1]);
-    else if (!titel && bullets.length === 0) titel = t;
-    else bullets.push(t);
+    else if (!titel) titel = t;
+    else plainLines.push(t);
   }
   if (titel) items.push({ text: titel, fontSize: 10, bold: true, margin: [0, 0, 0, 2] });
+  for (const line of plainLines) {
+    items.push({ text: line, fontSize: 10, margin: [0, 0, 0, 0] });
+  }
   if (bullets.length > 0) {
     items.push({ ul: bullets.map((b) => ({ text: b, fontSize: 10 })), margin: [0, 0, 0, 0] });
-  } else if (!titel) {
-    items.push({ text: text || "", fontSize: 10 });
   }
+  if (items.length === 0) items.push({ text: text || "", fontSize: 10 });
   return { stack: items };
 }
 
-function kundeAdresse(k: ApiKunde): string[] {
+function kundeAdresse(k: ApiKunde, ap?: ApiAnsprechpartner): string[] {
   const lines: string[] = [];
   if (k.firmenname) lines.push(k.firmenname);
-  const person = [k.vorname, k.nachname].filter(Boolean).join(" ");
+  const apPerson = ap ? [ap.vorname, ap.nachname].filter(Boolean).join(" ").trim() : "";
+  const person = apPerson || [k.vorname, k.nachname].filter(Boolean).join(" ");
   if (person) lines.push(person);
   if (k.strasse) lines.push(k.strasse);
   const plzOrt = [k.plz, k.ort].filter(Boolean).join(" ");
@@ -122,7 +126,7 @@ function hasStundenPositionen(positionen: ApiPosition[]): boolean {
 function stundenText(p: ApiPosition): string {
   if (p.modus !== "stunden") return "";
   const menge = p.menge.toLocaleString("de-DE", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
-  return `${menge} h`;
+  return `${menge} Std.`;
 }
 function abrechnungsartText(p: ApiPosition): string {
   if (p.ausfuehrung && p.ausfuehrung.trim()) return p.ausfuehrung;
@@ -325,7 +329,7 @@ function buildDoc(args: BuildArgs) {
         columns: [
           {
             width: "*",
-            stack: kundeAdresse(args.kunde).map((l, i) => ({
+            stack: kundeAdresse(args.kunde, args.ansprechpartner).map((l, i) => ({
               text: l,
               fontSize: 10,
               bold: i === 0,
