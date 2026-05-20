@@ -33,6 +33,7 @@ import { driveRoutes } from "./routes/drive.js";
 import { emailRoutes } from "./routes/email.js";
 import { externRoutes } from "./routes/extern.js";
 import { datenbankRoutes } from "./routes/datenbank.js";
+import { testdatenResetRoutes } from "./routes/testdaten-reset.js";
 import { dauerauftragRoutes } from "./routes/dauerauftrag.js";
 import { dashboardRoutes } from "./routes/dashboard.js";
 import { seedOrUpdateDefaultVorlagen } from "./email/templates.js";
@@ -257,6 +258,7 @@ async function main(): Promise<void> {
   await app.register(emailRoutes);
   await app.register(externRoutes);
   await app.register(datenbankRoutes);
+  await app.register(testdatenResetRoutes);
   await app.register(dauerauftragRoutes);
   await app.register(dashboardRoutes);
 
