@@ -184,137 +184,91 @@ interface DefaultVorlage {
 
 const P = (s: string) => `<p style="margin:0 0 12px 0">${s}</p>`;
 
+// Bankblock einmal definieren, damit alle Vorlagen einheitlich bleiben.
+const BANK_BLOCK =
+  "Empfänger: {{firma.name}}<br>" +
+  "IBAN: {{firma.iban}}<br>" +
+  "BIC: {{firma.bic}}<br>" +
+  "Bank: {{firma.bank}}<br>" +
+  "Verwendungszweck: {{rechnung.nummer}}";
+
 const DEFAULTS: DefaultVorlage[] = [
   // -------- Angebot --------
   {
-    seedKey: "angebot.standard.v2",
+    seedKey: "angebot.versand.v3",
     name: "Angebot Versand",
     kontext: "angebot",
-    betreff: "Ihr Angebot {{angebot.nummer}} von {{firma.name}}",
+    betreff: "Angebot {{angebot.nummer}}",
     bodyHtml:
       P("{{anrede.zeile}}") +
-      P("vielen Dank für Ihr Interesse an unseren Leistungen. Im Anhang finden Sie unser Angebot <strong>{{angebot.nummer}}</strong> über {{angebot.summe}} brutto, gültig bis {{angebot.gueltigBis}}.") +
-      P("Wir haben den Vorschlag genau auf Ihre Anforderungen abgestimmt.") +
-      P("Wir freuen uns auf Ihre Rückmeldung."),
-  },
-  {
-    seedKey: "angebot.nachfass.v2",
-    name: "Angebot freundlich nachfassen",
-    kontext: "angebot",
-    betreff: "Kurze Nachfrage zu Ihrem Angebot {{angebot.nummer}}",
-    bodyHtml:
-      P("{{anrede.zeile}}") +
-      P("vor einigen Tagen haben wir Ihnen unser Angebot <strong>{{angebot.nummer}}</strong> vom {{angebot.datum}} zugesendet. Wir wollten kurz nachfragen, ob bereits eine Entscheidung absehbar ist.") +
-      P("Falls noch Informationen fehlen oder Sie sich Anpassungen wünschen, passen wir das Angebot selbstverständlich gerne an.") +
-      P("Wir freuen uns auf Ihre Rückmeldung."),
-  },
-  {
-    seedKey: "angebot.auftragsbestaetigung.v2",
-    name: "Auftragsbestätigung",
-    kontext: "angebot",
-    betreff: "Auftragsbestätigung zu Angebot {{angebot.nummer}}",
-    bodyHtml:
-      P("{{anrede.zeile}}") +
-      P("vielen Dank für Ihren Auftrag. Wir bestätigen die Annahme unseres Angebots <strong>{{angebot.nummer}}</strong> über {{angebot.summe}} brutto.") +
-      P("Wir melden uns in Kürze mit den nächsten Schritten zur Terminabstimmung.") +
-      P("Wir freuen uns sehr auf die Zusammenarbeit."),
+      P("im Anhang erhalten Sie unser Angebot {{angebot.nummer}} vom {{angebot.datum}} über {{angebot.summe}} brutto. Das Angebot ist gültig bis zum {{angebot.gueltigBis}}.") +
+      P("Bei Fragen oder Anpassungswünschen melden Sie sich gerne.") +
+      P("Mit freundlichen Grüßen"),
   },
 
   // -------- Rechnung --------
   {
-    seedKey: "rechnung.standard.v2",
+    seedKey: "rechnung.versand.v3",
     name: "Rechnung Versand",
     kontext: "rechnung",
-    betreff: "Ihre Rechnung {{rechnung.nummer}} von {{firma.name}}",
+    betreff: "Rechnung {{rechnung.nummer}}",
     bodyHtml:
       P("{{anrede.zeile}}") +
-      P("anbei senden wir Ihnen die Rechnung <strong>{{rechnung.nummer}}</strong> vom {{rechnung.datum}} über {{rechnung.summe}} brutto.") +
-      P("Wir bitten Sie, den Betrag bis zum <strong>{{rechnung.faellig}}</strong> auf folgendes Konto zu überweisen:<br>" +
-        "Empfänger: {{firma.name}}<br>IBAN: {{firma.iban}}<br>BIC: {{firma.bic}}<br>Bank: {{firma.bank}}<br>Verwendungszweck: {{rechnung.nummer}}") +
-      P("Vielen Dank für Ihr Vertrauen."),
+      P("im Anhang erhalten Sie unsere Rechnung {{rechnung.nummer}} vom {{rechnung.datum}} über {{rechnung.summe}} brutto.") +
+      P("Bitte überweisen Sie den Betrag bis zum {{rechnung.faellig}} auf folgendes Konto:<br>" + BANK_BLOCK) +
+      P("Vielen Dank für die Zusammenarbeit.") +
+      P("Mit freundlichen Grüßen"),
   },
   {
-    seedKey: "rechnung.erinnerung.v2",
-    name: "Zahlungserinnerung freundlich",
+    seedKey: "rechnung.erinnerung.v3",
+    name: "Zahlungserinnerung",
     kontext: "rechnung",
-    betreff: "Freundliche Erinnerung zu Rechnung {{rechnung.nummer}}",
+    betreff: "Zahlungserinnerung zu Rechnung {{rechnung.nummer}}",
     bodyHtml:
       P("{{anrede.zeile}}") +
-      P("vermutlich ist es im Tagesgeschäft untergegangen. Unsere Rechnung <strong>{{rechnung.nummer}}</strong> vom {{rechnung.datum}} über {{rechnung.summe}} ist aktuell noch offen. Es sind {{rechnung.offen}} ausstehend.") +
-      P("Bitte prüfen Sie den Vorgang und überweisen Sie den Betrag in den nächsten Tagen auf folgendes Konto:<br>" +
-        "Empfänger: {{firma.name}}<br>IBAN: {{firma.iban}}<br>BIC: {{firma.bic}}<br>Verwendungszweck: {{rechnung.nummer}}") +
-      P("Falls die Zahlung bereits unterwegs ist, betrachten Sie diese Nachricht bitte als gegenstandslos.") +
-      P("Vielen Dank für Ihre Aufmerksamkeit."),
-  },
-  {
-    seedKey: "rechnung.zahlungseingang.v2",
-    name: "Zahlungseingang Bestätigung",
-    kontext: "rechnung",
-    betreff: "Zahlungseingang zu Rechnung {{rechnung.nummer}}",
-    bodyHtml:
-      P("{{anrede.zeile}}") +
-      P("vielen Dank, wir haben Ihre Zahlung zu Rechnung <strong>{{rechnung.nummer}}</strong> über {{rechnung.summe}} erhalten. Der Vorgang ist damit für uns abgeschlossen.") +
-      P("Wir freuen uns auf die weitere Zusammenarbeit."),
+      P("die Rechnung {{rechnung.nummer}} vom {{rechnung.datum}} über {{rechnung.summe}} ist seit dem {{rechnung.faellig}} fällig. Bislang konnten wir keinen Zahlungseingang feststellen.") +
+      P("Wir bitten Sie, den offenen Betrag von {{rechnung.offen}} auf folgendes Konto zu überweisen:<br>" + BANK_BLOCK) +
+      P("Sollte die Zahlung bereits erfolgt sein, ist diese Nachricht gegenstandslos.") +
+      P("Mit freundlichen Grüßen"),
   },
 
   // -------- Mahnung --------
   {
-    seedKey: "mahnung.stufe1.v2",
-    name: "Mahnung Stufe 1",
-    kontext: "mahnung",
-    betreff: "Zahlungserinnerung zu Rechnung {{rechnung.nummer}}",
-    bodyHtml:
-      P("{{anrede.zeile}}") +
-      P("die Rechnung <strong>{{rechnung.nummer}}</strong> vom {{rechnung.datum}} über {{rechnung.summe}} ist seit {{mahnung.tageUeberfaellig}} Tagen überfällig. Aktuell sind noch {{rechnung.offen}} offen.") +
-      P("Wir bitten Sie, den ausstehenden Betrag bis zum <strong>{{mahnung.neueFrist}}</strong> auf folgendes Konto zu überweisen:<br>" +
-        "Empfänger: {{firma.name}}<br>IBAN: {{firma.iban}}<br>BIC: {{firma.bic}}<br>Verwendungszweck: {{rechnung.nummer}}") +
-      P("Sollten Sie die Zahlung in den letzten Tagen bereits veranlasst haben, betrachten Sie dieses Schreiben bitte als gegenstandslos."),
-  },
-  {
-    seedKey: "mahnung.stufe2.v2",
+    seedKey: "mahnung.stufe2.v3",
     name: "Mahnung Stufe 2",
     kontext: "mahnung",
     betreff: "2. Mahnung zu Rechnung {{rechnung.nummer}}",
     bodyHtml:
       P("{{anrede.zeile}}") +
-      P("trotz unserer Erinnerung ist die Rechnung <strong>{{rechnung.nummer}}</strong> vom {{rechnung.datum}} weiterhin offen. Aktuell sind {{rechnung.offen}} ausstehend, dazu kommen Mahngebühren in Höhe von {{mahnung.gebuehr}}. Die Gesamtforderung beträgt damit <strong>{{mahnung.gesamtForderung}}</strong>.") +
-      P("Wir bitten Sie, den Gesamtbetrag bis spätestens <strong>{{mahnung.neueFrist}}</strong> auf folgendes Konto zu überweisen:<br>" +
-        "Empfänger: {{firma.name}}<br>IBAN: {{firma.iban}}<br>BIC: {{firma.bic}}<br>Verwendungszweck: {{rechnung.nummer}}") +
-      P("Bitte nehmen Sie diese Mahnung ernst. Sollte es Gründe geben, die einer fristgerechten Zahlung entgegenstehen, melden Sie sich bitte umgehend bei uns, damit wir gemeinsam eine Lösung finden können."),
+      P("die Rechnung {{rechnung.nummer}} vom {{rechnung.datum}} ist trotz unserer Erinnerung weiterhin offen. Aktuell sind {{rechnung.offen}} ausstehend, dazu kommen Mahngebühren in Höhe von {{mahnung.gebuehr}}. Die Gesamtforderung beträgt {{mahnung.gesamtForderung}}.") +
+      P("Wir bitten Sie, den Gesamtbetrag bis spätestens {{mahnung.neueFrist}} auf folgendes Konto zu überweisen:<br>" + BANK_BLOCK) +
+      P("Sollte die Zahlung in den letzten Tagen bereits erfolgt sein, betrachten Sie dieses Schreiben bitte als gegenstandslos.") +
+      P("Mit freundlichen Grüßen"),
   },
   {
-    seedKey: "mahnung.stufe3.v2",
-    name: "Mahnung Stufe 3 letzte",
+    seedKey: "mahnung.stufe3.v3",
+    name: "Letzte Mahnung",
     kontext: "mahnung",
     betreff: "Letzte Mahnung zu Rechnung {{rechnung.nummer}}",
     bodyHtml:
       P("{{anrede.zeile}}") +
-      P("zur Rechnung <strong>{{rechnung.nummer}}</strong> vom {{rechnung.datum}} ist trotz mehrfacher Erinnerung kein Zahlungseingang zu verzeichnen. Aktuell sind {{rechnung.offen}} offen, zuzüglich Mahngebühren von {{mahnung.gebuehr}}. Die Gesamtforderung beträgt <strong>{{mahnung.gesamtForderung}}</strong>.") +
-      P("Wir setzen Ihnen hiermit eine letzte Frist bis zum <strong>{{mahnung.neueFrist}}</strong>. Bitte überweisen Sie den vollständigen Betrag auf folgendes Konto:<br>" +
-        "Empfänger: {{firma.name}}<br>IBAN: {{firma.iban}}<br>BIC: {{firma.bic}}<br>Verwendungszweck: {{rechnung.nummer}}") +
-      P("Sollte bis zu diesem Termin kein Zahlungseingang erfolgen, sehen wir uns gezwungen, die Forderung an ein Inkassobüro abzugeben oder gerichtliche Schritte einzuleiten. Bitte vermeiden Sie diesen Weg und reagieren Sie zeitnah."),
+      P("zur Rechnung {{rechnung.nummer}} vom {{rechnung.datum}} liegt uns trotz mehrfacher Erinnerung kein Zahlungseingang vor. Offen sind {{rechnung.offen}} zuzüglich Mahngebühren von {{mahnung.gebuehr}}. Die Gesamtforderung beträgt {{mahnung.gesamtForderung}}.") +
+      P("Wir setzen Ihnen hiermit eine letzte Frist bis zum {{mahnung.neueFrist}}. Bitte überweisen Sie den vollständigen Betrag auf folgendes Konto:<br>" + BANK_BLOCK) +
+      P("Sollte bis zu diesem Termin kein Zahlungseingang erfolgen, behalten wir uns weitere Schritte vor.") +
+      P("Mit freundlichen Grüßen"),
   },
 
-  // -------- Allgemein --------
+  // -------- Protokoll --------
   {
-    seedKey: "allgemein.anfrage.v2",
-    name: "Allgemeine Nachricht",
-    kontext: "allgemein",
-    betreff: "Nachricht von {{firma.name}}",
+    seedKey: "protokoll.versand.v3",
+    name: "Protokoll Versand",
+    kontext: "protokoll",
+    betreff: "Protokoll {{protokoll.nummer}}",
     bodyHtml:
       P("{{anrede.zeile}}") +
-      P("vielen Dank für Ihre Nachricht. Wir melden uns hiermit zu Ihrem Anliegen.") +
-      P("Bitte ergänzen Sie hier den eigentlichen Inhalt Ihrer Nachricht."),
-  },
-  {
-    seedKey: "allgemein.danke.v2",
-    name: "Dankesnachricht",
-    kontext: "allgemein",
-    betreff: "Vielen Dank von {{firma.name}}",
-    bodyHtml:
-      P("{{anrede.zeile}}") +
-      P("wir möchten uns kurz für die angenehme Zusammenarbeit und Ihr Vertrauen bedanken. Es freut uns sehr, Sie zu unseren Kundinnen und Kunden zählen zu dürfen.") +
-      P("Sollten Sie zukünftig weitere Anliegen haben, sind wir gerne für Sie da."),
+      P("im Anhang erhalten Sie das unterzeichnete Protokoll {{protokoll.nummer}} vom {{protokoll.datum}} zu Ihrer Ablage.") +
+      P("Bei Rückfragen melden Sie sich gerne.") +
+      P("Mit freundlichen Grüßen"),
   },
 ];
 
