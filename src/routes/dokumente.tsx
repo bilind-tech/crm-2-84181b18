@@ -208,39 +208,14 @@ function Page() {
         }
       />
 
-      {/* Breadcrumb + Ordner-Aktionen */}
-      <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-border bg-card p-2">
-        <div className="flex flex-1 flex-wrap items-center gap-1 text-sm">
-          <button
-            type="button"
-            onClick={() => setOrdner(null)}
-            className={`flex items-center gap-1 rounded-md px-2 py-1 hover:bg-muted ${aktuellerOrdnerId === null ? "font-semibold" : ""}`}
-          >
-            <Home className="h-3.5 w-3.5" /> Alle Dokumente
-          </button>
-          {pfad.map((o, i) => (
-            <span key={o.id} className="flex items-center gap-1">
-              <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
-              <button
-                type="button"
-                onClick={() => setOrdner(o.id)}
-                className={`rounded-md px-2 py-1 hover:bg-muted ${i === pfad.length - 1 ? "font-semibold" : ""}`}
-              >
-                {o.name}
-              </button>
-            </span>
-          ))}
-        </div>
-        <Button variant="outline" size="sm" onClick={() => setNeuOrdnerParent(aktuellerOrdnerId)} className="rounded-lg">
-          <FolderPlus className="mr-1.5 h-4 w-4" /> Neuer Ordner
-        </Button>
-        {aktuellerOrdnerId && (
+      {aktuellerOrdnerId && (
+        <div className="flex justify-end">
           <label className="flex items-center gap-1.5 px-2 text-xs text-muted-foreground">
             <input type="checkbox" checked={!!recursive} onChange={(e) => setRecursive(e.target.checked)} />
             inkl. Unterordner
           </label>
-        )}
-      </div>
+        </div>
+      )}
 
       <div className="grid gap-4 lg:grid-cols-[260px_1fr]">
         {/* Ordner-Sidebar */}
