@@ -9,6 +9,7 @@ import type {
   Kunde,
   Firmendaten,
   Ansprechpartner,
+  Objekt,
 } from "@/lib/api/types";
 import logoUrl from "@/assets/logo.png";
 import { A4, createHotspotTracker, type RuntimeHotspot } from "./hotspotTracker";
@@ -160,16 +161,21 @@ function beschreibungBlock(text: string): unknown {
   return { stack: items };
 }
 
-function kundeAdresse(k: Kunde, ap?: Ansprechpartner) {
+function kundeAdresse(k: Kunde, ap?: Ansprechpartner, o?: Objekt | null) {
   const lines: string[] = [];
   if (k.firmenname) lines.push(k.firmenname);
   const apPerson = ap ? [ap.vorname, ap.nachname].filter(Boolean).join(" ").trim() : "";
   const person = apPerson || [k.vorname, k.nachname].filter(Boolean).join(" ");
   if (person) lines.push(person);
-  if (k.strasse) lines.push(k.strasse);
-  const plzOrt = [k.plz, k.ort].filter(Boolean).join(" ");
+  // Adresse: bevorzugt vom Kunden, sonst Fallback aus dem Objekt.
+  const strasse = k.strasse || o?.strasse || "";
+  const plz = k.plz || o?.plz || "";
+  const ort = k.ort || o?.ort || "";
+  if (strasse) lines.push(strasse);
+  const plzOrt = [plz, ort].filter(Boolean).join(" ");
   if (plzOrt) lines.push(plzOrt);
-  if (k.land && k.land !== "Deutschland") lines.push(k.land);
+  const land = k.land || o?.land;
+  if (land && land !== "Deutschland") lines.push(land);
   return lines;
 }
 
