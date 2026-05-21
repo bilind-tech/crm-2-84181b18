@@ -89,7 +89,7 @@ export async function driftCheckDokumente(): Promise<DriftResult> {
   const dokumente = listDokumente({ limit: 1000 } as never);
   for (const d of dokumente) {
     const fileId = d.drive?.fileId ?? null;
-    const hatFehler = !!d.drive?.error;
+    const hatFehler = d.drive?.status === "fehler" || !!d.drive?.fehlerText;
     if (!fileId || hatFehler) {
       try {
         const ok = await backfillOne("dokument", d.id);
