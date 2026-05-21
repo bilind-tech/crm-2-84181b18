@@ -1,42 +1,37 @@
-# Fix: Pauschal-Belege über mehrere Seiten + falsche Summen in Listen
+## Problemanalyse
 
-Zwei voneinander unabhängige Bugs, beide bestätigt im Code. Helfer `src/lib/belege/summen.ts` existiert bereits, wird in den Listen aber nicht genutzt.
+Die zwei Bugs in der PDF-Vorschau im Beleg-Editor (Live-Preview) kommen beide aus `src/lib/pdf/belegPdf.ts`. Der frühere Fix wurde nur in `backend/src/pdf/layout.ts` ausgeliefert — der Editor nutzt aber den Frontend-Generator, dort steht der alte Code noch.
 
-## Bug 1 — Listen zeigen 0 € bei Pauschal-Positionen
+### Bug 1 — Tabelle springt komplett auf Seite 2
+In `leistungstabelle()` (Frontend) ist alles in *einer* Tabelle gebündelt mit:
+- `dontBreakRows: true` → eine Zeile mit sehr langer Pauschal-Beschreibung passt nicht mehr auf den Rest von Seite 1 und wird komplett auf Seite 2 verschoben
+- `keepWithHeaderRows: 1` → Header wandert mit, also bleibt Seite 1 ohne Tabelle
+- Die Summenzeilen (MwSt + Gesamt) liegen im selben Body, hängen also an derselben unteren Kante
 
-**Wo:** `src/routes/rechnungen.tsx:73` und `src/routes/angebote.tsx:91`
-Beide rechnen nur `menge * einzelpreisNetto * (1 - rabatt/100)`. Bei Pauschal-Positionen ist `einzelpreisNetto = 0`, der Wert liegt in `pauschalpreisNetto` → Liste zeigt 0 €. Detailseite + PDF rechnen schon korrekt.
+Zusätzlich hat der Intro-Block (Anrede + Einleitungstext) `unbreakable: true`, was die Verschiebung noch verschärft.
 
-**Fix:**
-- `summePosition` / `summenRechnung` aus `src/lib/belege/summen.ts` verwenden (existiert, deckt Pauschal-Modus ab).
-- `brutto(r)` in `rechnungen.tsx` umstellen auf `summenRechnung(r.positionen, r.rabattGesamt).brutto`.
-- Inline-Summe in `angebote.tsx` (Zeile ~91) ebenfalls auf `summenRechnung(...)` umstellen.
-- Keine Steuer-/Rabatt-Logik ändern, nur die Position-Berechnung.
+### Bug 2 — Empfänger-Adresse leer trotz Objekt
+`generateRechnungPdf(rechnung, kunde, firma, ansprechpartner, objekt?)` akzeptiert zwar ein `objekt`, aber:
+- `PdfEditorLayout` nimmt das `objekt` gar nicht als Prop entgegen
+- `LivePdfPreview` ruft die Generator-Funktion ohne `objekt` auf
 
-## Bug 2 — Lange Pauschal-Beschreibung → Tabelle wird nicht gerendert / kein Seitenumbruch
+Dadurch greift der bereits vorhandene Fallback in `kundeAdresse()` (Kunden-Adresse → Objekt-Adresse) in der Live-Preview nie. Im Backend-PDF (Versand, Download) funktioniert es bereits.
 
-**Wo:** `backend/src/pdf/layout.ts`
-- `leistungstabelle` (Z. 187): `dontBreakRows: true` verhindert, dass eine einzelne Zeile mit sehr langer Beschreibung über die Seite umgebrochen wird. Wenn die Zeile höher als eine Seite ist, "verschluckt" pdfmake die Tabelle.
-- Intro-Block (Z. 378–383) und Outro-Block (Z. 386–393) sind beide `unbreakable: true`. Bei langem Intro kann die Seite eskalieren.
+## Änderungen
 
-**Fix:**
-- `dontBreakRows: false` (Default) setzen, `keepWithHeaderRows: 1` lassen → Header wandert mit, lange Position-Zeilen brechen sauber um.
-- Die zwei Summenzeilen (MwSt + Gesamtbetrag) in eine eigene kleine Tabelle direkt darunter auslagern, **mit** `dontBreakRows: true` und `keepWithHeaderRows` der zweiten Zeile, damit „MwSt" und „Gesamtbetrag" nicht getrennt werden.
-- `unbreakable: true` am Intro-Stack (Z. 383) entfernen — Intro darf brechen. Am Outro-Stack (Z. 392) belassen (klein, soll mit Gruß zusammenbleiben).
-- Kurze Belege bleiben optisch identisch.
+### 1. `src/lib/pdf/belegPdf.ts` — Tabelle korrekt umbrechen
+- `leistungstabelle()` in zwei Tabellen splitten: `positionsTabelle` (Header + Positionen, `dontBreakRows: false`, kein `keepWithHeaderRows`) und `summenTabelle` (MwSt + Gesamtbetrag, `dontBreakRows: true`). Rückgabe als `{ stack: [positionsTabelle, summenTabelle], id: "tabelle" }` (Hotspot-ID bleibt erhalten).
+- Den Intro-Stack (Anrede + Intro) `unbreakable: true` entfernen, damit die Tabelle bei knappem Platz direkt auf Seite 1 anfängt. Outro behält `unbreakable: true`.
 
-## Zu ändernde Dateien
+### 2. Objekt in die Live-Preview durchreichen
+- `src/routes/rechnungen.$id.bearbeiten.tsx` und `src/routes/angebote.$id.bearbeiten.tsx`: bei vorhandener `objektId` das Objekt aus dem bestehenden Kunden-Detail-Datenstrom (bzw. `useApi`) laden und an `PdfEditorLayout` weiterreichen. Wenn die Daten dort schon im Scope liegen, einfach durchreichen — sonst minimaler Ladeaufruf analog zum Ansprechpartner.
+- `src/components/pdf-editor/PdfEditorLayout.tsx`: `objekt?: Objekt | null` zu beiden Props-Varianten hinzufügen, an `LivePdfPreview` durchreichen.
+- `src/components/pdf-editor/LivePdfPreview.tsx`: `objekt` zu `CommonProps` aufnehmen, in `latestPropsRef` aufnehmen, im Build-Aufruf an `generateAngebotPdf` / `generateRechnungPdf` weitergeben, und in `semanticKey` einbeziehen (sonst rebuildet die Vorschau nicht, wenn das Objekt sich ändert).
 
-- `src/routes/rechnungen.tsx` — `brutto(r)` über `summenRechnung` neu berechnen
-- `src/routes/angebote.tsx` — Inline-Summe ersetzen
-- `backend/src/pdf/layout.ts` — `dontBreakRows` ausschalten, Summen-Subtabelle, Intro `unbreakable` entfernen
-
-## Außerhalb des Scopes
-
-- Andere Beleg-Designs, Drive-Sync, PDF-Pipeline-Refactor, Druck-Stylesheets im Browser (PDF-Druck-Pfad ist serverseitig identisch).
+### Aus dem Scope ausgeschlossen
+- Backend-PDF (`backend/src/pdf/layout.ts`) — bereits korrekt.
+- Kein Wechsel der Adress-Policy (Kunde bleibt primär, Objekt nur als Fallback).
+- Keine Änderungen an Listen-Summen, Editor-Logik, Drive-Sync.
 
 ## Verifikation
-
-- Build grün.
-- Liste Rechnungen: Rechnung mit ausschließlich Pauschal-Position zeigt korrekten Brutto-Wert.
-- Pauschal-Beleg mit sehr langer Beschreibung erzeugt mehrseitiges PDF, Tabelle + Summenzeilen sichtbar, Header wiederholt sich auf Folgeseiten.
+Nach den Änderungen im Editor eine Rechnung mit sehr langem Pauschal-Text öffnen: Tabellenkopf + erste Zeile starten auf Seite 1 und brechen in die Folgeseite um; Summenblock bleibt zusammen. Eine Rechnung mit leerer Kunden-Adresse aber ausgefülltem Objekt: Empfängerblock zeigt Straße/PLZ/Ort aus dem Objekt.

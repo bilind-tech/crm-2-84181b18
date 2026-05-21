@@ -16,6 +16,7 @@ function Page() {
   const { data: kunde, isLoading: kundeLoading } = useKunde(rechnung?.kundeId ?? "");
   const { data: firma, isLoading: firmaLoading } = useFirmendaten();
   const ansprechpartner = kunde?.ansprechpartner?.find((a) => a.id === rechnung?.ansprechpartnerId);
+  const objekt = kunde?.objekte?.find((o) => o.id === rechnung?.objektId) ?? null;
 
   if (rechnungLoading) {
     return <EditorLoading label="Rechnung wird geladen …" />;
@@ -41,6 +42,7 @@ function Page() {
       kunde={kunde}
       firma={firma}
       ansprechpartner={ansprechpartner}
+      objekt={objekt}
       backTo={{ to: "/rechnungen/$id", params: { id } }}
     />
   );

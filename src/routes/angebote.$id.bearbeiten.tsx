@@ -16,6 +16,7 @@ function Page() {
   const { data: kunde, isLoading: kundeLoading } = useKunde(angebot?.kundeId ?? "");
   const { data: firma, isLoading: firmaLoading } = useFirmendaten();
   const ansprechpartner = kunde?.ansprechpartner?.find((a) => a.id === angebot?.ansprechpartnerId);
+  const objekt = kunde?.objekte?.find((o) => o.id === angebot?.objektId) ?? null;
 
   // Beleg wird primär geladen — solange laden, Skeleton mit klarem Hinweis
   if (angebotLoading) {
@@ -43,6 +44,7 @@ function Page() {
       kunde={kunde}
       firma={firma}
       ansprechpartner={ansprechpartner}
+      objekt={objekt}
       backTo={{ to: "/angebote/$id", params: { id } }}
     />
   );

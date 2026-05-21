@@ -354,25 +354,44 @@ function leistungstabelle(
     ? [...TABLE_COL_WIDTHS_STUNDEN]
     : [...TABLE_COL_WIDTHS_STANDARD];
 
-  return {
-    id: "tabelle",
+  // Positionszeilen — werden vor den Summen abgetrennt. Lange
+  // Pauschal-Beschreibungen dürfen über Seiten umbrechen (dontBreakRows:false),
+  // sonst „verschluckt" pdfmake die ganze Tabelle auf Seite 1.
+  // Body OHNE die letzten beiden Summenzeilen.
+  const positionsBody = body.slice(0, body.length - 2);
+  const summenBody = body.slice(body.length - 2);
+
+  const tableLayout = {
+    hLineWidth: () => 0.6,
+    vLineWidth: () => 0.6,
+    hLineColor: () => COLOR_TEXT,
+    vLineColor: () => COLOR_TEXT,
+    paddingTop: () => 8,
+    paddingBottom: () => 8,
+    paddingLeft: () => 8,
+    paddingRight: () => 8,
+  };
+
+  const positionsTabelle = {
     table: {
       headerRows: 1,
-      keepWithHeaderRows: 1,
+      widths,
+      body: positionsBody,
+    },
+    layout: tableLayout,
+  };
+  const summenTabelle = {
+    table: {
       dontBreakRows: true,
       widths,
-      body,
+      body: summenBody,
     },
-    layout: {
-      hLineWidth: () => 0.6,
-      vLineWidth: () => 0.6,
-      hLineColor: () => COLOR_TEXT,
-      vLineColor: () => COLOR_TEXT,
-      paddingTop: () => 8,
-      paddingBottom: () => 8,
-      paddingLeft: () => 8,
-      paddingRight: () => 8,
-    },
+    layout: tableLayout,
+  };
+
+  return {
+    id: "tabelle",
+    stack: [positionsTabelle, summenTabelle],
   };
 }
 
@@ -615,7 +634,6 @@ async function buildDoc(
           { id: "anrede", text: anrede(ctx.kunde, ctx.ansprechpartner), margin: [0, 0, 0, 8] },
           { id: "intro", text: intro, margin: [0, 0, 0, 14] },
         ],
-        unbreakable: true,
       },
       leistungstabelle(beleg.positionen, t, beleg.steuersatz),
       {

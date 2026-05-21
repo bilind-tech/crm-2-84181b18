@@ -23,6 +23,7 @@ import type {
   Kunde,
   Firmendaten,
   Ansprechpartner,
+  Objekt,
   BelegOptionen,
 } from "@/lib/api/types";
 
@@ -33,6 +34,7 @@ type Props =
       kunde: Kunde;
       firma: Firmendaten;
       ansprechpartner?: Ansprechpartner;
+      objekt?: Objekt | null;
       backTo: { to: string; params?: Record<string, string> };
     }
   | {
@@ -41,11 +43,12 @@ type Props =
       kunde: Kunde;
       firma: Firmendaten;
       ansprechpartner?: Ansprechpartner;
+      objekt?: Objekt | null;
       backTo: { to: string; params?: Record<string, string> };
     };
 
 export function PdfEditorLayout(props: Props) {
-  const { kind, beleg, kunde, firma, ansprechpartner, backTo } = props;
+  const { kind, beleg, kunde, firma, ansprechpartner, objekt, backTo } = props;
   const editor = useBelegEditor(kind, beleg);
   const [activeTab, setActiveTab] = useState<EditorTab>("stammdaten");
   const [mobileView, setMobileView] = useState<"editor" | "preview">("editor");
@@ -99,6 +102,7 @@ export function PdfEditorLayout(props: Props) {
       kunde={kunde}
       firma={firma}
       ansprechpartner={ansprechpartner}
+      objekt={objekt ?? null}
       renderEditor={renderEditor}
       rowActions={rowActions}
       tableActions={tableActions}

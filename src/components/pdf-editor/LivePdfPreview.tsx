@@ -17,7 +17,7 @@ configurePdfWorker();
 import { Loader2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { generateAngebotPdf, generateRechnungPdf } from "@/lib/pdf/belegPdf";
-import type { Angebot, Rechnung, Kunde, Firmendaten, Ansprechpartner } from "@/lib/api/types";
+import type { Angebot, Rechnung, Kunde, Firmendaten, Ansprechpartner, Objekt } from "@/lib/api/types";
 import { PdfFieldOverlay, type RowAction, type TableAction } from "./PdfFieldOverlay";
 import { A4 } from "@/lib/pdf/hotspotTracker";
 import type { RuntimeHotspot } from "@/lib/pdf/hotspotTracker";
@@ -27,6 +27,7 @@ interface CommonProps {
   kunde: Kunde;
   firma: Firmendaten;
   ansprechpartner?: Ansprechpartner;
+  objekt?: Objekt | null;
   /** Inline-Editor pro Hotspot (Render-Prop). */
   renderEditor: (fieldId: string, close: () => void) => React.ReactNode;
   /** Aktionen für `pos:`-Zeilen. */
@@ -47,7 +48,7 @@ function semanticKey(obj: unknown): string {
 }
 
 export function LivePdfPreview(props: Props) {
-  const { draft, kunde, firma, ansprechpartner, renderEditor, kind, rowActions, tableActions } =
+  const { draft, kunde, firma, ansprechpartner, objekt, renderEditor, kind, rowActions, tableActions } =
     props;
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -72,8 +73,8 @@ export function LivePdfPreview(props: Props) {
 
   // Aktueller semantischer Snapshot-Key des Drafts (+ Kontext).
   const currentKey = useMemo(
-    () => semanticKey({ draft, kunde, firma, ansprechpartner, kind }),
-    [draft, kunde, firma, ansprechpartner, kind],
+    () => semanticKey({ draft, kunde, firma, ansprechpartner, objekt, kind }),
+    [draft, kunde, firma, ansprechpartner, objekt, kind],
   );
 
   // Letzter erfolgreich gebauter Key → daraus leitet sich „aktuell?" ab.
@@ -94,8 +95,8 @@ export function LivePdfPreview(props: Props) {
   // der zuletzt gewünschte Key am Ende neu gebaut.
   const inFlightRef = useRef(false);
   const queuedKeyRef = useRef<string | null>(null);
-  const latestPropsRef = useRef({ draft, kunde, firma, ansprechpartner, kind });
-  latestPropsRef.current = { draft, kunde, firma, ansprechpartner, kind };
+  const latestPropsRef = useRef({ draft, kunde, firma, ansprechpartner, objekt, kind });
+  latestPropsRef.current = { draft, kunde, firma, ansprechpartner, objekt, kind };
 
   const runBuild = useCallback(async () => {
     if (inFlightRef.current) {
@@ -110,8 +111,8 @@ export function LivePdfPreview(props: Props) {
     try {
       const result =
         snap.kind === "angebot"
-          ? await generateAngebotPdf(snap.draft as Angebot, snap.kunde, snap.firma, snap.ansprechpartner)
-          : await generateRechnungPdf(snap.draft as Rechnung, snap.kunde, snap.firma, snap.ansprechpartner);
+          ? await generateAngebotPdf(snap.draft as Angebot, snap.kunde, snap.firma, snap.ansprechpartner, snap.objekt ?? null)
+          : await generateRechnungPdf(snap.draft as Rechnung, snap.kunde, snap.firma, snap.ansprechpartner, snap.objekt ?? null);
       if (!(result.blob instanceof Blob) || result.blob.size === 0) {
         throw new Error("PDF konnte nicht erzeugt werden (leerer Blob).");
       }
