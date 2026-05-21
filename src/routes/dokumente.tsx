@@ -392,7 +392,11 @@ function Page() {
                           <div className="min-w-0">
                             <div className="flex items-center gap-1.5">
                               <p className="truncate font-medium">{d.titel}</p>
-                              <DriveSyncBadge dokument={d} />
+                              <DriveSyncBadge
+                                dokument={d}
+                                onRetry={() => retryDok(d.id)}
+                                retryPending={driveRetry.isPending && driveRetry.variables?.belegId === d.id}
+                              />
                             </div>
                             <p className="truncate text-xs text-muted-foreground">{d.dateiname}</p>
                           </div>
