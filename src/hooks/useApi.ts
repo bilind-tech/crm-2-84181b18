@@ -552,13 +552,28 @@ export const useDeleteZahlung = (rechnungId: string) => {
 };
 
 // ---------- Dokumente ----------
-export const useDokumente = (params?: { kundeId?: string; objektId?: string }) =>
+export const useDokumente = (params?: {
+  kundeId?: string;
+  objektId?: string;
+  /** `null` = nur lose Dokumente (Root), `string` = bestimmter Ordner, `undefined` = alle. */
+  ordnerId?: string | null;
+  /** Bei gesetztem ordnerId: rekursiv inkl. Unterordner. */
+  recursive?: boolean;
+}) =>
   useQuery({
-    queryKey: [...qk.dokumente(params?.kundeId), params?.objektId ?? "all"],
+    queryKey: [
+      ...qk.dokumente(params?.kundeId),
+      params?.objektId ?? "all",
+      params?.ordnerId === undefined ? "any" : params.ordnerId ?? "root",
+      params?.recursive ? "rec" : "flat",
+    ],
     queryFn: () => {
       const q = new URLSearchParams();
       if (params?.kundeId) q.set("kundeId", params.kundeId);
       if (params?.objektId) q.set("objektId", params.objektId);
+      if (params?.ordnerId === null) q.set("ordnerId", "root");
+      else if (typeof params?.ordnerId === "string") q.set("ordnerId", params.ordnerId);
+      if (params?.recursive) q.set("recursive", "true");
       const s = q.toString();
       return api.get<Dokument[]>(`/dokumente${s ? `?${s}` : ""}`);
     },
