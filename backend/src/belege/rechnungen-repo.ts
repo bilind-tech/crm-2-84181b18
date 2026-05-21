@@ -21,7 +21,7 @@ import { emitBelegMutated } from "./events.js";
 const RECHNUNG_COLS = `
   id, nummer, kunde_id, objekt_id, ansprechpartner_id, quell_angebot_id,
   titel, intro_text, outro_text, rabatt_gesamt, steuersatz,
-  rechnungsdatum, faelligkeitsdatum, notizen, status, versendet_am,
+  rechnungsdatum, faelligkeitsdatum, leistungsmonat, notizen, status, versendet_am,
   archiviert, optionen, drive, mahnungen, mahn_pausiert_bis,
   inkasso_markiert, dauerauftrag_id, erstellt_am, geaendert_am
 `;
@@ -110,6 +110,7 @@ export interface RechnungWrite {
   steuersatz?: number;
   rechnungsdatum?: string;
   faelligkeitsdatum?: string;
+  leistungsmonat?: string | null;
   notizen?: string;
   optionen?: unknown;
 }
@@ -146,11 +147,11 @@ export function createRechnung(data: RechnungWrite): ApiRechnung {
       `INSERT INTO rechnung (
          id, nummer, nummer_periode, nummer_quelle, kunde_id, objekt_id, ansprechpartner_id, quell_angebot_id,
          titel, intro_text, outro_text, rabatt_gesamt, steuersatz,
-         rechnungsdatum, faelligkeitsdatum, notizen, status, archiviert, optionen
+         rechnungsdatum, faelligkeitsdatum, leistungsmonat, notizen, status, archiviert, optionen
        ) VALUES (
          @id, @nummer, @nummer_periode, 'auto', @kunde_id, @objekt_id, @ansprechpartner_id, @quell_angebot_id,
          @titel, @intro_text, @outro_text, @rabatt_gesamt, @steuersatz,
-         @rechnungsdatum, @faelligkeitsdatum, @notizen, 'entwurf', 0, @optionen
+         @rechnungsdatum, @faelligkeitsdatum, @leistungsmonat, @notizen, 'entwurf', 0, @optionen
        )`,
     ).run({
       id,
@@ -167,6 +168,7 @@ export function createRechnung(data: RechnungWrite): ApiRechnung {
       steuersatz: data.steuersatz ?? 19,
       rechnungsdatum,
       faelligkeitsdatum: faelligkeit,
+      leistungsmonat: data.leistungsmonat ?? null,
       notizen: data.notizen ?? null,
       optionen: data.optionen != null ? JSON.stringify(data.optionen) : null,
     });
@@ -190,6 +192,7 @@ const RECHNUNG_UPDATABLE: Record<string, string> = {
   steuersatz: "steuersatz",
   rechnungsdatum: "rechnungsdatum",
   faelligkeitsdatum: "faelligkeitsdatum",
+  leistungsmonat: "leistungsmonat",
   notizen: "notizen",
   archiviert: "archiviert",
   optionen: "optionen",
