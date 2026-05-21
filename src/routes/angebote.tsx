@@ -87,10 +87,14 @@ function statusBadge(status: string) {
 }
 
 function summe(a: Angebot) {
-  return (
-    a.positionen.reduce((acc, p) => acc + p.menge * p.einzelpreisNetto * (1 - p.rabatt / 100), 0) *
-    (1 + a.steuersatz / 100)
-  );
+  const netto = a.positionen.reduce((acc, p) => {
+    const linie =
+      p.modus === "pauschal"
+        ? (p.pauschalpreisNetto ?? 0) * (1 - p.rabatt / 100)
+        : p.menge * p.einzelpreisNetto * (1 - p.rabatt / 100);
+    return acc + linie;
+  }, 0);
+  return netto * (1 + a.steuersatz / 100);
 }
 
 function Page() {
