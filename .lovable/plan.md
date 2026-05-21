@@ -1,109 +1,63 @@
+## Ziel
 
-# Ordner für Dokumente
+PDF-Layout für Rechnungen (und Angebote/Protokolle, wo sinnvoll) verbessern und ein neues Feld „Leistungsmonat" für Rechnungen einführen.
 
-Ziel: Auf `/dokumente` echte Ordner — verschachtelbar, mit Anlegen / Umbenennen / Verschieben / Löschen, und beim Datei-Upload eine Pflicht-Auswahl „in welchen Ordner?". Funktioniert auf Desktop und Mobil, hält sich an die Single-User- und Daten-strikt-getrennt-Regeln, und respektiert die Drive-Spiegelung sowie Soft-Delete.
+## 1. Empfänger-Adressblock (Rechnung, Angebot, Protokoll)
 
-## Was der Nutzer sieht
-
-### Übersichtsseite `/dokumente`
-- Neuer Bereich oben: **Ordnerpfad als Breadcrumb** (`Alle Dokumente › Steuer › 2026`) + Buttons „Neuer Ordner" und „Ordner umbenennen" (nur wenn nicht Root).
-- Linke Spalte auf Desktop (`sm:`): **Ordnerbaum** (klappbar, mit Anzahl Dokumente). Auf Mobil stattdessen ein horizontaler Chip-Streifen + Sheet „Ordner wählen".
-- Tabelle/Karten: zeigen nur Dokumente + direkte Unterordner des aktuellen Ordners. Ordner-Zeile mit Klapp-Icon, Klick navigiert hinein.
-- Bestehende Filter (Tabs, Suche, Kunde, Objekt) bleiben; sie filtern **innerhalb** des gewählten Ordners. Zusätzlich Tab „Alle (rekursiv)" der den Ordner-Filter aufhebt — damit nichts verloren geht.
-- Drag-&-Drop: Dokument-Zeile/Karte auf einen Ordner im Baum oder Breadcrumb ziehen verschiebt.
-- Pro Dokument im Kontextmenü (3-Punkte): „Verschieben nach…" (öffnet Ordner-Picker-Sheet), „In neuen Ordner verschieben…", „Löschen" (wie bisher).
-- Pro Ordner im Kontextmenü: „Umbenennen", „Verschieben nach…", „Löschen". Beim Löschen eines nicht-leeren Ordners erscheint ein Bestätigungsdialog mit zwei Optionen: **Inhalte in den Eltern-Ordner verschieben** (Standard) oder **Inhalte mitlöschen** (Soft-Delete, wie bisher).
-
-### Upload-Flow
-- `DokumentUploadPanel`: neue Pflicht-Auswahl **Ordner** (Default = aktuell sichtbarer Ordner, falls vorhanden, sonst „Allgemein").
-  - Wenn auf `/dokumente` mit aktivem Ordner: Voreinstellung = dieser Ordner, geräuschlos.
-  - Wenn Stapel ohne Ordner gestartet wird (z. B. via Global-DropZone): Sheet „In welchen Ordner?" vor dem Upload, mit Liste + „+ Neuer Ordner".
-- Wenn an Kunde/Objekt-Detail hochgeladen wird (`kundeId`/`objektId` gesetzt): Ordner-Auswahl bleibt sichtbar, Default = „Kunde: <Name>" wenn ein Auto-Ordner existiert, sonst „Allgemein". Kein Zwang, einen Kunden-Ordner anzulegen.
-- Handy-Scan-Sessions tragen den Ziel-Ordner im Session-Token; das Handy lädt direkt dort hoch.
-
-### Globaler Drop
-- `GlobalDropZone` zeigt vor dem Upload ein kleines „Ordner wählen"-Sheet (gleiche Komponente wie oben).
-
-## Datenmodell (Backend, SQLite)
-
-Neue Migration `034_dokument_ordner.sql`:
-
-```text
-CREATE TABLE dokument_ordner (
-  id            TEXT PRIMARY KEY,
-  name          TEXT NOT NULL,
-  parent_id     TEXT REFERENCES dokument_ordner(id) ON DELETE RESTRICT,
-  erstellt_am   TEXT NOT NULL DEFAULT (datetime('now')),
-  geloescht_am  TEXT,
-  UNIQUE (parent_id, name) -- Geschwister müssen eindeutig sein
-);
-CREATE INDEX ix_ordner_parent ON dokument_ordner(parent_id) WHERE geloescht_am IS NULL;
-
-ALTER TABLE dokumente ADD COLUMN ordner_id TEXT REFERENCES dokument_ordner(id) ON DELETE SET NULL;
-CREATE INDEX ix_dok_ordner ON dokumente(ordner_id) WHERE geloescht_am IS NULL;
+**Soll-Zustand**:
+```
+Firmenname Mustermann GmbH
+Max Mustermann               ← Ansprechpartner (oder Vor-/Nachname Kunde)
+Musterstraße 12              ← Adresse
+53757 Sankt Augustin         ← PLZ + Ort
 ```
 
-- Root = `ordner_id IS NULL` („Alle Dokumente" / Posteingang).
-- Soft-Delete via `geloescht_am`, konsistent mit Step 27. Hartes Löschen + Datei-Cleanup nur über bestehende `/datenbank/...hart-loeschen`-Route (kein Sonderweg).
-- Move-Operation prüft Zyklen (kein Ordner unter sich selbst).
+**Beobachtung**: Der Code in `kundeAdresse()` baut diese Zeilen bereits korrekt (sowohl in `src/lib/pdf/belegPdf.ts` als auch in `backend/src/pdf/layout.ts`). Wenn Adresse/PLZ/Ort aktuell fehlen, kommt das fast sicher daher, dass diese Felder am **Kunden-Datensatz** leer sind und stattdessen am **Objekt** stehen.
 
-## Backend-Routen (`backend/src/dokumente/ordner.ts` + Erweiterung in `routes/`)
+**Fix**:
+- Fallback einbauen: wenn `kunde.strasse` / `plz` / `ort` leer sind und ein `objektId` am Beleg hängt, Adresse aus dem Objekt ziehen (Frontend-Generator + Backend-Layout).
+- Bei Protokollen analog dafür sorgen, dass der gleiche 4-Zeilen-Block (Firma, Ansprechpartner, Strasse, PLZ Ort) im Empfänger steht (`src/lib/pdf/werkzeugePdf.ts`).
 
-| Methode + Pfad | Zweck |
-|---|---|
-| `GET /dokumente/ordner` | Baum (id, name, parentId, anzahl, kindAnzahl) — eine Query, im Server zu Baum geformt |
-| `POST /dokumente/ordner` | `{ name, parentId? }` — anlegen |
-| `PATCH /dokumente/ordner/:id` | `{ name?, parentId? }` — umbenennen / verschieben, mit Zyklus-Check |
-| `DELETE /dokumente/ordner/:id?mode=move-to-parent\|cascade` | Standard `move-to-parent`; `cascade` soft-löscht Inhalte rekursiv |
-| `PATCH /dokumente/:id` | bestehend, akzeptiert zusätzlich `ordnerId` |
-| `POST /dokumente/bulk-move` | `{ ids: string[], ordnerId: string\|null }` für Mehrfach-Verschieben |
-| `GET /dokumente` | bekommt `?ordnerId=` (mit `?recursive=1` rekursiv) |
+## 2. Leistungsmonat für Rechnungen
 
-Alle Routen via `requireAuth` (Single-User). Validierung via Zod (Namen `1..80` Zeichen, Whitelist `[\w \-/().&]`).
+**Neues optionales Feld** `leistungsmonat` (Format `YYYY-MM`, z. B. `2026-04`).
 
-## Drive-Spiegelung
-- Aktive Regel bleibt: PDFs (Rechnung/Angebot) laufen in den festen `Rechnungen/{YYYY}/{MM}` bzw. `Angebote/...` Pfad — **nicht** in Nutzer-Ordner. Diese Logik wird vom neuen Modul nicht angefasst.
-- Frei hochgeladene Dokumente (Quelle `upload`/`drag-drop`/`handy-scan`) werden, sobald Drive verbunden ist, unter `mycleancenter.cm/Dokumente/<Ordnerpfad>/` gespiegelt. Ordner werden in Drive über das vorhandene `ensureFolderPath` angelegt.
-- Verschieben in der App → asynchroner Drive-Move (wenn `drive_file_id` gesetzt); Fehlschlag setzt nur `drive_status="fehler"`, blockiert App-Aktion nicht.
+**Backend**:
+- Migration `034_rechnung_leistungsmonat.sql`: `ALTER TABLE rechnungen ADD COLUMN leistungsmonat TEXT NULL`.
+- Schema/Validation/Mapper in `backend/src/belege/` erweitern (create + update).
 
-## Frontend-Aufbau
+**Frontend `RechnungForm`**:
+- Neuer Select „Leistungsmonat" mit Optionen aus den letzten 6 + nächsten 2 Monaten + „Kein Monat".
+- Default: aktueller Monat.
+- Wird in `useCreateRechnung` mitgeschickt.
 
-Neue Dateien:
-- `src/lib/dokumente/ordnerApi.ts` — fetch-Wrapper für die Routen.
-- `src/hooks/useDokumentOrdner.ts` — `useQuery(["dokumente","ordner"])` + Mutationen.
-- `src/components/dokumente/OrdnerBaum.tsx` — Desktop-Sidebar, klappbar, Drop-Target.
-- `src/components/dokumente/OrdnerBreadcrumb.tsx`.
-- `src/components/dokumente/OrdnerPickerSheet.tsx` — wiederverwendet in Upload + „Verschieben nach…".
-- `src/components/dokumente/OrdnerLoeschenDialog.tsx` — 2-Stufen-Bestätigung (move-to-parent / cascade).
-- `src/components/dokumente/NeuerOrdnerDialog.tsx`.
+**PDF-Intro (sowohl Frontend `belegPdf.ts` als auch Backend `layout.ts`)**:
+- `defaultIntroRechnung(r)` so erweitern: wenn `r.leistungsmonat` gesetzt → `„hiermit übersenden wir Ihnen die Rechnung v. April 2026 für folgende Leistungen:"` (Monat lokalisiert via `toLocaleDateString("de-DE", { month: "long", year: "numeric" })`).
+- Ohne Leistungsmonat bleibt der bisherige Satz.
+- Custom `introText` / `eigenesIntro` überschreibt weiterhin.
 
-Änderungen in:
-- `src/routes/dokumente.tsx` — Layout mit Sidebar/Breadcrumb, neuer Route-Param `?ordner=<id>` (validateSearch), Drop-Handler.
-- `src/components/dokumente/DokumentUploadPanel.tsx` — Bulk-Meta bekommt Pflichtfeld `ordnerId`, Picker mit „+ Neuer Ordner".
-- `src/components/dokumente/GlobalDropZone.tsx` — vorgeschaltetes Picker-Sheet.
-- `src/components/dokumente/DokumentViewer.tsx` + `DokumentBearbeitenDialog.tsx` — Anzeige „Ordner: …" + Verschieben-Button.
-- `src/lib/api/types.ts` + `src/lib/api/adapters.ts` — `ordnerId` an `Dokument`, neue Typen `DokumentOrdner`.
-- `src/lib/mock/backend.ts` (falls verwendet) — Mock-Ordner für Preview.
+## 3. Signatur „Mit freundlichen Grüßen"
 
-## Migration bestehender Daten
-- Migration legt keinen Default-Ordner an. Alle bisherigen Dokumente bleiben mit `ordner_id = NULL` und erscheinen unter „Alle Dokumente" — kein Datenverlust, kein Verschieben ohne Zustimmung.
+Aktuell wird der Geschäftsführer-Name und „Geschäftsführer" in `COLOR_MUTED` (`#555555`) gerendert.
 
-## Tests
-- `backend/test/dokumente-ordner.spec.ts`: CRUD, Zyklus-Verhinderung, Unique-Name pro Parent, Delete-Modi, Bulk-Move, recursive Listing.
-- Erweiterung `backend/test/dokumente.spec.ts`: Upload mit `ordnerId`, Filter nach Ordner.
-- Frontend-Smoke: Liste rendert mit/ohne Ordner, Upload-Pflichtfeld blockiert Submit.
+**Fix** in `belegPdf.ts` + `layout.ts`: beide Zeilen auf `COLOR_TEXT` (`#000000`) umstellen.
 
-## Reihenfolge der Implementierung
-1. Migration + Backend-Repo + Routen + Tests.
-2. Frontend-Hooks + Typen.
-3. Übersichtsseite (Sidebar + Breadcrumb + Listenfilter).
-4. Upload-Panel + GlobalDropZone Picker.
-5. Verschieben (Kontextmenü + Drag) + Löschen-Dialog.
-6. Drive-Spiegelung für freie Uploads + Move-Sync.
-7. Memory aktualisieren (`mem/features/dokumente.md` + Index-Eintrag).
+## 4. Footer-Ausrichtung
 
-## Was bewusst NICHT in diesem Schritt steckt
-- Keine Berechtigungen pro Ordner (Single-User).
-- Keine Tag-/Smart-Folder-Logik — nur klassische Ordner.
-- Keine Mehrfach-Auswahl-Toolbar; Bulk-Move-Endpoint existiert, UI dafür kommt später.
-- Kein automatisches Sortieren nach Kunde/Jahr — Nutzer entscheidet selbst.
+Aktueller 4-spaltiger Footer (Firma | Bank | Telefon/Email | Handelsregister) ist komplett linksbündig.
+
+**Fix**: Die zwei mittleren Spalten (Bank + Telefon/Email) bekommen `alignment: "center"`; die zwei äußeren Spalten bleiben linksbündig. Wird in beiden `footer()`-Funktionen (Frontend + Backend) gesetzt.
+
+## Geänderte Dateien (Übersicht)
+
+- `backend/src/db/migrations/034_rechnung_leistungsmonat.sql` *(neu)*
+- `backend/src/belege/types.ts`, `validation.ts`, `mappers.ts`, `rechnungen-repo.ts`
+- `backend/src/pdf/layout.ts` — Adresse mit Objekt-Fallback, Intro mit Leistungsmonat, Signatur-Farbe, Footer-Ausrichtung
+- `src/lib/api/types.ts`, `src/lib/api/adapters.ts` — Feld `leistungsmonat`
+- `src/components/forms/RechnungForm.tsx` — Monats-Select
+- `src/lib/pdf/belegPdf.ts` — gleiche 4 PDF-Änderungen wie Backend
+- `src/lib/pdf/werkzeugePdf.ts` — Protokoll-Empfängerblock (Strasse + PLZ/Ort)
+
+## Offene Frage
+
+Soll der Leistungsmonat-Select **Pflicht** sein (jede Rechnung muss einen Monat haben) oder **optional** (Default „—", Satz erscheint dann ohne Monat)?
