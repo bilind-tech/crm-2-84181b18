@@ -167,24 +167,16 @@ function leistungstabelle(positionen: ApiPosition[], totalsT: { netto: number; s
 
   const spanCols = colCount - 1;
   const spanFiller = Array.from({ length: spanCols - 1 }, () => ({}));
-  body.push([
-    { text: `Zzgl. gesetzlicher Mehrwertsteuer ${steuersatz}%`, colSpan: spanCols, fontSize: 10 },
-    ...spanFiller,
-    { text: eur(totalsT.steuer), fontSize: 10, alignment: "right" },
-  ]);
-  body.push([
-    { text: "Gesamtbetrag inkl. MwSt.", colSpan: spanCols, fontSize: 10, bold: true },
-    ...spanFiller,
-    { text: eur(totalsT.brutto), fontSize: 10, alignment: "right", bold: true },
-  ]);
 
   const widths = showStunden ? ["*", 60, 90, 85] : ["*", 110, 95];
 
-  return {
+  const positionsTabelle = {
     table: {
       headerRows: 1,
       keepWithHeaderRows: 1,
-      dontBreakRows: true,
+      // dontBreakRows: false (Default) — sehr lange Beschreibungszeilen
+      // dürfen über mehrere Seiten umbrechen, sonst „verschluckt" pdfmake
+      // die ganze Tabelle.
       widths,
       body,
     },
@@ -199,6 +191,40 @@ function leistungstabelle(positionen: ApiPosition[], totalsT: { netto: number; s
       paddingRight: () => 8,
     },
   };
+
+  const summenBody: unknown[][] = [
+    [
+      { text: `Zzgl. gesetzlicher Mehrwertsteuer ${steuersatz}%`, colSpan: spanCols, fontSize: 10 },
+      ...spanFiller,
+      { text: eur(totalsT.steuer), fontSize: 10, alignment: "right" },
+    ],
+    [
+      { text: "Gesamtbetrag inkl. MwSt.", colSpan: spanCols, fontSize: 10, bold: true },
+      ...spanFiller,
+      { text: eur(totalsT.brutto), fontSize: 10, alignment: "right", bold: true },
+    ],
+  ];
+
+  const summenTabelle = {
+    table: {
+      // Summenblock soll nicht durch Seitenumbruch zerschnitten werden.
+      dontBreakRows: true,
+      widths,
+      body: summenBody,
+    },
+    layout: {
+      hLineWidth: () => 0.6,
+      vLineWidth: () => 0.6,
+      hLineColor: () => COLOR_TEXT,
+      vLineColor: () => COLOR_TEXT,
+      paddingTop: () => 8,
+      paddingBottom: () => 8,
+      paddingLeft: () => 8,
+      paddingRight: () => 8,
+    },
+  };
+
+  return { stack: [positionsTabelle, summenTabelle] };
 }
 
 function metaBox(meta: { label: string; wert: string }[], variant: "box" | "plain", headerNote?: string) {
@@ -380,7 +406,6 @@ function buildDoc(args: BuildArgs) {
           { text: anrede(args.kunde, args.ansprechpartner), margin: [0, 0, 0, 8] },
           { text: args.intro, margin: [0, 0, 0, 14] },
         ],
-        unbreakable: true,
       },
       leistungstabelle(args.positionen, t, args.steuersatz),
       {
