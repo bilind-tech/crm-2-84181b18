@@ -4,6 +4,7 @@
 // Firmendaten. Damit fühlen sich die Protokolle wie ein Beleg an.
 
 import logoFallback from "@/assets/logo.png";
+import { api } from "@/lib/api/client";
 import type { Firmendaten, Kunde, Objekt, ProtokollOptionen } from "@/lib/api/types";
 import { A4, createHotspotTracker, type RuntimeHotspot } from "./hotspotTracker";
 
@@ -52,12 +53,25 @@ async function fetchBundledLogo(): Promise<string | null> {
   }
 }
 
+async function fetchSettingsLogo(): Promise<string | null> {
+  try {
+    const firma = await api.get<Firmendaten>("/einstellungen/firma");
+    const logo = firma.logoUrl?.trim();
+    return logo || null;
+  } catch {
+    return null;
+  }
+}
+
 // Wie in belegPdf.ts: ist in den Einstellungen ein Logo gesetzt
 // (firma.logoUrl, meist data:-URL), wird dieses direkt verwendet —
 // pdfmake unterstützt data:-URLs nativ. Nur wenn nichts gesetzt ist,
 // fällt der Renderer auf das gebündelte Asset zurück.
 async function resolveLogo(firma?: Firmendaten): Promise<string | null> {
-  if (firma?.logoUrl && firma.logoUrl.trim()) return firma.logoUrl;
+  const providedLogo = firma?.logoUrl?.trim();
+  if (providedLogo) return providedLogo;
+  const settingsLogo = await fetchSettingsLogo();
+  if (settingsLogo) return settingsLogo;
   return await fetchBundledLogo();
 }
 
