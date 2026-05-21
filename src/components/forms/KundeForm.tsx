@@ -149,7 +149,7 @@ export function KundeForm({ onClose, onCreated }: Props) {
   // Live-Verfügbarkeitsprüfung Kürzel
   const kuerzelFreiQ = useKuerzelFrei(f.kuerzel);
   const kuerzelKonflikt =
-    f.kuerzel.length >= 3 && kuerzelFreiQ.data && !kuerzelFreiQ.data.frei
+    f.kuerzel.length >= 1 && kuerzelFreiQ.data && !kuerzelFreiQ.data.frei
       ? kuerzelFreiQ.data.kunde
       : null;
 
@@ -185,10 +185,6 @@ export function KundeForm({ onClose, onCreated }: Props) {
     }
     if (f.typ === "privat" && !f.nachname.trim()) {
       toast.error("Nachname ist erforderlich");
-      return;
-    }
-    if (f.kuerzel && f.kuerzel.length < 3) {
-      toast.error("Kürzel muss 3–4 Zeichen haben");
       return;
     }
     if (kuerzelKonflikt) {
@@ -379,7 +375,6 @@ export function KundeForm({ onClose, onCreated }: Props) {
                 value={f.kuerzel}
                 onChange={(e) => handleKuerzelChange(e.target.value)}
                 placeholder="z. B. MUST"
-                maxLength={4}
                 className="font-mono uppercase tracking-wider"
               />
               <div className="min-h-[1.25rem] text-xs">
@@ -387,9 +382,9 @@ export function KundeForm({ onClose, onCreated }: Props) {
                   <span className="text-destructive">
                     ✗ Bereits vergeben an {kuerzelKonflikt.nummer} • {kuerzelKonflikt.name}
                   </span>
-                ) : f.kuerzel.length >= 3 && kuerzelFreiQ.isFetching ? (
+                ) : f.kuerzel.length >= 1 && kuerzelFreiQ.isFetching ? (
                   <span className="text-muted-foreground">Prüfe Verfügbarkeit…</span>
-                ) : f.kuerzel.length >= 3 && kuerzelFreiQ.data?.frei ? (
+                ) : f.kuerzel.length >= 1 && kuerzelFreiQ.data?.frei ? (
                   <span className="text-emerald-600 dark:text-emerald-400">
                     ✓ Kürzel frei
                     {vorschauNummer && (
@@ -410,14 +405,14 @@ export function KundeForm({ onClose, onCreated }: Props) {
                   </span>
                 ) : (
                   <span className="text-muted-foreground">
-                    3–4 Zeichen. So beginnen alle Rechnungen & Angebote dieses Kunden.
+                    Beliebige Länge. So beginnen alle Rechnungen & Angebote dieses Kunden.
                   </span>
                 )}
               </div>
             </div>
           </Field>
 
-          {f.kuerzel.length >= 3 && (
+          {f.kuerzel.length >= 1 && (
             <Field label="Nächste Nummer (diesen Monat) startet bei">
               <Input
                 type="number"
