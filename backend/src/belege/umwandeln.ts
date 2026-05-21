@@ -33,10 +33,11 @@ export function angebotInRechnungUmwandeln(angebotId: string): ApiRechnung | nul
       rabatt: p.rabatt,
       modus: p.modus,
       pauschalpreisNetto: p.pauschalpreisNetto,
-      ausfuehrung: p.ausfuehrung,
     })),
     rabattGesamt: src.rabattGesamt,
     steuersatz: src.steuersatz,
+    einsatzVon: src.einsatzVon,
+    einsatzBis: src.einsatzBis,
     notizen: src.notizen,
     optionen: src.optionen,
   });
