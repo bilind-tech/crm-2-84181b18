@@ -9,6 +9,7 @@ export interface DokumentRow {
   typ: string;
   kunde_id: string | null;
   objekt_id: string | null;
+  ordner_id: string | null;
   upload_session_id: string | null;
   dateiname: string;
   mime_type: string;
@@ -54,6 +55,7 @@ export function rowToDokument(r: DokumentRow): Dokument {
     typ: r.typ as Dokument["typ"],
     kundeId: r.kunde_id,
     objektId: r.objekt_id,
+    ordnerId: r.ordner_id,
     uploadSessionId: r.upload_session_id,
     dateiname: r.dateiname,
     mimeType: r.mime_type,

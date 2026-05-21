@@ -23,6 +23,7 @@ export interface Dokument {
   typ: DokumentTyp;
   kundeId?: string | null;
   objektId?: string | null;
+  ordnerId?: string | null;
   uploadSessionId?: string | null;
   dateiname: string;
   mimeType: string;
@@ -47,6 +48,7 @@ export interface DokumentMetaInput {
   typ?: DokumentTyp;
   kundeId?: string | null;
   objektId?: string | null;
+  ordnerId?: string | null;
   dokumentdatum?: string | null;
   betrag?: number | null;
   steuerrelevant?: boolean;
@@ -59,6 +61,9 @@ export interface DokumentMetaInput {
 export interface DokumentListFilter {
   kundeId?: string;
   objektId?: string;
+  ordnerId?: string | null;
+  /** Wenn true UND ordnerId gesetzt: rekursiv inkl. Unterordner. */
+  recursive?: boolean;
   typ?: DokumentTyp;
   jahr?: number;
   /** Nur nicht-erledigte. */
