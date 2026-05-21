@@ -88,9 +88,6 @@ export function LeistungsBeschreibung({
   }
 
   function handleKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
-    const el = e.currentTarget;
-    const { selectionStart, selectionEnd, value: v } = el;
-
     // Cmd/Ctrl + B / I / U → Markdown-Wrap
     if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey) {
       const k = e.key.toLowerCase();
@@ -110,54 +107,8 @@ export function LeistungsBeschreibung({
         return;
       }
     }
-
-    // Enter → Bullet fortsetzen, wenn aktuelle Zeile mit "• " beginnt
-    if (e.key === "Enter" && !e.shiftKey && selectionStart === selectionEnd) {
-      const lineStart = v.lastIndexOf("\n", selectionStart - 1) + 1;
-      const currentLine = v.slice(lineStart, selectionStart);
-      const bulletMatch = currentLine.match(/^(\s*)([•\-*])\s+/);
-      if (bulletMatch) {
-        const rest = currentLine.slice(bulletMatch[0].length).trim();
-        if (rest === "") {
-          // Leerer Bullet → Bullet entfernen, normalen Umbruch erzeugen
-          e.preventDefault();
-          const before = v.slice(0, lineStart);
-          const after = v.slice(selectionStart);
-          const next = `${before}\n${after}`;
-          onChange(next);
-          requestAnimationFrame(() => {
-            const pos = lineStart + 1;
-            el.setSelectionRange(pos, pos);
-          });
-          return;
-        }
-        // Neuer Bullet
-        e.preventDefault();
-        const insert = `\n${bulletMatch[1]}• `;
-        const before = v.slice(0, selectionStart);
-        const after = v.slice(selectionStart);
-        const next = `${before}${insert}${after}`;
-        onChange(next);
-        requestAnimationFrame(() => {
-          const pos = selectionStart + insert.length;
-          el.setSelectionRange(pos, pos);
-        });
-      }
-      return;
-    }
-
-    // Tab → 2 Leerzeichen einfügen
-    if (e.key === "Tab" && !e.shiftKey) {
-      e.preventDefault();
-      const before = v.slice(0, selectionStart);
-      const after = v.slice(selectionEnd);
-      const next = `${before}  ${after}`;
-      onChange(next);
-      requestAnimationFrame(() => {
-        const pos = selectionStart + 2;
-        el.setSelectionRange(pos, pos);
-      });
-    }
+    // Kein Auto-Bullet, kein Tab-Einrücken: Formatierung erfolgt manuell über
+    // die Toolbar (B/I/U/Liste). Enter erzeugt nur einen normalen Zeilenumbruch.
   }
 
   function bulletEinfuegen() {
