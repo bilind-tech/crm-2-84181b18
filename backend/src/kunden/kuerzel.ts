@@ -1,5 +1,5 @@
 // Validierung & Eindeutigkeit für Kunden-Kürzel.
-// Format: 3-4 Zeichen [A-Z0-9]. Leere Kürzel sind erlaubt.
+// Format: beliebig viele Zeichen [A-Z0-9] (mind. 1). Leere Kürzel sind erlaubt.
 import { getDatabase } from "../db/index.js";
 
 export function normalizeKuerzel(input: string | null | undefined): string | null {
@@ -9,7 +9,7 @@ export function normalizeKuerzel(input: string | null | undefined): string | nul
 }
 
 export function isKuerzelFormatOk(k: string): boolean {
-  return /^[A-Z0-9]{3,4}$/.test(k);
+  return /^[A-Z0-9]+$/.test(k);
 }
 
 export interface KuerzelTreffer {

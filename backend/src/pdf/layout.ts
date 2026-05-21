@@ -99,7 +99,10 @@ function header(f: FirmaForPdf, logoDataUrl: string | null) {
 
 function footer(f: FirmaForPdf) {
   return function () {
-    const cell = (lines: (string | null | undefined)[], alignment: "left" | "center" = "left") => ({
+    const cell = (
+      lines: (string | null | undefined)[],
+      alignment: "left" | "center" | "right" = "left",
+    ) => ({
       stack: lines.filter(Boolean).map((l) => ({ text: l as string, fontSize: 7, color: COLOR_TEXT, alignment })),
     });
     return {
@@ -116,7 +119,7 @@ function footer(f: FirmaForPdf) {
             ]),
             cell(["Bank", f.bankName, f.iban], "center"),
             cell([f.telefon, f.email], "center"),
-            cell([f.handelsregister, f.ustId ? `USt-ID: ${f.ustId}` : null, f.webseite]),
+            cell([f.handelsregister, f.ustId ? `USt-ID: ${f.ustId}` : null, f.webseite], "right"),
           ],
           columnGap: 12,
         },

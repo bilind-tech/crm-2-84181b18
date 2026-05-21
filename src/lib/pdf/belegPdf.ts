@@ -225,7 +225,10 @@ function header(firma: Firmendaten, logo: string | null) {
 
 function footer(firma: Firmendaten) {
   return function () {
-    const cell = (lines: (string | null | undefined)[], alignment: "left" | "center" = "left") => ({
+    const cell = (
+      lines: (string | null | undefined)[],
+      alignment: "left" | "center" | "right" = "left",
+    ) => ({
       stack: lines
         .filter(Boolean)
         .map((l) => ({ text: l as string, fontSize: 7, color: COLOR_TEXT, alignment })),
@@ -250,11 +253,14 @@ function footer(firma: Firmendaten) {
             ]),
             cell(["Bank", firma.bankName, firma.iban], "center"),
             cell([firma.telefon, firma.email], "center"),
-            cell([
-              firma.handelsregister,
-              firma.ustId ? `USt-ID: ${firma.ustId}` : null,
-              firma.webseite,
-            ]),
+            cell(
+              [
+                firma.handelsregister,
+                firma.ustId ? `USt-ID: ${firma.ustId}` : null,
+                firma.webseite,
+              ],
+              "right",
+            ),
           ],
           columnGap: 12,
         },
