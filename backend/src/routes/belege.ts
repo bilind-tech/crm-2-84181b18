@@ -190,6 +190,7 @@ export async function belegeRoutes(app: FastifyInstance): Promise<void> {
         steuersatz: z.number().min(0).max(100).optional(),
         rechnungsdatum: z.string().optional(),
         faelligkeitsdatum: z.string().optional(),
+        leistungsmonat: z.string().regex(/^\d{4}-\d{2}$/).nullish(),
         notizen: z.string().max(10000).optional(),
         optionen: z.unknown().optional(),
       });
