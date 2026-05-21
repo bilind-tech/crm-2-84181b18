@@ -1,4 +1,4 @@
-import { Cloud, CloudOff, AlertTriangle, Loader2, ExternalLink } from "lucide-react";
+import { Cloud, CloudOff, AlertTriangle, Loader2, ExternalLink, RotateCw } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import type { Dokument } from "@/lib/api/types";
 import { formatDate } from "@/lib/format";
@@ -17,9 +17,13 @@ interface Props {
   /** xs = nur Icon, sm = Icon + kurzer Text. */
   size?: "xs" | "sm";
   className?: string;
+  /** Wenn gesetzt, erscheint bei state="error" ein kleiner Retry-Button. */
+  onRetry?: () => void;
+  /** Spinner anzeigen, solange Retry läuft. */
+  retryPending?: boolean;
 }
 
-export function DriveSyncBadge({ dokument, size = "xs", className }: Props) {
+export function DriveSyncBadge({ dokument, size = "xs", className, onRetry, retryPending }: Props) {
   const state = driveState(dokument);
   if (state === "none") return null;
 
@@ -62,20 +66,40 @@ export function DriveSyncBadge({ dokument, size = "xs", className }: Props) {
   const iconSize = size === "xs" ? "h-3.5 w-3.5" : "h-4 w-4";
 
   return (
-    <TooltipProvider delayDuration={200}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span
-            className={`inline-flex items-center gap-1 ${size === "sm" ? "text-xs" : ""} ${classes} ${className ?? ""}`}
-            aria-label={tooltip}
-          >
-            <Icon className={iconSize} />
-            {size === "sm" && <span>{label}</span>}
-          </span>
-        </TooltipTrigger>
-        <TooltipContent>{tooltip}</TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+    <span className={`inline-flex items-center gap-1 ${className ?? ""}`}>
+      <TooltipProvider delayDuration={200}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span
+              className={`inline-flex items-center gap-1 ${size === "sm" ? "text-xs" : ""} ${classes}`}
+              aria-label={tooltip}
+            >
+              <Icon className={iconSize} />
+              {size === "sm" && <span>{label}</span>}
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>{tooltip}</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+      {state === "error" && onRetry && (
+        <TooltipProvider delayDuration={200}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); if (!retryPending) onRetry(); }}
+                disabled={retryPending}
+                className="inline-flex h-5 w-5 items-center justify-center rounded hover:bg-muted text-muted-foreground hover:text-foreground disabled:opacity-50"
+                aria-label="Drive-Sync neu starten"
+              >
+                <RotateCw className={`h-3 w-3 ${retryPending ? "animate-spin" : ""}`} />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>Drive-Sync neu starten</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      )}
+    </span>
   );
 }
 
