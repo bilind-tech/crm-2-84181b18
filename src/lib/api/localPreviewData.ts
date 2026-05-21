@@ -375,7 +375,7 @@ export function localPreviewGet<T>(path: string): T | null {
   }
   if (cleanPath === "/aktivitaeten") return [] as T;
   if (cleanPath === "/benachrichtigungen") return [] as T;
-  if (cleanPath === "/einstellungen/firma") return previewFirma as T;
+  if (cleanPath === "/einstellungen/firma") return (readStore().firma ?? previewFirma) as T;
   if (cleanPath === "/einstellungen/nummernkreise") return previewNummernkreise as T;
   return null;
 }
