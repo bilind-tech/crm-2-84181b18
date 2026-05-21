@@ -76,6 +76,8 @@ export interface DbAngebot {
   rabatt_gesamt: number;
   steuersatz: number;
   gueltig_bis: string | null;
+  einsatz_von: string | null;
+  einsatz_bis: string | null;
   notizen: string | null;
   status: string;
   versendet_am: string | null;
@@ -99,6 +101,8 @@ export interface ApiAngebot {
   rabattGesamt: number;
   steuersatz: number;
   gueltigBis?: string;
+  einsatzVon?: string;
+  einsatzBis?: string;
   notizen?: string;
   status: string;
   versendetAm?: string;
@@ -123,6 +127,8 @@ export function angebotRowToApi(r: DbAngebot, positionen: ApiPosition[]): ApiAng
     rabattGesamt: r.rabatt_gesamt,
     steuersatz: r.steuersatz,
     gueltigBis: r.gueltig_bis ?? undefined,
+    einsatzVon: r.einsatz_von ?? undefined,
+    einsatzBis: r.einsatz_bis ?? undefined,
     notizen: r.notizen ?? undefined,
     status: r.status,
     versendetAm: r.versendet_am ? isoFromSqlite(r.versendet_am) : undefined,
@@ -150,6 +156,8 @@ export interface DbRechnung {
   rechnungsdatum: string;
   faelligkeitsdatum: string;
   leistungsmonat: string | null;
+  einsatz_von: string | null;
+  einsatz_bis: string | null;
   notizen: string | null;
   status: string;
   versendet_am: string | null;
@@ -213,6 +221,8 @@ export interface ApiRechnung {
   rechnungsdatum: string;
   faelligkeitsdatum: string;
   leistungsmonat?: string;
+  einsatzVon?: string;
+  einsatzBis?: string;
   notizen?: string;
   status: string;
   versendetAm?: string;
@@ -249,6 +259,8 @@ export function rechnungRowToApi(
     rechnungsdatum: r.rechnungsdatum,
     faelligkeitsdatum: r.faelligkeitsdatum,
     leistungsmonat: r.leistungsmonat ?? undefined,
+    einsatzVon: r.einsatz_von ?? undefined,
+    einsatzBis: r.einsatz_bis ?? undefined,
     notizen: r.notizen ?? undefined,
     status: r.status,
     versendetAm: r.versendet_am ? isoFromSqlite(r.versendet_am) : undefined,
