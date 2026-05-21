@@ -28,7 +28,7 @@ const optionen = {
 };
 
 export const previewFirma: Firmendaten = {
-  firmenname: "My Clean Center",
+  firmenname: "My Clean Center GmbH",
   rechtsform: "GmbH",
   strasse: "Musterstraße 12",
   plz: "53757",
@@ -149,6 +149,7 @@ interface PreviewStore {
   dauerauftragSonderpos: DauerauftragSonderposition[];
   dauerauftragEinstellungen?: DauerauftragEinstellungen;
   dauerauftragSeq?: number;
+  firma?: Firmendaten;
 }
 
 function clone<T>(value: T): T {
@@ -171,6 +172,7 @@ function readStore(): PreviewStore {
       dauerauftragSonderpos: Array.isArray(parsed.dauerauftragSonderpos) ? parsed.dauerauftragSonderpos : [],
       dauerauftragEinstellungen: parsed.dauerauftragEinstellungen,
       dauerauftragSeq: typeof parsed.dauerauftragSeq === "number" ? parsed.dauerauftragSeq : 0,
+      firma: parsed.firma,
     };
   } catch {
     return { angebote: [], rechnungen: [], dauerauftraege: [], dauerauftragLaeufe: [], dauerauftragSonderpos: [] };
