@@ -310,7 +310,7 @@ async function processDokumentMove(row: DriveUpload): Promise<void> {
   }
   const zielFolderId = await ensureCrmOrdnerInDrive(dok.ordnerId ?? null);
   await moveDriveFile(fileId, zielFolderId);
-  markErfolg(row.id, fileId, dok.drive?.webViewLink ?? undefined);
+  markErfolg(row.id, fileId, dok.drive?.url ?? undefined);
   setStatusOk();
 }
 
