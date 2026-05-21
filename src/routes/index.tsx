@@ -146,7 +146,11 @@ function Dashboard() {
               {offene.slice(0, 4).map((r) => {
                 const summe =
                   r.positionen.reduce(
-                    (a, p) => a + p.menge * p.einzelpreisNetto * (1 - p.rabatt / 100),
+                    (a, p) =>
+                      a +
+                      (p.modus === "pauschal"
+                        ? (p.pauschalpreisNetto ?? 0) * (1 - p.rabatt / 100)
+                        : p.menge * p.einzelpreisNetto * (1 - p.rabatt / 100)),
                     0,
                   ) *
                   (1 + r.steuersatz / 100);

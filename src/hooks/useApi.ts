@@ -477,7 +477,10 @@ function berechneRechnungStatus(r: Rechnung): Rechnung["status"] {
   let netto = 0;
   let steuer = 0;
   for (const p of r.positionen) {
-    const linie = p.menge * p.einzelpreisNetto * (1 - p.rabatt / 100);
+    const linie =
+      p.modus === "pauschal"
+        ? (p.pauschalpreisNetto ?? 0) * (1 - p.rabatt / 100)
+        : p.menge * p.einzelpreisNetto * (1 - p.rabatt / 100);
     netto += linie;
     steuer += linie * (p.steuersatz / 100);
   }
