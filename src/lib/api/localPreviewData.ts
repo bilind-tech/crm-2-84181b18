@@ -28,7 +28,7 @@ const optionen = {
 };
 
 export const previewFirma: Firmendaten = {
-  firmenname: "My Clean Center",
+  firmenname: "My Clean Center GmbH",
   rechtsform: "GmbH",
   strasse: "Musterstraße 12",
   plz: "53757",
@@ -149,6 +149,7 @@ interface PreviewStore {
   dauerauftragSonderpos: DauerauftragSonderposition[];
   dauerauftragEinstellungen?: DauerauftragEinstellungen;
   dauerauftragSeq?: number;
+  firma?: Firmendaten;
 }
 
 function clone<T>(value: T): T {
@@ -171,6 +172,7 @@ function readStore(): PreviewStore {
       dauerauftragSonderpos: Array.isArray(parsed.dauerauftragSonderpos) ? parsed.dauerauftragSonderpos : [],
       dauerauftragEinstellungen: parsed.dauerauftragEinstellungen,
       dauerauftragSeq: typeof parsed.dauerauftragSeq === "number" ? parsed.dauerauftragSeq : 0,
+      firma: parsed.firma,
     };
   } catch {
     return { angebote: [], rechnungen: [], dauerauftraege: [], dauerauftragLaeufe: [], dauerauftragSonderpos: [] };
@@ -373,7 +375,7 @@ export function localPreviewGet<T>(path: string): T | null {
   }
   if (cleanPath === "/aktivitaeten") return [] as T;
   if (cleanPath === "/benachrichtigungen") return [] as T;
-  if (cleanPath === "/einstellungen/firma") return previewFirma as T;
+  if (cleanPath === "/einstellungen/firma") return (readStore().firma ?? previewFirma) as T;
   if (cleanPath === "/einstellungen/nummernkreise") return previewNummernkreise as T;
   return null;
 }
@@ -620,6 +622,14 @@ export function localPreviewMutate<T>(method: string, path: string, body?: unkno
     const current = store.dauerauftragEinstellungen ?? DA_DEFAULT_EINSTELLUNGEN;
     const next = { ...current, ...(body as Partial<DauerauftragEinstellungen>) };
     store.dauerauftragEinstellungen = next;
+    writeStore(store);
+    return next as T;
+  }
+
+  if (method === "PATCH" && cleanPath === "/einstellungen/firma") {
+    const current = store.firma ?? previewFirma;
+    const next: Firmendaten = { ...current, ...(body as Partial<Firmendaten>) };
+    store.firma = next;
     writeStore(store);
     return next as T;
   }

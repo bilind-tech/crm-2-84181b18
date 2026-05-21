@@ -1,25 +1,36 @@
-## Logo in Protokollen aus den Einstellungen verwenden
+## Problem
 
-### Problem
-In `src/lib/pdf/werkzeugePdf.ts` fetcht `logoDataUrl(firma.logoUrl)` die URL und wandelt sie über `FileReader` erneut in einen data‑URL um. Dabei fällt der Code zu oft auf das gebündelte Fallback `@/assets/logo.png` zurück, sodass im Protokoll-/Schlüsselübergabe-PDF nicht das in **Einstellungen → Firma** hochgeladene Logo (als `data:`‑URL in `firma.logoUrl`) erscheint, sondern der Standard.
+Im **Preview-/Demo-Modus** (kein laufendes Pi-Backend erreichbar) verhält sich die Firmendaten-Seite genau wie beschrieben:
 
-In `src/lib/pdf/belegPdf.ts` (Zeile 633–637) ist es bereits richtig gelöst: ist `firma.logoUrl` gesetzt, wird der Wert **direkt** als pdfmake-`image` verwendet — kein Fetch nötig, da pdfmake `data:`-URLs nativ unterstützt.
+- **GET `/einstellungen/firma`** liefert in `localPreviewData.ts` immer die **statische Konstante** `previewFirma` zurück (Zeile 376).
+- **PATCH `/einstellungen/firma`** hat in `localPreviewMutate` **keinen Handler** (Zeile 381–627) → Aufruf fällt durch auf den realen `fetch(getBackendUrl()+path)`, der ohne erreichbares Backend einen Netzwerkfehler wirft.
+- Folge: Beim Klick auf „Speichern" wird die Änderung verworfen. Sobald das Query erneut lädt (Tab-Wechsel, Window-Focus, Re-Render), läuft `useEffect(() => setForm(initial), [initial])` und überschreibt das Formular wieder mit `previewFirma` — Webseite leer, Firmenname zurück auf den hardcodierten Default `"My Clean Center"` (ohne „GmbH", ohne Leerzeichen-Korrektur).
 
-### Lösung
-`werkzeugePdf.ts` an dieselbe Logik angleichen:
+Das **echte Pi-Backend** macht das korrekt: `backend/src/settings/schemas.ts` nutzt `z.string().trim()` (erhält interne Leerzeichen), und `backend/src/routes/einstellungen.ts` mappt `firmenname↔name` / `webseite↔web` sauber in beide Richtungen. Der Test `backend/test/firma-settings.spec.ts` beweist Roundtrip inkl. Leerzeichen und Webseite. System-Updates ersetzen laut Architektur nur Code in `/opt/mycleancenter/current/`, niemals Daten in `/var/lib/mycleancenter/` — gespeicherte Werte bleiben über Updates erhalten.
 
-1. Neue Helper-Funktion `resolveLogo(firma)`:
-   - Wenn `firma?.logoUrl` getrimmt nicht leer ist → diese **direkt** zurückgeben (keine `fetch` Pipeline).
-   - Sonst Fallback `@/assets/logo.png` über `fetch` als data‑URL laden.
-2. In `generateUebergabeprotokollPdf` (Zeile 316) und `generateSchluesseluebergabePdf` (Zeile 459) `logoDataUrl(data.firma?.logoUrl)` durch `resolveLogo(data.firma)` ersetzen.
-3. Die alte `logoDataUrl()`‑Pipeline behalten, aber nur noch als Fallback‑Loader für das gebündelte Asset (ohne `src`‑Parameter).
+## Lösung
 
-### Nicht betroffen
-- `header()`, `footer()` und alle übrigen Layoutbausteine bleiben unverändert.
-- Beleg-PDFs (Angebot/Rechnung) sind nicht betroffen.
-- `firma.logoUrl` selbst (Speicherort, Schema) wird nicht angefasst.
+### 1. `src/lib/api/localPreviewData.ts` — Firma im Preview-Store persistieren
 
-### Verifikation
-- In Einstellungen ein Logo hochladen, dann ein Übergabeprotokoll und eine Schlüsselübergabe öffnen.
-- Rechts oben muss das hochgeladene Logo erscheinen, **nicht** das Standard‑MCC‑Logo.
-- Wenn man das Logo in Einstellungen entfernt, soll das gebündelte Fallback‑Logo erscheinen.
+- `previewFirma.firmenname` korrigieren von `"My Clean Center"` auf `"My Clean Center GmbH"` (passend zum Backend-Default, mit Leerzeichen).
+- Im Preview-Store eine optionale `firma?: Firmendaten`-Property halten.
+- GET-Handler ändern: `return store.firma ?? previewFirma`.
+- PATCH-Handler hinzufügen für `/einstellungen/firma`:
+  - Body als `Partial<Firmendaten>` interpretieren
+  - mit aktuellem Wert (`store.firma ?? previewFirma`) mergen
+  - in `store.firma` schreiben und Store speichern
+  - gemergten Datensatz zurückgeben
+
+Damit speichert das Formular im Preview-Modus zuverlässig — Webseite bleibt erhalten, Firmenname mit Leerzeichen bleibt erhalten, auch über Tab-Wechsel/Refresh.
+
+### 2. Verifikation am echten Pi-Backend
+
+Keine Code-Änderung nötig. Nach Deployment einmal prüfen:
+
+- Auf dem Pi: `sqlite3 /var/lib/mycleancenter/data.db "SELECT value FROM setting WHERE key='firma';"` — wenn dort ein alter Wert wie `"name":"MyCleanCenter GmbH"` steht, einmal in der UI auf `"My Clean Center GmbH"` korrigieren und speichern. Der Wert bleibt dann über alle weiteren Updates erhalten.
+
+## Nicht geändert
+
+- `backend/src/settings/schemas.ts`, `backend/src/routes/einstellungen.ts`, `backend/src/pdf/firma.ts` — bereits korrekt, Tests bestätigen.
+- Update-Logik — fasst Daten-Verzeichnis nicht an (Projekt-Regel).
+- Memory-Regeln bleiben unverändert.
