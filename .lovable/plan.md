@@ -1,65 +1,89 @@
-## Ziel
+# Plan: Drive-Sync Folge-Runde abschließen
 
-In Angebot- und Rechnungsformularen:
+Stand nach Code-Check:
+- Backend-Mapping `dokument_ordner_drive_map`, Queue-Ops und Worker sind da (Mig. 035/036, `ordner-drive-map-repo.ts`, `upload-worker.ts`).
+- Drift-Check-Route `/drive/sync/dokumente-full` existiert noch **nicht** (`backend/src/routes/drive.ts`).
+- `DriveSyncBadge` zeigt Status („synced / pending / error"), aber **kein Retry-Button** in den Listen (`src/routes/dokumente.tsx`, ebenso Rechnungen/Angebote, wo der Badge nicht eingebunden ist).
+- `OrdnerBaum.tsx` zeigt **keinen Drive-Status-Punkt** pro Ordnerzeile.
 
-1. Das Feld **„Ausführung"** in jeder Position entfernen — es ist redundant, weil bei Dauerauftrag die Frequenz/Ausführung bereits dort konfiguriert wird.
-2. Stattdessen auf **Beleg-Ebene** ein optionales **Einsatzdatum / -zeitraum** anbieten, das **nur sichtbar ist, wenn kein Dauerauftrag aktiv ist** (z. B. einmalige Reinigung am 12.06.2026 oder vom 12.–14.06.2026).
-3. **Auto-Formatierung** in der Leistungsbeschreibung komplett abschalten: kein automatischer `• `-Bullet nach Enter, kein Tab→2 Leerzeichen, kein Bullet-Fortsetzen. Formatierung ausschließlich manuell über die Toolbar (B / I / U / Liste-Button bleiben).
+Es sind also alle drei offenen Punkte noch zu bauen.
 
-## Frontend
+---
 
-### `src/components/forms/LeistungsBeschreibung.tsx`
-- `handleKeyDown` entkernen: Enter-Sonderlogik (Bullet-Fortsetzung) und Tab→2-Spaces komplett entfernen.
-- Markdown-Wrap-Shortcuts (Cmd/Ctrl+B/I/U) bleiben.
-- Bullet-Button in der Toolbar bleibt (manuelles Einfügen via `bulletEinfuegen`).
+## 1) Backend — Drift-Check Route `POST /drive/sync/dokumente-full`
 
-### `src/components/forms/PositionenEditor.tsx`
-- Feld „Ausführung (optional, …)" inkl. Label, Input und Hilfstext im Pauschal-Modus entfernen.
-- `PositionDraft.ausfuehrung`, `emptyPosition().ausfuehrung`, `defaultAusfuehrung`-Prop, `add(modus)`-Vorbelegung, `toApiPositionen`/`fromApiPosition`-Mapping entfernen.
-- Hinweistext „Tipp: Enter nach … setzt automatisch …" entfernen (passt nicht mehr).
+Zweck: alle CRM-Ordner & Dokumente gegen Drive abgleichen, fehlende Mappings/Uploads/Verschiebungen als Queue-Ops nachziehen. Idempotent, sicher (nur additiv, **niemals** lokal löschen).
 
-### `src/components/forms/RechnungForm.tsx` und `AngebotForm.tsx`
-- `defaultAusfuehrung={…formatWiederkehrend(…)}`-Prop am `PositionenEditor` entfernen.
-- Neuen Block **„Einsatztermin"** einbauen (nur wenn `!dauerauftragAktiv`):
-  - Zwei Date-Inputs: `einsatzVon` (Pflicht im Block) und `einsatzBis` (optional; wenn leer ⇒ ein-Tages-Einsatz).
-  - Default: `einsatzVon = heute`, `einsatzBis = leer`.
-  - Hinweistext: „Lass leer, wenn der Termin noch offen ist."
-- Beim Submit `einsatzVon`/`einsatzBis` als ISO-Datum mitsenden; bei Dauerauftrag immer `null`/weglassen.
+**Datei:** `backend/src/drive/drift-check.ts` (neu) + Route in `backend/src/routes/drive.ts`.
 
-### `src/routes/angebote.$id.tsx` und `rechnungen.$id.tsx`
-- Anzeige `{p.ausfuehrung && <span>{p.ausfuehrung} · </span>}` entfernen.
-- Einsatzdatum/-zeitraum im Detail anzeigen (z. B. „Einsatz: 12.06.2026" oder „Einsatz: 12.–14.06.2026"), wenn gesetzt.
+**Schritte des Drift-Checks:**
+1. `loadDriveSettings()` — wenn nicht verbunden → 409 wie bei `/drive/backfill`.
+2. `ensureRootFolder()` aufrufen, dann `Dokumente/`-Stamm sicherstellen.
+3. **Ordner:** `listOrdner()` aus DB → für jeden Ordner ohne Eintrag in `dokument_ordner_drive_map` (oder mit `fehler_text`) → `enqueue({ belegArt: "ordner_create", op_payload_json: { ordnerId, parentId } })`. Hierarchie depth-first, Parent zuerst.
+4. **Verschobene Ordner:** Map vorhanden, aber `parentId` weicht vom letzten bekannten Drive-Pfad ab → `enqueue("ordner_move")`.
+5. **Dokumente:** `listDokumente({limit: 5000})` → für jedes Dokument ohne `drive.fileId` oder mit `drive.error` → `backfillOne("dokument", id)`; wenn `ordnerId` sich gegenüber Drive-Lage geändert hat → `enqueue("dokument_move")`.
+6. Rückgabe: `{ ok: true, ordnerNeu, ordnerVerschoben, dokumenteNeu, dokumenteVerschoben, fehler }`.
+7. Am Ende `tickDriveQueue(20)` anstoßen.
 
-### `src/lib/api/types.ts`
-- `Position.ausfuehrung` als deprecated markieren (im Type-Layer entfernen, sobald Backend mitzieht — siehe unten).
-- Auf `Angebot` und `Rechnung`: `einsatzVon?: string` (ISO), `einsatzBis?: string | null` ergänzen.
+**Sicherheit (Memory-Regel „nichts löschen"):**
+- Drift-Check enqueued **nur** `*_create` / `*_move` / Upload-Ops. Niemals `*_delete`.
+- Keine DB-Mutation außerhalb der bestehenden Repo-Funktionen.
+- Vorher: kein Backup nötig (read-only auf Daten-Verzeichnis), aber Test im `backend/test/`-Set abdecken.
 
-## Backend
+---
 
-### Migration `037_beleg_einsatztermin.sql`
-- `ALTER TABLE angebot ADD COLUMN einsatz_von TEXT, ADD COLUMN einsatz_bis TEXT;`
-- `ALTER TABLE rechnung ADD COLUMN einsatz_von TEXT, ADD COLUMN einsatz_bis TEXT;`
-- Format `YYYY-MM-DD`, beide nullable.
+## 2) Frontend — Retry-Button in der Dokumente-Liste
 
-### Repos & Mapper (`backend/src/belege/`)
-- `angebote-repo.ts`, `rechnungen-repo.ts`: `einsatz_von`/`einsatz_bis` lesen/schreiben.
-- `mappers.ts`: `einsatzVon`/`einsatzBis` ins API-DTO mappen.
-- `validation.ts`: optionales `einsatzVon` (`YYYY-MM-DD`), `einsatzBis` ≥ `einsatzVon`, beide nur erlaubt wenn `!dauerauftrag`.
+`src/components/dokumente/DriveSyncBadge.tsx` um optionalen `onRetry`-Hook erweitern; bei `state === "error"` einen kleinen Icon-Button (RefreshCw) neben dem Badge anzeigen.
 
-### `backend/src/belege/positionen.ts` und `umwandeln.ts`
-- `ausfuehrung`-Spalte/-Feld **vorerst beibehalten** (Bestandsdaten), aber beim Insert nicht mehr aus dem Frontend übernehmen — immer `null` setzen.
-- Folge-Migration (separat, später) kann die Spalte droppen, sobald Bestand migriert ist.
+Neuer Hook `useDriveRetry()` in `src/hooks/useApi.ts` (oder neu `src/hooks/useDriveSync.ts`):
+```
+POST /drive/uploads/enqueue  { belegArt: "dokument", belegId }
+```
+(existiert bereits im Backend) → bei Erfolg Query `dokumente` invalidieren.
 
-### PDF (`backend/src/pdf/layout.ts` + `src/lib/pdf/belegPdf.ts`)
-- Position-Zeile: `p.ausfuehrung`-Fallback in `formatModus` entfernen.
-- Intro-Text um Einsatztermin erweitern, wenn gesetzt: „… für die Reinigung am 12.06.2026" / „… vom 12.06.2026 bis 14.06.2026". Bei Dauerauftrag unverändert.
+Einbindung:
+- `src/routes/dokumente.tsx` — beide Stellen (Listen-Item Zeile 378 und 517): `<DriveSyncBadge dokument={d} onRetry={() => retry(d.id)} />`.
+- Toast bei Erfolg/Fehler.
 
-## Open Question
+**Bewusst nicht** in Rechnungen-/Angebote-Liste einbauen (separater Strang — der Drive-Status für Belege wird derzeit nur im Detail/Editor angezeigt; bleibt unverändert, um Scope klein zu halten).
 
-Soll der Einsatztermin auch in die **PDF-Kopfzeile** (z. B. unter „Rechnungsdatum") als eigene Zeile „Einsatz: 12.06.2026" gerendert werden, oder reicht die Erwähnung im Intro-Text?
+---
 
-## Out of Scope
+## 3) Frontend — Ordner-Status-Punkt im `OrdnerBaum`
 
-- Per-Position-Einsatzdaten (z. B. Position A am Tag 1, Position B am Tag 2) — wäre Overkill.
-- Drop der `ausfuehrung`-Spalte in der DB (separate Aufräum-Migration).
-- Änderungen am Protokoll-PDF.
+Neue API: Backend-Endpoint `GET /drive/ordner/status` liefert pro Ordner-Id Status aus `dokument_ordner_drive_map`:
+```
+{ ordnerId: { status: "synced"|"pending"|"error"|"none", error?: string, syncedAt?: string } }
+```
+Implementierung in `backend/src/routes/drive.ts` mit `listAll()` aus `ordner-drive-map-repo.ts`.
+
+Frontend:
+- Neuer Hook `useOrdnerDriveStatus()` (TanStack Query, refetch alle 5s solange `pending` vorkommt, sonst alle 30s).
+- `OrdnerBaum.tsx`: `Props` um `driveStatus?: Record<string, "synced"|"pending"|"error"|"none">` erweitern. In `BaumKnoten` rechts neben dem Folder-Icon einen 6×6-Punkt rendern (`bg-success` / `bg-muted-foreground animate-pulse` / `bg-warning`); `synced` ohne Punkt oder dezent grün; Tooltip mit Status-Text. Style folgt Memory (kein Sparkle, dezent).
+- Aufrufer (`src/routes/dokumente.tsx`) übergibt die Map.
+
+---
+
+## Geänderte/neue Dateien
+**Neu**
+- `backend/src/drive/drift-check.ts`
+- `src/hooks/useDriveSync.ts` (oder Funktionen in `useApi.ts`)
+- `backend/test/drive-drift-check.spec.ts`
+
+**Bearbeitet**
+- `backend/src/routes/drive.ts` (Routen `POST /drive/sync/dokumente-full`, `GET /drive/ordner/status`)
+- `backend/src/drive/upload-worker.ts` (falls Worker-Hooks für neue Op-Felder fehlen — wahrscheinlich nicht, da 036 schon alles abdeckt)
+- `src/components/dokumente/DriveSyncBadge.tsx` (onRetry)
+- `src/components/dokumente/OrdnerBaum.tsx` (driveStatus-Punkt)
+- `src/routes/dokumente.tsx` (Retry-Wiring + Status-Map)
+
+## Out of scope
+- Drift-Check für Belege (Rechnungen/Angebote) — separater Punkt, falls gewünscht.
+- Drive-Restore aus Papierkorb.
+- Visuelle Überarbeitung des `GlobalDriveSyncBadge`.
+
+## Risiko / Edge-Cases
+- Drift-Check darf bei vielen Dokumenten nicht blockieren: harte Obergrenze 1000 Items pro Lauf, Cursor-Marker später (Ticket vermerken, nicht jetzt bauen).
+- Bei nicht-verbundenem Drive 409 + verständliche Fehlermeldung; FE-Button sollte das tolerieren.
+- Polling-Intervall im Baum: nur bei sichtbarem Tab aktiv (`document.visibilityState === "visible"`).
