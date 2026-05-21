@@ -38,8 +38,10 @@ async function getPdfMake(): Promise<AnyPdfMake> {
 
 async function logoDataUrl(src?: string): Promise<string | null> {
   try {
-    const url = src && src.trim() ? src : logoFallback;
+    const trimmed = typeof src === "string" ? src.trim() : "";
+    const url = trimmed.length > 0 ? trimmed : logoFallback;
     const res = await fetch(url);
+    if (!res.ok) throw new Error(`logo fetch ${res.status}`);
     const blob = await res.blob();
     return await new Promise<string>((resolve, reject) => {
       const r = new FileReader();
@@ -48,7 +50,19 @@ async function logoDataUrl(src?: string): Promise<string | null> {
       r.readAsDataURL(blob);
     });
   } catch {
-    return null;
+    // Zweiter Versuch: hart auf das gebündelte Fallback-Asset
+    try {
+      const res = await fetch(logoFallback);
+      const blob = await res.blob();
+      return await new Promise<string>((resolve, reject) => {
+        const r = new FileReader();
+        r.onload = () => resolve(r.result as string);
+        r.onerror = reject;
+        r.readAsDataURL(blob);
+      });
+    } catch {
+      return null;
+    }
   }
 }
 
@@ -114,10 +128,13 @@ function header(firma: Firmendaten | undefined, logo: string | null, logoSichtba
 function footer(firma?: Firmendaten) {
   return function () {
     const f = firma ?? ({} as Firmendaten);
-    const cell = (lines: (string | null | undefined)[]) => ({
+    const cell = (
+      lines: (string | null | undefined)[],
+      alignment: "left" | "center" | "right" = "left",
+    ) => ({
       stack: lines
         .filter(Boolean)
-        .map((l) => ({ text: l as string, fontSize: 7, color: COLOR_TEXT })),
+        .map((l) => ({ text: l as string, fontSize: 7, color: COLOR_TEXT, alignment })),
     });
     return {
       margin: [55, 0, 55, 12] as [number, number, number, number],
@@ -137,7 +154,10 @@ function footer(firma?: Firmendaten) {
             ]),
             cell(["Bank", f.bankName, f.iban]),
             cell([f.telefon, f.email]),
-            cell([f.handelsregister, f.ustId ? `USt-ID: ${f.ustId}` : null, f.webseite]),
+            cell(
+              [f.handelsregister, f.ustId ? `USt-ID: ${f.ustId}` : null, f.webseite],
+              "right",
+            ),
           ],
           columnGap: 12,
         },
