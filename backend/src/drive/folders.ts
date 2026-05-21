@@ -147,3 +147,98 @@ export async function createTextFile(opts: { parentFolderId: string; name: strin
   });
   return { id: res.data.id ?? "", webViewLink: res.data.webViewLink ?? undefined };
 }
+
+// ---------- Dokumente-Mirror: CRM-Ordner ↔ Drive ----------
+
+/** Wurzel-Ordner für die freie Dokumente-Spiegelung (`mycleancenter.cm/Dokumente`). */
+export async function ensureDokumenteRoot(): Promise<string> {
+  return ensureFolderPath("Dokumente");
+}
+
+/** Wurzel-Ordner für den weichen Drive-Papierkorb (`mycleancenter.cm/Dokumente/_Papierkorb`). */
+export async function ensurePapierkorbRoot(): Promise<string> {
+  return ensureFolderPath("Dokumente/_Papierkorb");
+}
+
+/** Legt einen Drive-Ordner mit Namen unter parentId an oder findet einen existierenden. */
+export async function ensureNamedFolder(name: string, parentId: string): Promise<string> {
+  return findOrCreateFolder(name, parentId);
+}
+
+export async function renameDriveFolder(fileId: string, name: string): Promise<void> {
+  const drive = getClient();
+  await drive.files.update({ fileId, requestBody: { name } });
+}
+
+/** Verschiebt eine Drive-Datei/Ordner unter einen neuen Parent. */
+export async function moveDriveFile(
+  fileId: string,
+  neuerParentId: string,
+): Promise<void> {
+  const drive = getClient();
+  const cur = await drive.files.get({ fileId, fields: "parents" });
+  const oldParents = (cur.data.parents ?? []).join(",");
+  await drive.files.update({
+    fileId,
+    addParents: neuerParentId,
+    removeParents: oldParents || undefined,
+    requestBody: {},
+  });
+}
+
+/** Legt eine Datei in den Drive-Papierkorb (trashed=true, 30 Tage Rettungsnetz). */
+export async function trashDriveFile(fileId: string): Promise<void> {
+  const drive = getClient();
+  await drive.files.update({ fileId, requestBody: { trashed: true } });
+}
+
+/** Holt aktuelle Drive-Metadaten — wird für Pre-Flight-Checks vor Löschungen verwendet. */
+export async function getDriveFileMeta(fileId: string): Promise<{
+  id: string; name: string; parents: string[]; trashed: boolean; mimeType: string;
+} | null> {
+  try {
+    const drive = getClient();
+    const res = await drive.files.get({
+      fileId,
+      fields: "id,name,parents,trashed,mimeType",
+    });
+    return {
+      id: res.data.id ?? fileId,
+      name: res.data.name ?? "",
+      parents: res.data.parents ?? [],
+      trashed: !!res.data.trashed,
+      mimeType: res.data.mimeType ?? "",
+    };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (/404|notFound|not found/i.test(msg)) return null;
+    throw e;
+  }
+}
+
+/** Listet Kinder eines Drive-Ordners (nur ID + Name + Trashed-Flag). */
+export async function listDriveChildren(parentId: string): Promise<{
+  id: string; name: string; mimeType: string; trashed: boolean;
+}[]> {
+  const drive = getClient();
+  const out: { id: string; name: string; mimeType: string; trashed: boolean }[] = [];
+  let pageToken: string | undefined;
+  do {
+    const res = await drive.files.list({
+      q: `'${parentId}' in parents and trashed = false`,
+      fields: "nextPageToken, files(id,name,mimeType,trashed)",
+      pageSize: 500,
+      pageToken,
+    });
+    for (const f of res.data.files ?? []) {
+      out.push({
+        id: f.id ?? "",
+        name: f.name ?? "",
+        mimeType: f.mimeType ?? "",
+        trashed: !!f.trashed,
+      });
+    }
+    pageToken = res.data.nextPageToken ?? undefined;
+  } while (pageToken);
+  return out;
+}

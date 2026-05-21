@@ -1,6 +1,7 @@
 // Repo für Dokument-Ordner (hierarchisch, Soft-Delete).
 import crypto from "node:crypto";
 import { getDatabase } from "../db/index.js";
+import { emit } from "../events/bus.js";
 
 export interface DokumentOrdner {
   id: string;
@@ -116,7 +117,9 @@ export function createOrdner(input: CreateOrdnerInput): DokumentOrdner {
   getDatabase()
     .prepare(`INSERT INTO dokument_ordner (id, name, parent_id) VALUES (?, ?, ?)`)
     .run(id, name, parentId);
-  return getOrdner(id)!;
+  const created = getOrdner(id)!;
+  emit("ordner:erstellt", { id });
+  return created;
 }
 
 function pfadEnthaelt(startId: string, suchId: string): boolean {
@@ -157,7 +160,16 @@ export function updateOrdner(id: string, patch: UpdateOrdnerInput): DokumentOrdn
   getDatabase()
     .prepare(`UPDATE dokument_ordner SET name = ?, parent_id = ? WHERE id = ?`)
     .run(neuName, neuParent, id);
-  return getOrdner(id);
+  const next = getOrdner(id);
+  if (next) {
+    if (cur.name !== next.name) {
+      emit("ordner:umbenannt", { id, nameVorher: cur.name, nameNachher: next.name });
+    }
+    if (cur.parentId !== next.parentId) {
+      emit("ordner:verschoben", { id, parentVorher: cur.parentId, parentNachher: next.parentId });
+    }
+  }
+  return next;
 }
 
 /** Soft-Löschen. Modus bestimmt, was mit Inhalten passiert. */
@@ -170,8 +182,16 @@ export function deleteOrdner(
   const db = getDatabase();
   let verschoben = 0;
   let mitgeloescht = 0;
+  let nachfolger: string[] = [];
 
   if (modus === "move-to-parent") {
+    // Vorher: betroffene Dokumente einsammeln (für Move-Events).
+    const dokIds = db
+      .prepare(`SELECT id FROM dokumente WHERE ordner_id = ? AND geloescht_am IS NULL`)
+      .all(id) as { id: string }[];
+    const childIds = db
+      .prepare(`SELECT id FROM dokument_ordner WHERE parent_id = ? AND geloescht_am IS NULL`)
+      .all(id) as { id: string }[];
     // Direkte Dokumente in den Parent hochziehen.
     const r1 = db
       .prepare(`UPDATE dokumente SET ordner_id = ? WHERE ordner_id = ? AND geloescht_am IS NULL`)
@@ -180,6 +200,12 @@ export function deleteOrdner(
     // Direkte Unterordner in den Parent hochziehen.
     db.prepare(`UPDATE dokument_ordner SET parent_id = ? WHERE parent_id = ? AND geloescht_am IS NULL`)
       .run(cur.parentId, id);
+    for (const c of childIds) {
+      emit("ordner:verschoben", { id: c.id, parentVorher: id, parentNachher: cur.parentId });
+    }
+    for (const d of dokIds) {
+      emit("dokument:verschoben", { id: d.id, ordnerIdVorher: id, ordnerIdNachher: cur.parentId });
+    }
   } else {
     // cascade: rekursiv alle Nachfahren + deren Dokumente soft-löschen.
     const stack: string[] = [id];
@@ -197,6 +223,9 @@ export function deleteOrdner(
     }
     // Dokumente in diesen Ordnern soft-löschen.
     const placeholders = ids.map(() => "?").join(",");
+    const dokRows = db
+      .prepare(`SELECT id FROM dokumente WHERE ordner_id IN (${placeholders}) AND geloescht_am IS NULL`)
+      .all(...ids) as { id: string }[];
     const r1 = db
       .prepare(
         `UPDATE dokumente SET geloescht_am = datetime('now')
@@ -209,11 +238,17 @@ export function deleteOrdner(
       `UPDATE dokument_ordner SET geloescht_am = datetime('now')
        WHERE id IN (${placeholders}) AND geloescht_am IS NULL`,
     ).run(...ids);
+    nachfolger = ids.filter((x) => x !== id);
+    for (const d of dokRows) {
+      emit("dokument:geloescht", { id: d.id });
+    }
+    emit("ordner:geloescht", { id, modus, nachfolger });
     return { geloescht: true, verschoben: 0, mitgeloescht };
   }
 
   // Schließlich Ordner selbst soft-löschen.
   db.prepare(`UPDATE dokument_ordner SET geloescht_am = datetime('now') WHERE id = ?`).run(id);
+  emit("ordner:geloescht", { id, modus, nachfolger: [] });
   return { geloescht: true, verschoben, mitgeloescht };
 }
 
@@ -240,12 +275,22 @@ export function descendantIds(rootId: string): string[] {
 export function moveDokumente(ids: string[], ordnerId: string | null): number {
   if (ids.length === 0) return 0;
   if (ordnerId !== null && !getOrdner(ordnerId)) throw new OrdnerError("parent-missing");
+  const db = getDatabase();
+  const placeholdersIn = ids.map(() => "?").join(",");
+  const vorher = db
+    .prepare(`SELECT id, ordner_id FROM dokumente WHERE id IN (${placeholdersIn})`)
+    .all(...ids) as { id: string; ordner_id: string | null }[];
   const placeholders = ids.map(() => "?").join(",");
-  const r = getDatabase()
+  const r = db
     .prepare(
       `UPDATE dokumente SET ordner_id = ?
        WHERE id IN (${placeholders}) AND geloescht_am IS NULL`,
     )
     .run(ordnerId, ...ids);
+  for (const v of vorher) {
+    if ((v.ordner_id ?? null) !== ordnerId) {
+      emit("dokument:verschoben", { id: v.id, ordnerIdVorher: v.ordner_id ?? null, ordnerIdNachher: ordnerId });
+    }
+  }
   return r.changes;
 }

@@ -4,7 +4,16 @@ import { getDatabase } from "../db/index.js";
 import { emit } from "../events/bus.js";
 
 export type DriveUploadStatus = "pending" | "running" | "erfolg" | "fehler" | "manuell";
-export type BelegArt = "angebot" | "rechnung" | "dokument";
+export type BelegArt =
+  | "angebot"
+  | "rechnung"
+  | "dokument"
+  | "ordner_create"
+  | "ordner_rename"
+  | "ordner_move"
+  | "ordner_delete"
+  | "dokument_delete"
+  | "dokument_move";
 
 export interface DriveUpload {
   id: string;
@@ -13,6 +22,7 @@ export interface DriveUpload {
   dateiName: string;
   pdfSha256: string;
   idempotenzKey: string;
+  opPayload?: Record<string, unknown> | null;
   status: DriveUploadStatus;
   versuche: number;
   naechsterVersuchAt?: string | null;
@@ -27,6 +37,7 @@ export interface DriveUpload {
 interface Row {
   id: string; beleg_art: BelegArt; beleg_id: string;
   datei_name: string; pdf_sha256: string; idempotenz_key: string;
+  op_payload_json: string | null;
   status: DriveUploadStatus; versuche: number;
   naechster_versuch_at: string | null;
   drive_file_id: string | null; drive_web_link: string | null;
@@ -36,11 +47,16 @@ interface Row {
 const map = (r: Row): DriveUpload => ({
   id: r.id, belegArt: r.beleg_art, belegId: r.beleg_id,
   dateiName: r.datei_name, pdfSha256: r.pdf_sha256, idempotenzKey: r.idempotenz_key,
+  opPayload: r.op_payload_json ? safeParse(r.op_payload_json) : null,
   status: r.status, versuche: r.versuche, naechsterVersuchAt: r.naechster_versuch_at,
   driveFileId: r.drive_file_id, driveWebLink: r.drive_web_link,
   fehlerText: r.fehler_text, abgeschlossenAm: r.abgeschlossen_am,
   erstelltAm: r.erstellt_am, geaendertAm: r.geaendert_am,
 });
+
+function safeParse(s: string): Record<string, unknown> | null {
+  try { return JSON.parse(s) as Record<string, unknown>; } catch { return null; }
+}
 
 const BACKOFF_MIN = [1, 5, 15, 60, 240, 1440];
 function plusMin(min: number): string {
@@ -53,6 +69,7 @@ export interface EnqueueInput {
   dateiName: string;
   pdfSha256: string;
   idempotenzKey: string;
+  opPayload?: Record<string, unknown> | null;
 }
 export function enqueue(input: EnqueueInput): { row: DriveUpload; created: boolean } {
   const db = getDatabase();
@@ -61,9 +78,12 @@ export function enqueue(input: EnqueueInput): { row: DriveUpload; created: boole
   if (existing) return { row: map(existing), created: false };
   const id = crypto.randomUUID();
   db.prepare(
-    `INSERT INTO drive_upload_queue (id, beleg_art, beleg_id, datei_name, pdf_sha256, idempotenz_key, status, versuche, naechster_versuch_at)
-     VALUES (?,?,?,?,?,?, 'pending', 0, datetime('now'))`,
-  ).run(id, input.belegArt, input.belegId, input.dateiName, input.pdfSha256, input.idempotenzKey);
+    `INSERT INTO drive_upload_queue (id, beleg_art, beleg_id, datei_name, pdf_sha256, idempotenz_key, op_payload_json, status, versuche, naechster_versuch_at)
+     VALUES (?,?,?,?,?,?,?, 'pending', 0, datetime('now'))`,
+  ).run(
+    id, input.belegArt, input.belegId, input.dateiName, input.pdfSha256, input.idempotenzKey,
+    input.opPayload ? JSON.stringify(input.opPayload) : null,
+  );
   return { row: getById(id)!, created: true };
 }
 
@@ -103,6 +123,11 @@ export function claimDue(limit: number): DriveUpload[] {
       `SELECT * FROM drive_upload_queue
        WHERE status = 'pending'
          AND (naechster_versuch_at IS NULL OR naechster_versuch_at <= datetime('now'))
+         AND NOT EXISTS (
+           SELECT 1 FROM drive_upload_queue r2
+            WHERE r2.beleg_id = drive_upload_queue.beleg_id
+              AND r2.status = 'running'
+         )
        ORDER BY erstellt_am ASC LIMIT ?`,
     ).all(limit) as Row[];
     for (const r of due) {
