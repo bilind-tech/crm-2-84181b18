@@ -284,7 +284,6 @@ function Page() {
                     </div>
                     {istPauschal ? (
                       <div className="mt-0.5 text-xs text-muted-foreground">
-                        {p.ausfuehrung && <span>{p.ausfuehrung} · </span>}
                         Pauschal
                       </div>
                     ) : (

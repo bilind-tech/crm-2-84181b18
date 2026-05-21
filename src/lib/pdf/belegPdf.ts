@@ -277,7 +277,6 @@ function stundenText(p: Position): string {
   return `${menge} Std.`;
 }
 function abrechnungsartText(p: Position): string {
-  if (p.ausfuehrung && p.ausfuehrung.trim()) return p.ausfuehrung;
   if (p.modus === "stunden") return "Stundensatz";
   if (p.modus === "einzel") return "Einzelposition";
   return "Pauschal";
@@ -478,7 +477,9 @@ interface BuildOptions {
 
 export function defaultIntroAngebot(a: Angebot, opts: BuildOptions = {}) {
   if (opts.intro) return opts.intro;
-  return `gerne unterbreiten wir Ihnen ein Angebot für „${a.titel}" und folgende Leistungen:`;
+  const einsatz = formatEinsatzClient(a.einsatzVon, a.einsatzBis);
+  const suffix = einsatz ? ` für die Reinigung ${einsatz}` : "";
+  return `gerne unterbreiten wir Ihnen ein Angebot für „${a.titel}"${suffix} und folgende Leistungen:`;
 }
 export function defaultOutroAngebot(a: Angebot, opts: BuildOptions = {}) {
   if (opts.outro) return opts.outro;
@@ -494,6 +495,10 @@ export function defaultOutroAngebot(a: Angebot, opts: BuildOptions = {}) {
 }
 export function defaultIntroRechnung(_r: Rechnung, opts: BuildOptions = {}) {
   if (opts.intro) return opts.intro;
+  const einsatz = formatEinsatzClient(_r.einsatzVon, _r.einsatzBis);
+  if (einsatz) {
+    return `hiermit übersenden wir Ihnen die Rechnung für die Reinigung ${einsatz} für folgende Leistungen:`;
+  }
   if (_r.leistungsmonat) {
     const m = /^(\d{4})-(\d{2})$/.exec(_r.leistungsmonat);
     if (m) {
@@ -505,6 +510,17 @@ export function defaultIntroRechnung(_r: Rechnung, opts: BuildOptions = {}) {
     }
   }
   return `hiermit übersenden wir Ihnen die Rechnung für folgende Leistungen:`;
+}
+
+function formatEinsatzClient(von?: string, bis?: string): string {
+  if (!von) return "";
+  const vonStr = dt(von);
+  if (!vonStr) return "";
+  if (bis && bis !== von) {
+    const bisStr = dt(bis);
+    if (bisStr) return `vom ${vonStr} bis ${bisStr}`;
+  }
+  return `am ${vonStr}`;
 }
 export function defaultOutroRechnung(_r: Rechnung, opts: BuildOptions = {}) {
   if (opts.outro) return opts.outro;

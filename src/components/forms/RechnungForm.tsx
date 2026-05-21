@@ -28,7 +28,6 @@ import {
   type PositionDraft,
 } from "./PositionenEditor";
 import { OptionenBlock, defaultOptionen, type OptionenState } from "./OptionenBlock";
-import { formatWiederkehrend } from "./DauerauftragKonfig";
 import { AnsprechpartnerPicker } from "./AnsprechpartnerPicker";
 import { Repeat, Check } from "lucide-react";
 import { DateInput } from "@/components/ui/date-input";
@@ -59,6 +58,8 @@ export function RechnungForm({ onClose, defaultKundeId, defaultObjektId }: Props
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
   });
+  const [einsatzVon, setEinsatzVon] = useState<string>(todayISO());
+  const [einsatzBis, setEinsatzBis] = useState<string>("");
   const [positionen, setPositionen] = useState<PositionDraft[]>(() => [emptyPosition(19)]);
   const [optionen, setOptionen] = useState<OptionenState>(defaultOptionen);
   const [ansprechpartnerId, setAnsprechpartnerId] = useState<string | undefined>();
@@ -115,6 +116,8 @@ export function RechnungForm({ onClose, defaultKundeId, defaultObjektId }: Props
       rechnungsdatum,
       faelligkeitsdatum: faellig,
       leistungsmonat: leistungsmonat || undefined,
+      einsatzVon: !optionen.wiederkehrend && einsatzVon ? einsatzVon : undefined,
+      einsatzBis: !optionen.wiederkehrend && einsatzBis ? einsatzBis : undefined,
       status: "entwurf",
       introText: optionen.eigenesIntroAktiv ? optionen.eigenesIntro : undefined,
       outroText: optionen.eigenesOutroAktiv ? optionen.eigenesOutro : undefined,
@@ -270,11 +273,27 @@ export function RechnungForm({ onClose, defaultKundeId, defaultObjektId }: Props
           positionen={positionen}
           onChange={setPositionen}
           defaultSteuersatz={steuersatz}
-          defaultAusfuehrung={
-            optionen.wiederkehrend ? formatWiederkehrend(optionen.wiederkehrendDetails) : undefined
-          }
         />
       </div>
+
+      {!optionen.wiederkehrend && (
+        <div>
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Einsatztermin
+          </p>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Einsatz am">
+              <DateInput value={einsatzVon} onChange={setEinsatzVon} />
+            </Field>
+            <Field label="bis (optional, für Mehrtages-Einsatz)">
+              <DateInput value={einsatzBis} onChange={setEinsatzBis} />
+            </Field>
+          </div>
+          <p className="mt-1.5 text-[11px] text-muted-foreground">
+            Lass „bis" leer, wenn die Reinigung nur an einem Tag stattfindet.
+          </p>
+        </div>
+      )}
 
       <OptionenBlock value={optionen} onChange={setOptionen} />
 
