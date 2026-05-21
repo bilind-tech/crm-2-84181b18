@@ -7,7 +7,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, unlinkSyn
 import path from "node:path";
 import { config } from "../config.js";
 import type { ApiAngebot, ApiRechnung } from "../belege/mappers.js";
-import type { ApiKunde, ApiAnsprechpartner } from "../kunden/mappers.js";
+import type { ApiKunde, ApiAnsprechpartner, ApiObjekt } from "../kunden/mappers.js";
 import type { FirmaForPdf } from "./types.js";
 
 export type BelegArt = "angebot" | "rechnung";
@@ -27,9 +27,10 @@ export function computeHash(parts: {
   kunde: ApiKunde;
   firma: FirmaForPdf;
   ansprechpartner?: ApiAnsprechpartner;
+  objekt?: ApiObjekt | null;
   logoFingerprint: string | null;
 }): string {
-  const { beleg, kunde, firma, ansprechpartner, logoFingerprint } = parts;
+  const { beleg, kunde, firma, ansprechpartner, objekt, logoFingerprint } = parts;
   const payload = {
     nummer: beleg.nummer,
     geaendertAm: beleg.geaendertAm,
@@ -45,12 +46,14 @@ export function computeHash(parts: {
     })),
     rechnungsdatum: (beleg as ApiRechnung).rechnungsdatum,
     faelligkeitsdatum: (beleg as ApiRechnung).faelligkeitsdatum,
+    leistungsmonat: (beleg as ApiRechnung).leistungsmonat,
     gueltigBis: (beleg as ApiAngebot).gueltigBis,
     kunde: {
       n: kunde.nummer, f: kunde.firmenname, v: kunde.vorname, na: kunde.nachname,
       s: kunde.strasse, p: kunde.plz, o: kunde.ort, l: kunde.land, a: kunde.anrede,
     },
     ap: ansprechpartner ? { v: ansprechpartner.vorname, n: ansprechpartner.nachname, a: ansprechpartner.anrede } : null,
+    obj: objekt ? { s: objekt.strasse, p: objekt.plz, o: objekt.ort, l: objekt.land } : null,
     firma,
     logo: logoFingerprint,
   };
