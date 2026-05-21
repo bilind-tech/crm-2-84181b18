@@ -149,6 +149,7 @@ export interface DbRechnung {
   steuersatz: number;
   rechnungsdatum: string;
   faelligkeitsdatum: string;
+  leistungsmonat: string | null;
   notizen: string | null;
   status: string;
   versendet_am: string | null;
@@ -211,6 +212,7 @@ export interface ApiRechnung {
   steuersatz: number;
   rechnungsdatum: string;
   faelligkeitsdatum: string;
+  leistungsmonat?: string;
   notizen?: string;
   status: string;
   versendetAm?: string;
@@ -246,6 +248,7 @@ export function rechnungRowToApi(
     steuersatz: r.steuersatz,
     rechnungsdatum: r.rechnungsdatum,
     faelligkeitsdatum: r.faelligkeitsdatum,
+    leistungsmonat: r.leistungsmonat ?? undefined,
     notizen: r.notizen ?? undefined,
     status: r.status,
     versendetAm: r.versendet_am ? isoFromSqlite(r.versendet_am) : undefined,
