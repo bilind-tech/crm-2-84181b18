@@ -1,6 +1,6 @@
 // PDF-Hook mit React-Query-Cache.
 //
-// - Pro Beleg-ID gibt es genau EINE Query (`["pdf", art, id]`).
+// - Pro Beleg-ID + adressrelevanter Änderung gibt es eine Query.
 // - `staleTime: Infinity` → solange App offen, kein automatisches Nachladen.
 // - Beim ersten Öffnen wird die PDF einmal gebaut/geladen, danach kommt sie
 //   bei jedem Re-Mount sofort aus dem Cache (kein Loader-Flackern).
@@ -17,7 +17,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useKunde, useFirmendaten, useObjekt } from "@/hooks/useApi";
 import { generateAngebotPdf, generateRechnungPdf } from "@/lib/pdf/belegPdf";
 import { fetchBackendPdf } from "@/lib/pdf/backendPdf";
-import type { Angebot, Rechnung, Kunde, Firmendaten, Objekt } from "@/lib/api/types";
+import type { Angebot, Rechnung, Kunde, Firmendaten, Ansprechpartner, Objekt } from "@/lib/api/types";
 
 type Status = "idle" | "loading" | "ready" | "error";
 
@@ -48,6 +48,7 @@ export const pdfQueryKey = (art: "angebot" | "rechnung", id: string, signature?:
 function pdfDependencySignature(
   beleg: Angebot | Rechnung | undefined,
   kunde: Kunde | undefined,
+  ansprechpartner: Ansprechpartner | undefined,
   objekt: Objekt | null | undefined,
 ): string {
   if (!beleg) return "noop";
@@ -56,6 +57,10 @@ function pdfDependencySignature(
     beleg.geaendertAm,
     beleg.objektId ?? "kein-objekt",
     kunde?.geaendertAm ?? "kunde-offen",
+    ansprechpartner?.id ?? "kein-ap",
+    ansprechpartner?.vorname ?? "",
+    ansprechpartner?.nachname ?? "",
+    ansprechpartner?.anrede ?? "",
     objekt?.id ?? "objekt-offen",
     objekt?.geaendertAm ?? "",
     objekt?.strasse ?? "",
@@ -80,12 +85,13 @@ async function buildAngebot(
   angebot: Angebot,
   kunde: Kunde,
   firma: Firmendaten,
+  ansprechpartner?: Ansprechpartner,
   objekt?: Objekt | null,
 ): Promise<PdfData> {
   const backend = await fetchBackendPdf("angebot", angebot.id);
   if (backend) return { blob: backend.blob, fileName: backend.dateiname };
   const { blob } = await withTimeout(
-    generateAngebotPdf(angebot, kunde, firma, undefined, objekt ?? null),
+    generateAngebotPdf(angebot, kunde, firma, ansprechpartner, objekt ?? null),
     PDF_TIMEOUT_MS,
     "PDF-Erstellung",
   );
@@ -96,12 +102,13 @@ async function buildRechnung(
   rechnung: Rechnung,
   kunde: Kunde,
   firma: Firmendaten,
+  ansprechpartner?: Ansprechpartner,
   objekt?: Objekt | null,
 ): Promise<PdfData> {
   const backend = await fetchBackendPdf("rechnung", rechnung.id);
   if (backend) return { blob: backend.blob, fileName: backend.dateiname };
   const { blob } = await withTimeout(
-    generateRechnungPdf(rechnung, kunde, firma, undefined, objekt ?? null),
+    generateRechnungPdf(rechnung, kunde, firma, ansprechpartner, objekt ?? null),
     PDF_TIMEOUT_MS,
     "PDF-Erstellung",
   );
