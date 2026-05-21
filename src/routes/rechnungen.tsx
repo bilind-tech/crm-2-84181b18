@@ -21,7 +21,6 @@ import { useConfirm } from "@/hooks/useConfirm";
 import { RechnungAusDauerauftragDialog } from "@/components/dauerauftrag/RechnungAusDauerauftragDialog";
 import { FlowBar } from "@/components/flow/FlowBar";
 import { rechnungFlow } from "@/lib/flow/flows";
-import { summenRechnung } from "@/lib/belege/summen";
 import {
   ZEITRAUM_ALLE,
   passtInZeitraum,
