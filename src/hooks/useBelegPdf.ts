@@ -87,8 +87,9 @@ async function buildAngebot(
   firma: Firmendaten,
   ansprechpartner?: Ansprechpartner,
   objekt?: Objekt | null,
+  cacheBust?: string,
 ): Promise<PdfData> {
-  const backend = await fetchBackendPdf("angebot", angebot.id);
+  const backend = await fetchBackendPdf("angebot", angebot.id, undefined, cacheBust);
   if (backend) return { blob: backend.blob, fileName: backend.dateiname };
   const { blob } = await withTimeout(
     generateAngebotPdf(angebot, kunde, firma, ansprechpartner, objekt ?? null),
@@ -104,8 +105,9 @@ async function buildRechnung(
   firma: Firmendaten,
   ansprechpartner?: Ansprechpartner,
   objekt?: Objekt | null,
+  cacheBust?: string,
 ): Promise<PdfData> {
-  const backend = await fetchBackendPdf("rechnung", rechnung.id);
+  const backend = await fetchBackendPdf("rechnung", rechnung.id, undefined, cacheBust);
   if (backend) return { blob: backend.blob, fileName: backend.dateiname };
   const { blob } = await withTimeout(
     generateRechnungPdf(rechnung, kunde, firma, ansprechpartner, objekt ?? null),
@@ -177,7 +179,7 @@ export function useAngebotPdf(angebot?: Angebot): UsePdfResult {
 
   const query = useQuery({
     queryKey: angebot ? pdfQueryKey("angebot", angebot.id, dependencySignature) : ["pdf", "angebot", "noop"],
-    queryFn: () => buildAngebot(angebot!, kunde!, firma!, ansprechpartner, objekt ?? null),
+    queryFn: () => buildAngebot(angebot!, kunde!, firma!, ansprechpartner, objekt ?? null, dependencySignature),
     enabled,
     staleTime: Infinity,
     gcTime: 30 * 60 * 1000,
@@ -219,7 +221,7 @@ export function useRechnungPdf(rechnung?: Rechnung): UsePdfResult {
 
   const query = useQuery({
     queryKey: rechnung ? pdfQueryKey("rechnung", rechnung.id, dependencySignature) : ["pdf", "rechnung", "noop"],
-    queryFn: () => buildRechnung(rechnung!, kunde!, firma!, ansprechpartner, objekt ?? null),
+    queryFn: () => buildRechnung(rechnung!, kunde!, firma!, ansprechpartner, objekt ?? null, dependencySignature),
     enabled,
     staleTime: Infinity,
     gcTime: 30 * 60 * 1000,
