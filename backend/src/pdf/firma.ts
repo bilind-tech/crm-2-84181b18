@@ -27,8 +27,13 @@ interface FirmaSettings {
 
 export function loadFirmaForPdf(): FirmaForPdf {
   const f = getSetting<FirmaSettings>("firma") ?? {};
+  // Legacy-Korrektur: alter Default ohne Leerzeichen wird nur exakt-match
+  // ersetzt. Eigene Firmennamen werden niemals verändert.
+  const rawName = f.name?.trim() || "My Clean Center GmbH";
+  const firmenname =
+    rawName === "MyCleanCenter GmbH" ? "My Clean Center GmbH" : rawName;
   return {
-    firmenname: f.name?.trim() || "My Clean Center GmbH",
+    firmenname,
     strasse: f.strasse ?? null,
     plz: f.plz ?? null,
     ort: f.ort ?? null,
