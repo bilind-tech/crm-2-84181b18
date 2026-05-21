@@ -167,14 +167,15 @@ function kundeAdresse(k: Kunde, ap?: Ansprechpartner, o?: Objekt | null) {
   const apPerson = ap ? [ap.vorname, ap.nachname].filter(Boolean).join(" ").trim() : "";
   const person = apPerson || [k.vorname, k.nachname].filter(Boolean).join(" ");
   if (person) lines.push(person);
-  // Adresse: bevorzugt vom Kunden, sonst Fallback aus dem Objekt.
-  const strasse = k.strasse || o?.strasse || "";
-  const plz = k.plz || o?.plz || "";
-  const ort = k.ort || o?.ort || "";
+  // Wenn ein Objekt ausgewählt ist, ist dessen Einsatzadresse maßgeblich.
+  // Falls dort nichts gepflegt ist, fällt die PDF auf die Kundenadresse zurück.
+  const strasse = o?.strasse || k.strasse || "";
+  const plz = o?.plz || k.plz || "";
+  const ort = o?.ort || k.ort || "";
   if (strasse) lines.push(strasse);
   const plzOrt = [plz, ort].filter(Boolean).join(" ");
   if (plzOrt) lines.push(plzOrt);
-  const land = k.land || o?.land;
+  const land = o?.land || k.land;
   if (land && land !== "Deutschland") lines.push(land);
   return lines;
 }
