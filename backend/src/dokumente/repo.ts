@@ -158,14 +158,24 @@ export function updateDokument(id: string, patch: UpdateDokumentInput): Dokument
   getDatabase().prepare(
     `UPDATE dokumente SET ${sets.join(", ")} WHERE id = ? AND geloescht_am IS NULL`,
   ).run(...vals);
-  return getDokument(id);
+  const next = getDokument(id);
+  if (next && "ordnerId" in patch && (existing.ordnerId ?? null) !== (next.ordnerId ?? null)) {
+    emit("dokument:verschoben", {
+      id,
+      ordnerIdVorher: existing.ordnerId ?? null,
+      ordnerIdNachher: next.ordnerId ?? null,
+    });
+  }
+  return next;
 }
 
 /** Soft-Delete. Datei bleibt für 30 Tage liegen (Cleanup-Cron Step 13). */
 export function softDeleteDokument(id: string): boolean {
+  const cur = getDokument(id);
   const r = getDatabase().prepare(
     `UPDATE dokumente SET geloescht_am = datetime('now') WHERE id = ? AND geloescht_am IS NULL`,
   ).run(id);
+  if (r.changes > 0 && cur) emit("dokument:geloescht", { id });
   return r.changes > 0;
 }
 
