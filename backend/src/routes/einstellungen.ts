@@ -92,10 +92,17 @@ export async function einstellungenRoutes(app: FastifyInstance): Promise<void> {
   // Formular noch PDF-Renderer leere Felder sehen.
   function firmaToWire(base: Record<string, unknown>): Record<string, unknown> {
     const b = base;
+    // Legacy-Korrektur: alter Default-Schreibung ohne Leerzeichen wird
+    // nur bei exakter Übereinstimmung in „My Clean Center GmbH" überführt.
+    let name = b.name;
+    if (typeof name === "string" && name.trim() === "MyCleanCenter GmbH") {
+      name = "My Clean Center GmbH";
+    }
     return {
       ...b,
+      name,
       // UI-Aliasse zusätzlich zu den internen Feldern:
-      firmenname: b.name,
+      firmenname: name,
       webseite: b.web,
     };
   }
