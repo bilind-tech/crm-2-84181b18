@@ -291,9 +291,11 @@ export const useUpdateObjekt = (id: string) => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (data: Partial<Objekt>) => api.patch<Objekt>(`/objekte/${id}`, data),
-    onSuccess: () => {
+    onSuccess: (updated, vars) => {
       qc.invalidateQueries({ queryKey: ["objekte"] });
       qc.invalidateQueries({ queryKey: qk.objekt(id) });
+      const kundeId = updated?.kundeId ?? vars.kundeId;
+      if (kundeId) qc.invalidateQueries({ queryKey: qk.kunde(kundeId) });
     },
   });
 };
