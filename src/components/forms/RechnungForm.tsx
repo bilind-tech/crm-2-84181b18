@@ -243,6 +243,25 @@ export function RechnungForm({ onClose, defaultKundeId, defaultObjektId }: Props
         </Field>
       </div>
 
+      <Field label="Leistungsmonat">
+        <Select
+          value={leistungsmonat || "__none__"}
+          onValueChange={(v) => setLeistungsmonat(v === "__none__" ? "" : v)}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Monat wählen…" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__none__">— ohne Monat —</SelectItem>
+            {monatsOptionen.map((m) => (
+              <SelectItem key={m.value} value={m.value}>
+                {m.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </Field>
+
       <div>
         <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
           Leistungen & Preise
