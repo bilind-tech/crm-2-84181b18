@@ -50,8 +50,7 @@ function vorschlagKuerzel(name: string): string {
 function sanitizeKuerzel(v: string): string {
   return v
     .toUpperCase()
-    .replace(/[^A-Z0-9]/g, "")
-    .slice(0, 4);
+    .replace(/[^A-Z0-9]/g, "");
 }
 
 interface Props {
