@@ -31,6 +31,13 @@ import { listRechnungen } from "../belege/rechnungen-repo.js";
 import { listDokumente } from "../dokumente/repo.js";
 import { bumpBelegNummerMindestens, peekBelegNummer, periodeMMYY } from "../kunden/nummern.js";
 import { suche } from "../kunden/search.js";
+import {
+  createVertrag,
+  getVertrag,
+  listVertraege,
+  softDeleteVertrag,
+  updateVertrag,
+} from "../kunden/vertraege-repo.js";
 
 export async function stammdatenRoutes(app: FastifyInstance): Promise<void> {
   app.register(async (scoped) => {
@@ -174,6 +181,64 @@ export async function stammdatenRoutes(app: FastifyInstance): Promise<void> {
         return { error: "not-found" };
       }
       audit({ userId: req.user?.id, action: "kunde.delete", detail: { id: req.params.id }, ip: req.ip });
+      return { ok: true };
+    });
+
+    // ---------------- VERTRÄGE ----------------
+    const vertragSchema = z.object({
+      bezeichnung: z.string().max(120).optional(),
+      startDatum: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+      endDatum: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullish(),
+      notiz: z.string().max(2000).nullish(),
+    });
+
+    scoped.get<{ Params: { id: string } }>("/kunden/:id/vertraege", async (req, reply) => {
+      if (!getKunde(req.params.id)) {
+        reply.status(404);
+        return { error: "kunde-not-found" };
+      }
+      return listVertraege(req.params.id);
+    });
+
+    scoped.post<{ Params: { id: string } }>("/kunden/:id/vertraege", async (req, reply) => {
+      if (!getKunde(req.params.id)) {
+        reply.status(404);
+        return { error: "kunde-not-found" };
+      }
+      const parsed = vertragSchema.safeParse(req.body);
+      if (!parsed.success) {
+        reply.status(422);
+        return { error: "validation", detail: parsed.error.flatten() };
+      }
+      const v = createVertrag({ kundeId: req.params.id, ...parsed.data });
+      audit({ userId: req.user?.id, action: "vertrag.create", detail: { id: v.id, kundeId: v.kundeId }, ip: req.ip });
+      return v;
+    });
+
+    scoped.patch<{ Params: { id: string } }>("/vertraege/:id", async (req, reply) => {
+      const cur = getVertrag(req.params.id);
+      if (!cur) {
+        reply.status(404);
+        return { error: "not-found" };
+      }
+      const partial = vertragSchema.partial();
+      const parsed = partial.safeParse(req.body);
+      if (!parsed.success) {
+        reply.status(422);
+        return { error: "validation", detail: parsed.error.flatten() };
+      }
+      const v = updateVertrag(req.params.id, parsed.data as Record<string, unknown>);
+      audit({ userId: req.user?.id, action: "vertrag.update", detail: { id: req.params.id }, ip: req.ip });
+      return v;
+    });
+
+    scoped.delete<{ Params: { id: string } }>("/vertraege/:id", async (req, reply) => {
+      const ok = softDeleteVertrag(req.params.id);
+      if (!ok) {
+        reply.status(404);
+        return { error: "not-found" };
+      }
+      audit({ userId: req.user?.id, action: "vertrag.delete", detail: { id: req.params.id }, ip: req.ip });
       return { ok: true };
     });
 
