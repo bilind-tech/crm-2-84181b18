@@ -231,10 +231,20 @@ const RECHNUNG_UPDATABLE: Record<string, string> = {
 
 export function updateRechnung(id: string, patch: Record<string, unknown>): ApiRechnung | null {
   const db = getDatabase();
-  const cur = db.prepare(`SELECT status FROM rechnung WHERE id = ? AND geloescht_am IS NULL`).get(id) as
-    | { status: string }
+  const cur = db.prepare(`SELECT status, kunde_id FROM rechnung WHERE id = ? AND geloescht_am IS NULL`).get(id) as
+    | { status: string; kunde_id: string }
     | undefined;
   if (!cur) return null;
+
+  // Vertrags-Owner-Check vor dem Bauen der SETs.
+  if ("vertragId" in patch) {
+    const v = patch.vertragId;
+    if (v != null && v !== "") {
+      const vertrag = getVertrag(String(v));
+      if (!vertrag) throw new Error("vertrag-not-found");
+      if (vertrag.kundeId !== cur.kunde_id) throw new Error("vertrag-falscher-kunde");
+    }
+  }
 
   const sets: string[] = [];
   const params: Record<string, unknown> = { id };
