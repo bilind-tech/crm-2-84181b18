@@ -1,68 +1,123 @@
-# Kürzel & Startzähler — robust machen
+# Verträge pro Kunde + Vertragsbezug auf Rechnung
 
-Zwei zusammenhängende Fixes. Beide ändern Verhalten, das aktuell schlicht falsch ist.
+Feature: jeder Kunde kann **mehrere Verträge** haben (Bezeichnung + Startdatum, optional Enddatum + Notiz). Beim Rechnungs­erstellen wird abgefragt, welcher Vertrag verwendet wird (oder „ohne"). Auf der PDF erscheint dann **oberhalb der Positionstabelle** ein professioneller Einleitungssatz, der Vertrag + Datum nennt.
 
-## Problem
+Kein Datei-Upload, nur Stammdaten.
 
-1. **Kürzel max 4 Zeichen.** Frontend kappt hart auf 4 (`slice(0,4)`, `maxLength={4}`). Backend-Format erlaubt bereits beliebig viele Zeichen. Du willst freie Länge.
-2. **„Beginne ab NN" wird ignoriert.** Frontend schickt `startZaehlerAktuellerMonat` beim Kunde anlegen UND bearbeiten — aber **das Backend wertet das Feld weder in `POST /kunden` noch in `PATCH /kunden/:id` aus**. Folge:
-   - Erste Rechnung beginnt trotzdem bei `01`.
-   - Beim erneuten Bearbeiten zeigt das Dialog-Feld wieder „1", weil der Zähler nie auf 26 hochgesetzt wurde.
+## Datenmodell (SQLite)
 
-## Umsetzung
+Neue Migration `039_kunde_vertrag.sql`:
 
-### A) Kürzel-Länge freigeben
+```sql
+CREATE TABLE kunde_vertrag (
+  id            TEXT PRIMARY KEY,
+  kunde_id      TEXT NOT NULL REFERENCES kunde(id) ON DELETE CASCADE,
+  bezeichnung   TEXT NOT NULL DEFAULT '',   -- z.B. "Unterhaltsreinigung"
+  start_datum   TEXT NOT NULL,              -- ISO YYYY-MM-DD
+  end_datum     TEXT,                       -- optional
+  notiz         TEXT,
+  erstellt_am   TEXT NOT NULL DEFAULT (datetime('now')),
+  geaendert_am  TEXT NOT NULL DEFAULT (datetime('now')),
+  geloescht_am  TEXT
+);
+CREATE INDEX idx_kunde_vertrag_kunde ON kunde_vertrag(kunde_id) WHERE geloescht_am IS NULL;
 
-- `src/components/forms/KundeForm.tsx`
-  - `sanitizeKuerzel`: `.slice(0, 4)` entfernen.
-  - Auto-Vorschlag (`vorschlagKuerzel`): die beiden `.slice(0, 4)` auf eine großzügigere Obergrenze (z. B. 6) für den Auto-Vorschlag setzen — manueller Tipp bleibt unbegrenzt.
-  - `<Input maxLength={4}>` entfernen (oder auf z. B. 12 erhöhen als reine Schutzgrenze).
-  - Hinweistext „3–4 Zeichen" → „mind. 1 Zeichen (A–Z, 0–9)".
-  - Validierungs-Toast „Kürzel muss 3–4 Zeichen haben" entfernen (Backend-Format-Check reicht).
-- `src/components/forms/KundeBearbeitenDialog.tsx`
-  - Gleiche Anpassungen: `sanitizeKuerzel` ohne `slice`, `maxLength` weg, Hinweistext + Validierung anpassen.
-- Backend (`backend/src/kunden/kuerzel.ts`): bleibt wie es ist — `^[A-Z0-9]+$` erlaubt jede Länge ≥ 1. **Nichts ändern.**
-- Live-Check (`useKuerzelFrei`): aktuell triggert er erst ab `length >= 3`. Auf `>= 1` senken in beiden Dialogen.
+ALTER TABLE rechnung ADD COLUMN vertrag_id TEXT
+  REFERENCES kunde_vertrag(id) ON DELETE SET NULL;
+```
 
-### B) Startzähler zuverlässig anwenden
+Soft-Delete wie überall im System. Beim Löschen eines Vertrags: bestehende Rechnungen behalten ihren denormalisierten Intro-Text (wird beim Erstellen einmal gerendert oder live aus `vertrag_id` gelesen — siehe „PDF-Intro" unten).
 
-Kern: Backend muss `startZaehlerAktuellerMonat` aus dem Body lesen und in `belegnummer_zaehler` setzen. Helper dafür existiert bereits: `bumpBelegNummerMindestens(kundeId, art, periode, mindestens)` (idempotent, MAX-Logik).
+## Backend
 
-- `backend/src/routes/stammdaten.ts`
-  - Imports ergänzen: `bumpBelegNummerMindestens, periodeMMYY` aus `../kunden/nummern.js`.
-  - **POST `/kunden`** (nach erfolgreichem `createKunde`, vor `return k`):
-    ```ts
-    const start = Number(body.startZaehlerAktuellerMonat);
-    if (k.kuerzel && Number.isFinite(start) && start > 1) {
-      const periode = periodeMMYY();
-      bumpBelegNummerMindestens(k.id, "rechnung", periode, start);
-      bumpBelegNummerMindestens(k.id, "angebot", periode, start);
-    }
-    ```
-  - **PATCH `/kunden/:id`** (nach erfolgreichem `updateKunde`, vor Audit/Return): gleiche Logik mit `result.kuerzel` und `req.params.id`. Wichtig: vor dem Aufruf `delete body.startZaehlerAktuellerMonat`, damit `updateKunde` das unbekannte Feld nicht verschluckt/ablehnt.
-- Belegart-Trennung: Da die Frontend-Vorschau im Dialog/Form sowohl Rechnung als auch Angebot betrifft und die Eingabe „nächste Nummer ab" als gemeinsamer Startpunkt gemeint ist, beide Belegarten (`rechnung`, `angebot`) auf denselben Mindestwert heben. (Bestehende, höhere Zähler werden durch `MAX` nicht heruntergesetzt — sicher.)
-- `GET /kunden/:id/zaehler` liest danach den korrekten Wert → der Bearbeiten-Dialog zeigt beim nächsten Öffnen `26` statt `1`.
-- Vergabe (`vergebeBelegnummer` → `nextBelegNummer`): nutzt bereits `belegnummer_zaehler.naechster_start` per UPSERT. Sobald der Zähler auf `26` steht, vergibt die nächste Rechnung `26`, danach `27` usw. → erfüllt automatisch deinen 26 → 27 Wunsch ohne weitere Codeänderung.
+**Neu** `backend/src/kunden/vertraege-repo.ts`: `listVertraege(kundeId)`, `createVertrag`, `updateVertrag`, `softDeleteVertrag`, `getVertrag`.
 
-### C) Tests / Smoke
+**Routen** (`stammdaten.ts`, alle unter `requireAuth`):
+- `GET    /kunden/:id/vertraege` → Liste (aktive zuerst, dann archivierte)
+- `POST   /kunden/:id/vertraege` `{ bezeichnung, startDatum, endDatum?, notiz? }`
+- `PATCH  /vertraege/:id`
+- `DELETE /vertraege/:id` (soft)
+- Validation per Zod, `startDatum` Pflicht (ISO), Bezeichnung max 120.
 
-- Bestehende `backend/test/belege.spec.ts` ergänzen oder neuen Test:
-  - Kunde anlegen mit `kuerzel: "XYZ"`, `startZaehlerAktuellerMonat: 26`.
-  - `GET /kunden/:id/zaehler?art=rechnung` → `naechsterStart === 26`.
-  - Rechnung anlegen → Nummer endet auf `/26`.
-  - Zweite Rechnung → `/27`.
-  - PATCH mit `startZaehlerAktuellerMonat: 50` → Zähler springt auf 50, niedrigere Werte werden ignoriert (MAX-Verhalten).
+**Rechnung erweitern** (`belege/rechnungen-repo.ts` + `mappers.ts` + `routes/belege.ts`):
+- `RechnungWrite.vertragId?: string | null`
+- INSERT/UPDATE-Spalte `vertrag_id` mit Owner-Check (Vertrag gehört zum gleichen Kunden — sonst 422).
+- `RECHNUNG_UPDATABLE.vertragId = "vertrag_id"`.
+- `ApiRechnung.vertragId?` + im Mapping zurückgeben.
+- Endpoint `GET /rechnungen/:id` liefert optional auch eingebettetes `vertrag` (für PDF) — pragmatisch: `vertragId` reicht, PDF lädt nach.
+
+**PDF-Intro** (`backend/src/pdf/layout.ts` → `defaultIntroRechnung` und Pendant `src/lib/pdf/belegPdf.ts`):
+Neue Prioritätsreihenfolge:
+1. Manuell gesetzter `introText` → unverändert.
+2. **Vertrag vorhanden** → professioneller Satz, z. B.:
+   - mit Bezeichnung: `„Gemäß unserem Vertrag »{bezeichnung}« vom {DD.MM.YYYY} berechnen wir Ihnen folgende Leistungen:"`
+   - ohne Bezeichnung: `„Gemäß unserem Vertrag vom {DD.MM.YYYY} berechnen wir Ihnen folgende Leistungen:"`
+   - Zusatz Leistungsmonat anhängen wenn gesetzt: `„… für {Monat YYYY}."`
+3. Sonst: bestehende Logik (Einsatz / Leistungsmonat / Default).
+
+`belege/pdf-data.ts` / `pdf/cache.ts`: Vertrag (Bezeichnung + Startdatum) als Teil der Cache-Signatur, damit Änderungen am Vertrag PDFs invalidieren.
+
+## Frontend
+
+**Hooks** (`src/hooks/useApi.ts`):
+- `useVertraege(kundeId)`, `useCreateVertrag`, `useUpdateVertrag`, `useDeleteVertrag` (invalidiert `qk.kunden` + `["pdf"]`).
+- `qk.vertraege = (kundeId) => [...]`.
+
+**Verwaltung (= „die Einstellungen des Kunden")**
+
+Neue Komponente `src/components/kunden/VertraegeTab.tsx`:
+- Tabelle/Liste der Verträge: Bezeichnung · Startdatum · (Enddatum) · Aktionen (Bearbeiten/Löschen).
+- Inline „Neuer Vertrag"-Form (Bezeichnung, Start, End, Notiz) via `DateInput`.
+- Eingebunden:
+  - `KundeBearbeitenDialog`: neuer Tab „Verträge" neben „Stammdaten" und „Belegnummern".
+  - `src/routes/kunden.$id.tsx`: Card „Verträge" unterhalb der Stammdaten.
+- Kein globaler Einstellungen-Tab (Verträge sind kundenspezifisch). Falls du globale Vertrags­vorlagen willst, separat sagen.
+
+**Rechnungs-Erstellung** (`src/components/forms/RechnungForm.tsx`):
+- Nach Kundenwahl: `useVertraege(kundeId)`.
+- 0 Verträge → kein Block.
+- 1 Vertrag → kleiner Auswahl-Block:
+  - Toggle „Diese Rechnung auf Basis des Vertrags «{Bezeichnung}» vom {DD.MM.YYYY}" (Default an).
+  - Wenn aus: `vertragId = null`.
+- ≥2 Verträge → Select „Bezug zu Vertrag" mit Optionen aller Verträge + Eintrag „Ohne Vertragsbezug" (Default = neuester Vertrag).
+- Live-Vorschau des Intro-Satzes unter dem Auswahlblock.
+- `vertragId` wird in `create.mutateAsync` mitgeschickt.
+
+**Rechnung bearbeiten** (`src/routes/rechnungen.$id.bearbeiten.tsx` + Hotspot-Editor): zusätzlicher Picker für `vertragId` (gleiche Logik), Autosave wie gewohnt.
+
+**Detailansicht** Rechnung: kleines Badge „Vertrag: {Bezeichnung} vom {Datum}" unterhalb der Kopfdaten (rein informativ).
 
 ## Was NICHT geändert wird
 
-- Format-Regeln (Großschreibung, A–Z/0–9), Eindeutigkeit, 409-Konflikt-Flow.
-- Bestehende Belege/Nummern.
-- Logik in `belegnummer.ts` / `nummern.ts` — der vorhandene Helper macht genau das Richtige.
-- Preview-Modus (`localPreviewData.ts`) — der Fix betrifft den echten Pi-Backend-Pfad, den du laut Beschreibung benutzt. (Falls du explizit den Preview auch fixen willst: separat sagen.)
+- Angebote bleiben unberührt (User sprach explizit von Rechnung). Wenn gewünscht später analog.
+- Kein Datei-Upload, kein Vertragsdokument.
+- Keine Auto-Mails, kein Status-Lifecycle für Verträge.
+- Bestehende Belege ohne `vertrag_id` rendern wie bisher (Backwards-kompatibel).
 
-## Dateien
+## Tests
 
-- `src/components/forms/KundeForm.tsx`
-- `src/components/forms/KundeBearbeitenDialog.tsx`
-- `backend/src/routes/stammdaten.ts`
-- `backend/test/belege.spec.ts` (Test-Ergänzung)
+- `backend/test/vertraege.spec.ts` (neu): CRUD, Owner-Check (Vertrag eines anderen Kunden darf nicht an Rechnung gebunden werden → 422), Soft-Delete.
+- `backend/test/belege.spec.ts` ergänzen: Rechnung mit Vertrag → PDF-Intro enthält Vertrag + Datum. Ohne Vertrag → bisheriges Verhalten.
+
+## Dateien (Übersicht)
+
+Neu:
+- `backend/src/db/migrations/039_kunde_vertrag.sql`
+- `backend/src/kunden/vertraege-repo.ts`
+- `src/components/kunden/VertraegeTab.tsx`
+- `backend/test/vertraege.spec.ts`
+
+Geändert:
+- `backend/src/routes/stammdaten.ts` (neue Routen)
+- `backend/src/routes/belege.ts` (Validation `vertragId`)
+- `backend/src/belege/rechnungen-repo.ts` (INSERT/UPDATE/Validierung)
+- `backend/src/belege/mappers.ts` (`vertragId` in DTO)
+- `backend/src/pdf/layout.ts` + `backend/src/pdf/cache.ts` (Intro-Logik + Cache-Sig)
+- `src/lib/pdf/belegPdf.ts` (Client-PDF spiegelt Logik)
+- `src/lib/api/types.ts` (`Vertrag`, `Rechnung.vertragId`)
+- `src/hooks/useApi.ts` (neue Hooks, Cache-Invalidation)
+- `src/components/forms/RechnungForm.tsx` (Auswahlblock)
+- `src/routes/rechnungen.$id.bearbeiten.tsx` (Vertrags-Picker)
+- `src/routes/rechnungen.$id.tsx` (Badge)
+- `src/components/forms/KundeBearbeitenDialog.tsx` (Tab „Verträge")
+- `src/routes/kunden.$id.tsx` (Card „Verträge")
