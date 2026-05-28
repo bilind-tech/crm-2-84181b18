@@ -238,21 +238,20 @@ export function KundeBearbeitenDialog({ kunde, open, onOpenChange }: Props) {
                 value={kuerzel}
                 onChange={(e) => setKuerzel(sanitizeKuerzel(e.target.value))}
                 placeholder="z. B. GFU"
-                maxLength={4}
                 className="font-mono uppercase tracking-wider w-40"
               />
               <div className="mt-1.5 min-h-[1.25rem] text-xs">
-                {kuerzel.length >= 3 && kuerzelFreiQ.isFetching ? (
+                {kuerzel.length >= 1 && kuerzelFreiQ.isFetching ? (
                   <span className="text-muted-foreground">Prüfe Verfügbarkeit…</span>
                 ) : kuerzelKonflikt ? (
                   <span className="text-destructive">
                     ✗ Bereits vergeben an {kuerzelKonflikt.nummer} • {kuerzelKonflikt.name}
                   </span>
-                ) : kuerzel.length >= 3 && kuerzelFreiQ.data?.frei ? (
+                ) : kuerzel.length >= 1 && kuerzelFreiQ.data?.frei ? (
                   <span className="text-emerald-600 dark:text-emerald-400">✓ Kürzel frei</span>
                 ) : (
                   <span className="text-muted-foreground">
-                    3–4 Zeichen (A–Z, 0–9). Wird allen neuen Belegen dieses Kunden vorangestellt.
+                    Beliebige Länge (A–Z, 0–9). Wird allen neuen Belegen dieses Kunden vorangestellt.
                   </span>
                 )}
               </div>
