@@ -31,8 +31,7 @@ import type { Kunde } from "@/lib/api/types";
 function sanitizeKuerzel(v: string): string {
   return v
     .toUpperCase()
-    .replace(/[^A-Z0-9]/g, "")
-    .slice(0, 4);
+    .replace(/[^A-Z0-9]/g, "");
 }
 
 interface Props {
@@ -118,10 +117,6 @@ export function KundeBearbeitenDialog({ kunde, open, onOpenChange }: Props) {
     }
     if (kunde.typ === "privat" && !nachname.trim()) {
       toast.error("Nachname ist erforderlich");
-      return;
-    }
-    if (kuerzel && kuerzel.length < 3) {
-      toast.error("Kürzel muss 3–4 Zeichen haben");
       return;
     }
     if (kuerzelKonflikt) {
