@@ -372,6 +372,19 @@ function defaultOutroAngebot(a: ApiAngebot, outro?: string): string {
 }
 function defaultIntroRechnung(_r: ApiRechnung, intro?: string): string {
   if (intro) return intro;
+  const vertrag = _r.vertrag;
+  if (vertrag && vertrag.startDatum) {
+    const datum = dt(vertrag.startDatum);
+    const bez = vertrag.bezeichnung?.trim();
+    const kern = bez
+      ? `gemäß unserem Vertrag »${bez}« vom ${datum}`
+      : `gemäß unserem Vertrag vom ${datum}`;
+    if (_r.leistungsmonat) {
+      const monat = formatLeistungsmonat(_r.leistungsmonat);
+      if (monat) return `${kern} berechnen wir Ihnen für ${monat} folgende Leistungen:`;
+    }
+    return `${kern} berechnen wir Ihnen folgende Leistungen:`;
+  }
   const einsatz = formatEinsatz(_r.einsatzVon, _r.einsatzBis);
   if (einsatz) {
     return `hiermit übersenden wir Ihnen die Rechnung für die Reinigung ${einsatz} für folgende Leistungen:`;
