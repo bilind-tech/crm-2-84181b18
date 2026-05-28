@@ -262,7 +262,17 @@ export async function belegeRoutes(app: FastifyInstance): Promise<void> {
     });
 
     scoped.patch<{ Params: { id: string } }>("/rechnungen/:id", async (req, reply) => {
-      const r = updateRechnung(req.params.id, (req.body ?? {}) as Record<string, unknown>);
+      let r;
+      try {
+        r = updateRechnung(req.params.id, (req.body ?? {}) as Record<string, unknown>);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "update-failed";
+        if (msg === "vertrag-falscher-kunde" || msg === "vertrag-not-found") {
+          reply.status(422);
+          return { error: msg };
+        }
+        throw e;
+      }
       if (!r) {
         reply.status(404);
         return { error: "not-found" };
