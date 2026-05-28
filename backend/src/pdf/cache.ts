@@ -50,6 +50,7 @@ export function computeHash(parts: {
     gueltigBis: (beleg as ApiAngebot).gueltigBis,
     einsatzVon: (beleg as ApiAngebot).einsatzVon ?? (beleg as ApiRechnung).einsatzVon,
     einsatzBis: (beleg as ApiAngebot).einsatzBis ?? (beleg as ApiRechnung).einsatzBis,
+    vertrag: (beleg as ApiRechnung).vertrag ?? null,
     kunde: {
       n: kunde.nummer, f: kunde.firmenname, v: kunde.vorname, na: kunde.nachname,
       s: kunde.strasse, p: kunde.plz, o: kunde.ort, l: kunde.land, a: kunde.anrede,
