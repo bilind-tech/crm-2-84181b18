@@ -1,6 +1,14 @@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AnsprechpartnerPicker } from "@/components/forms/AnsprechpartnerPicker";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useVertraege } from "@/hooks/useApi";
 import type { Angebot, Rechnung, Kunde } from "@/lib/api/types";
 
 interface Props {
@@ -12,6 +20,7 @@ interface Props {
 }
 
 export function StammdatenPanel({ kind, draft, kunde, set }: Props) {
+  const { data: vertraege = [] } = useVertraege(kind === "rechnung" ? kunde.id : "");
   return (
     <div className="space-y-5">
       <Section label="Empfänger" feldId="kunde">
@@ -37,6 +46,27 @@ export function StammdatenPanel({ kind, draft, kunde, set }: Props) {
           onChange={(id) => set("ansprechpartnerId", id)}
         />
       </Section>
+
+      {kind === "rechnung" && vertraege.length > 0 && (
+        <Section label="Vertragsbezug" feldId="vertrag">
+          <Select
+            value={(draft as Rechnung).vertragId ?? "__none__"}
+            onValueChange={(v) => set("vertragId", v === "__none__" ? undefined : v)}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__none__">— ohne Vertragsbezug —</SelectItem>
+              {vertraege.map((v) => (
+                <SelectItem key={v.id} value={v.id}>
+                  {(v.bezeichnung || "Vertrag")} · ab {v.startDatum}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Section>
+      )}
 
       <Section label="Titel" feldId="titel">
         <Input
