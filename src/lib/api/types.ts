@@ -251,6 +251,10 @@ export interface Rechnung {
   archiviert: boolean;
   zahlungen: Zahlung[];
   optionen?: BelegOptionen;
+  /** Optional verknüpfter Kunden-Vertrag. */
+  vertragId?: ID;
+  /** Server-Echo: Vertrags-Snapshot, wenn vertragId gesetzt ist. */
+  vertrag?: { bezeichnung: string; startDatum: ISODate };
   /** Status der Drive-Synchronisation des PDFs. */
   drive?: DriveSyncInfo;
   /** Vom Backend gesetzt: ID des Dauerauftrags, zu dem diese Rechnung gehört (Auto-Verknüpfung). */
