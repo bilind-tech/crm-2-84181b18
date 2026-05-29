@@ -38,6 +38,7 @@ import type {
   UmsatzPunkt,
   UpdateLauf,
   UpdatePackageInfo,
+  Vertrag,
   Warnung,
   Zahlung,
 } from "@/lib/api/types";
@@ -165,6 +166,58 @@ export const useKundenZaehler = (id: string) =>
     queryFn: () => api.get<{ periode: string; naechsterStart: number }>(`/kunden/${id}/zaehler`),
     enabled: !!id,
   });
+
+// ---------- Verträge pro Kunde ----------
+export const useVertraege = (kundeId: string) =>
+  useQuery({
+    queryKey: ["kunden", kundeId, "vertraege"],
+    queryFn: () => api.get<Vertrag[]>(`/kunden/${kundeId}/vertraege`),
+    enabled: !!kundeId,
+  });
+
+export const useCreateVertrag = (kundeId: string) => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { bezeichnung?: string; startDatum: string; endDatum?: string | null; notiz?: string | null }) =>
+      api.post<Vertrag>(`/kunden/${kundeId}/vertraege`, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["kunden", kundeId, "vertraege"] });
+      qc.invalidateQueries({ queryKey: qk.kunde(kundeId) });
+    },
+  });
+};
+
+export const useUpdateVertrag = (kundeId: string) => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      ...patch
+    }: {
+      id: string;
+      bezeichnung?: string;
+      startDatum?: string;
+      endDatum?: string | null;
+      notiz?: string | null;
+    }) =>
+      api.patch<Vertrag>(`/vertraege/${id}`, patch),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["kunden", kundeId, "vertraege"] });
+      qc.invalidateQueries({ queryKey: qk.kunde(kundeId) });
+    },
+  });
+};
+
+export const useDeleteVertrag = (kundeId: string) => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.delete<void>(`/vertraege/${id}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["kunden", kundeId, "vertraege"] });
+      qc.invalidateQueries({ queryKey: qk.kunde(kundeId) });
+    },
+  });
+};
 
 /**
  * Live-Verfügbarkeitsprüfung für Kunden-Kürzel.

@@ -27,6 +27,7 @@ import {
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useKundenZaehler, useUpdateKunde, useKuerzelFrei } from "@/hooks/useApi";
 import type { Kunde } from "@/lib/api/types";
+import { VertraegeTab } from "@/components/kunden/VertraegeTab";
 
 function sanitizeKuerzel(v: string): string {
   return v
@@ -167,6 +168,9 @@ export function KundeBearbeitenDialog({ kunde, open, onOpenChange }: Props) {
             <TabsTrigger value="beleg" className="shrink-0 rounded-full px-3 sm:px-5">
               Belegnummern
             </TabsTrigger>
+            <TabsTrigger value="vertraege" className="shrink-0 rounded-full px-3 sm:px-5">
+              Verträge
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="stamm" className="mt-5 space-y-4">
@@ -286,6 +290,10 @@ export function KundeBearbeitenDialog({ kunde, open, onOpenChange }: Props) {
                 <span className="font-mono font-semibold text-foreground">{vorschau}</span>
               </div>
             )}
+          </TabsContent>
+
+          <TabsContent value="vertraege" className="mt-5">
+            <VertraegeTab kundeId={kunde.id} />
           </TabsContent>
         </Tabs>
 

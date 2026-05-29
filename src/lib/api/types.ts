@@ -251,12 +251,29 @@ export interface Rechnung {
   archiviert: boolean;
   zahlungen: Zahlung[];
   optionen?: BelegOptionen;
+  /** Optional verknüpfter Kunden-Vertrag. */
+  vertragId?: ID;
+  /** Server-Echo: Vertrags-Snapshot, wenn vertragId gesetzt ist. */
+  vertrag?: { bezeichnung: string; startDatum: ISODate };
   /** Status der Drive-Synchronisation des PDFs. */
   drive?: DriveSyncInfo;
   /** Vom Backend gesetzt: ID des Dauerauftrags, zu dem diese Rechnung gehört (Auto-Verknüpfung). */
   dauerauftragId?: ID;
   /** Nur in der Server-Antwort (nicht persistiert): Info zu einem neu erzeugten Dauerauftrag, für Toast-Feedback. */
   dauerauftragNeu?: { id: ID; nummer: string };
+  erstelltAm: ISODateTime;
+  geaendertAm: ISODateTime;
+}
+
+// ---------- Verträge ----------
+
+export interface Vertrag {
+  id: ID;
+  kundeId: ID;
+  bezeichnung: string;
+  startDatum: ISODate;
+  endDatum?: ISODate;
+  notiz?: string;
   erstelltAm: ISODateTime;
   geaendertAm: ISODateTime;
 }

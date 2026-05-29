@@ -10,6 +10,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { SlideOver } from "@/components/ui/slide-over";
 import { ObjektForm } from "@/components/forms/ObjektForm";
 import { AnsprechpartnerTab } from "@/components/kunden/AnsprechpartnerTab";
+import { VertraegeTab } from "@/components/kunden/VertraegeTab";
 import { AngebotForm } from "@/components/forms/AngebotForm";
 import { RechnungForm } from "@/components/forms/RechnungForm";
 import { FormErrorBoundary } from "@/components/layout/FormErrorBoundary";
@@ -167,6 +168,9 @@ function Page() {
           <TabsTrigger value="ansprechpartner" className="shrink-0 rounded-full px-3 sm:px-5">
             Ansprechpartner ({ansprechpartner.length})
           </TabsTrigger>
+          <TabsTrigger value="vertraege" className="shrink-0 rounded-full px-3 sm:px-5">
+            Verträge
+          </TabsTrigger>
           <TabsTrigger value="objekte" className="shrink-0 rounded-full px-3 sm:px-5">
             Objekte ({objekte.length})
           </TabsTrigger>
@@ -240,6 +244,10 @@ function Page() {
 
         <TabsContent value="ansprechpartner" className="mt-6">
           <AnsprechpartnerTab kundeId={k.id} liste={ansprechpartner} />
+        </TabsContent>
+
+        <TabsContent value="vertraege" className="mt-6">
+          <VertraegeTab kundeId={k.id} />
         </TabsContent>
 
         <TabsContent value="objekte" className="mt-6 space-y-3">

@@ -108,6 +108,15 @@ function Page() {
             <span className="font-mono">{r.nummer}</span> · {formatDate(r.rechnungsdatum)} · fällig{" "}
             {formatDate(r.faelligkeitsdatum)} · Status{" "}
             <span className="capitalize">{r.status}</span>
+            {r.vertrag && (
+              <>
+                {" · "}
+                <span className="inline-flex items-center rounded-full border border-border bg-muted/50 px-2 py-0.5 text-xs font-medium">
+                  Vertrag {r.vertrag.bezeichnung ? `»${r.vertrag.bezeichnung}« ` : ""}vom{" "}
+                  {formatDate(r.vertrag.startDatum)}
+                </span>
+              </>
+            )}
           </>
         }
         actions={

@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,6 +16,7 @@ import {
   useCreateRechnung,
   useNummernkreise,
   useKundenZaehler,
+  useVertraege,
 } from "@/hooks/useApi";
 import { vorschauBelegnummer } from "@/lib/belegNummer";
 import { toast } from "sonner";
@@ -63,11 +64,26 @@ export function RechnungForm({ onClose, defaultKundeId, defaultObjektId }: Props
   const [positionen, setPositionen] = useState<PositionDraft[]>(() => [emptyPosition(19)]);
   const [optionen, setOptionen] = useState<OptionenState>(defaultOptionen);
   const [ansprechpartnerId, setAnsprechpartnerId] = useState<string | undefined>();
+  const [vertragId, setVertragId] = useState<string | "__none__">("__none__");
 
   const objekteVonKunde = useMemo(
     () => objekteAlle.filter((o) => o.kundeId === kundeId),
     [objekteAlle, kundeId],
   );
+
+  const { data: vertraege = [] } = useVertraege(kundeId);
+  // Beim Kundenwechsel sinnvolle Default-Auswahl setzen:
+  // - 1 Vertrag  → vorausgewählt, sonst „kein Vertrag".
+  useEffect(() => {
+    if (!kundeId) {
+      setVertragId("__none__");
+      return;
+    }
+    if (vertraege.length === 1) setVertragId(vertraege[0].id);
+    else setVertragId("__none__");
+    // Bewusst nur auf Kunden- und Vertragslisten-Wechsel reagieren.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kundeId, vertraege.length]);
 
   const monatsOptionen = useMemo(() => {
     const out: { value: string; label: string }[] = [];
@@ -109,6 +125,7 @@ export function RechnungForm({ onClose, defaultKundeId, defaultObjektId }: Props
       kundeId,
       objektId: objektId || undefined,
       ansprechpartnerId: ansprechpartnerId || undefined,
+      vertragId: vertragId && vertragId !== "__none__" ? vertragId : undefined,
       titel,
       positionen: toApiPositionen(positionen),
       rabattGesamt,
@@ -191,6 +208,31 @@ export function RechnungForm({ onClose, defaultKundeId, defaultObjektId }: Props
           value={ansprechpartnerId}
           onChange={setAnsprechpartnerId}
         />
+      )}
+
+      {kundeId && vertraege.length > 0 && (
+        <Field
+          label={
+            vertraege.length === 1 ? "Vertragsbezug" : "Vertragsbezug (mehrere verfügbar)"
+          }
+        >
+          <Select value={vertragId} onValueChange={(v) => setVertragId(v)}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__none__">— ohne Vertragsbezug —</SelectItem>
+              {vertraege.map((v) => (
+                <SelectItem key={v.id} value={v.id}>
+                  {(v.bezeichnung || "Vertrag")} · ab {v.startDatum}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="mt-1.5 text-[11px] text-muted-foreground">
+            Wird im PDF oberhalb der Leistungen erwähnt (z.&nbsp;B. „Gemäß unserem Vertrag »…« vom …").
+          </p>
+        </Field>
       )}
 
       <div className="flex items-end gap-3">
