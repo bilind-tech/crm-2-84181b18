@@ -125,6 +125,7 @@ export function RechnungForm({ onClose, defaultKundeId, defaultObjektId }: Props
       kundeId,
       objektId: objektId || undefined,
       ansprechpartnerId: ansprechpartnerId || undefined,
+      vertragId: vertragId && vertragId !== "__none__" ? vertragId : undefined,
       titel,
       positionen: toApiPositionen(positionen),
       rabattGesamt,
