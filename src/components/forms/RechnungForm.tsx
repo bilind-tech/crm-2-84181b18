@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -73,16 +73,17 @@ export function RechnungForm({ onClose, defaultKundeId, defaultObjektId }: Props
 
   const { data: vertraege = [] } = useVertraege(kundeId);
   // Beim Kundenwechsel sinnvolle Default-Auswahl setzen:
-  // - 0 Verträge → none
-  // - 1 Vertrag  → vorausgewählt
-  // - mehrere    → none (User wählt aktiv)
-  const lastKundeRef = useRef<string>("");
-  if (lastKundeRef.current !== kundeId) {
-    lastKundeRef.current = kundeId;
-    // setState in render ist okay, weil identitätsgesichert (ref-gated)
+  // - 1 Vertrag  → vorausgewählt, sonst „kein Vertrag".
+  useEffect(() => {
+    if (!kundeId) {
+      setVertragId("__none__");
+      return;
+    }
     if (vertraege.length === 1) setVertragId(vertraege[0].id);
     else setVertragId("__none__");
-  }
+    // Bewusst nur auf Kunden- und Vertragslisten-Wechsel reagieren.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kundeId, vertraege.length]);
 
   const monatsOptionen = useMemo(() => {
     const out: { value: string; label: string }[] = [];
