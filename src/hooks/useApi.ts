@@ -38,6 +38,7 @@ import type {
   UmsatzPunkt,
   UpdateLauf,
   UpdatePackageInfo,
+  Vertrag,
   Warnung,
   Zahlung,
 } from "@/lib/api/types";
