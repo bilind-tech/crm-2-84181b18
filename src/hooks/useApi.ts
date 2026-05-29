@@ -190,7 +190,16 @@ export const useCreateVertrag = (kundeId: string) => {
 export const useUpdateVertrag = (kundeId: string) => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, ...patch }: { id: string } & Partial<Vertrag>) =>
+    mutationFn: ({
+      id,
+      ...patch
+    }: {
+      id: string;
+      bezeichnung?: string;
+      startDatum?: string;
+      endDatum?: string | null;
+      notiz?: string | null;
+    }) =>
       api.patch<Vertrag>(`/vertraege/${id}`, patch),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["kunden", kundeId, "vertraege"] });
