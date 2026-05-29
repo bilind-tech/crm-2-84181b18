@@ -10,6 +10,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { SlideOver } from "@/components/ui/slide-over";
 import { ObjektForm } from "@/components/forms/ObjektForm";
 import { AnsprechpartnerTab } from "@/components/kunden/AnsprechpartnerTab";
+import { VertraegeTab } from "@/components/kunden/VertraegeTab";
 import { AngebotForm } from "@/components/forms/AngebotForm";
 import { RechnungForm } from "@/components/forms/RechnungForm";
 import { FormErrorBoundary } from "@/components/layout/FormErrorBoundary";
