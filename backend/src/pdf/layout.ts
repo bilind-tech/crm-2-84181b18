@@ -114,12 +114,20 @@ function footer(f: FirmaForPdf) {
           columns: [
             cell([
               f.firmenname,
-              f.geschaeftsfuehrer ? `Geschäftsführer: ${f.geschaeftsfuehrer}` : null,
-              [f.strasse, [f.plz, f.ort].filter(Boolean).join(" ")].filter(Boolean).join(" - "),
+              f.strasse,
+              [f.plz, f.ort].filter(Boolean).join(" ") || null,
             ]),
             cell(["Bank", f.bankName, f.iban], "center"),
-            cell([f.telefon, f.email], "center"),
-            cell([f.handelsregister, f.ustId ? `USt-ID: ${f.ustId}` : null, f.webseite], "right"),
+            cell([f.telefon, f.mobil, f.email], "center"),
+            cell(
+              [
+                f.handelsregister,
+                f.ustId ? `USt-ID: ${f.ustId}` : null,
+                f.webseite,
+                f.geschaeftsfuehrer ? `Geschäftsführer: ${f.geschaeftsfuehrer}` : null,
+              ],
+              "right",
+            ),
           ],
           columnGap: 12,
         },
