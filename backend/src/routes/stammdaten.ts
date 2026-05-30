@@ -29,7 +29,11 @@ import { findKuerzelOwner, isKuerzelFormatOk, normalizeKuerzel } from "../kunden
 import { listAngebote } from "../belege/angebote-repo.js";
 import { listRechnungen } from "../belege/rechnungen-repo.js";
 import { listDokumente } from "../dokumente/repo.js";
-import { bumpBelegNummerMindestens, peekBelegNummer, periodeMMYY } from "../kunden/nummern.js";
+import {
+  peekBelegNummer,
+  periodeMMYY,
+  setBelegNummerStart,
+} from "../kunden/nummern.js";
 import { suche } from "../kunden/search.js";
 import {
   createVertrag,
@@ -122,10 +126,10 @@ export async function stammdatenRoutes(app: FastifyInstance): Promise<void> {
       const cleanBody = { ...body };
       delete (cleanBody as Record<string, unknown>).startZaehlerAktuellerMonat;
       const k = createKunde({ ...cleanBody, kuerzel } as Parameters<typeof createKunde>[0]);
-      if (k.kuerzel && Number.isFinite(startRaw) && startRaw > 1) {
+      if (k.kuerzel && Number.isFinite(startRaw) && startRaw >= 1) {
         const periode = periodeMMYY();
-        bumpBelegNummerMindestens(k.id, "rechnung", periode, startRaw);
-        bumpBelegNummerMindestens(k.id, "angebot", periode, startRaw);
+        setBelegNummerStart(k.id, "rechnung", periode, startRaw);
+        setBelegNummerStart(k.id, "angebot", periode, startRaw);
       }
       audit({ userId: req.user?.id, action: "kunde.create", detail: { id: k.id, nummer: k.nummer }, ip: req.ip });
       return k;
@@ -157,10 +161,10 @@ export async function stammdatenRoutes(app: FastifyInstance): Promise<void> {
           reply.status(404);
           return { error: "not-found" };
         }
-        if (result.kuerzel && Number.isFinite(startRaw) && startRaw > 1) {
+        if (result.kuerzel && Number.isFinite(startRaw) && startRaw >= 1) {
           const periode = periodeMMYY();
-          bumpBelegNummerMindestens(result.id, "rechnung", periode, startRaw);
-          bumpBelegNummerMindestens(result.id, "angebot", periode, startRaw);
+          setBelegNummerStart(result.id, "rechnung", periode, startRaw);
+          setBelegNummerStart(result.id, "angebot", periode, startRaw);
         }
         audit({ userId: req.user?.id, action: "kunde.update", detail: { id: result.id }, ip: req.ip });
         return result;
