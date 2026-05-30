@@ -1,71 +1,74 @@
 ## Ziel
-Der Druck soll auf dem Mac sauber funktionieren:
-- 1-seitige PDFs erscheinen im Druckdialog als genau 1 Seite
-- Logo und oberer Bereich werden nicht abgeschnitten
-- lange Rechnungen/Angebote/Protokolle laufen sauber über 2, 3 oder mehr Seiten
 
-## Plan
+Beim Klick auf „Drucken":
+- Neuer Tab öffnet sich (wie bisher, nötig für sauberen PDF-Druck in Safari)
+- Druckdialog erscheint **automatisch**, ohne dass der User Cmd+P drücken muss
+- Nach „Drucken" oder „Abbrechen" schließt sich der Tab **automatisch**
+- Funktioniert auf macOS-Safari **und** auf iPhone/iPad-Safari (dort AirPrint-Dialog)
+- Falls etwas schiefgeht: sauberer Fallback auf den jetzigen Zustand (User drückt Cmd+P selbst)
 
-### 1. Die Druckstrategie in `src/lib/pdf/printBlob.ts` aufteilen
-Ich stelle den Druck auf zwei klare Wege um:
+## Umsetzung
 
-- **Safari/WebKit auf macOS/iOS:** nicht mehr über das aktuelle versteckte Rasterbild-`iframe` drucken
-- **andere Browser:** bestehende Inline-Print-Strategie behalten und nur gezielt härten
+### 1. Druck-Tab-Inhalt umbauen (`src/lib/pdf/printBlob.ts`)
+Statt im neuen Tab direkt die PDF-Blob-URL zu setzen, wird eine winzige selbst gebaute HTML-Hülle geladen. Diese Hülle:
 
-Hintergrund: Im aktuellen Code ist bereits kommentiert, dass Safari/iOS automatisch über einen neuen Tab laufen soll, aber diese Sonderbehandlung ist faktisch noch nicht implementiert. Genau dort liegt sehr wahrscheinlich die Lücke.
+- bettet das PDF bildschirmfüllend ein (eigener PDF-Viewer-Tab-Look bleibt)
+- wartet bis das PDF wirklich gerendert ist
+- ruft dann automatisch den nativen Druckdialog auf
+- horcht auf den Abschluss des Druckdialogs und schließt den Tab
 
-### 2. Für Safari den nativen PDF-Druck verwenden
-Für Safari/WebKit wird der Druck aus dem **Original-PDF** ausgelöst statt aus gerenderten PNG-Seiten.
+Die HTML-Hülle wird per `document.write` in das schon im User-Klick geöffnete Fenster geschrieben — so bleibt der Tab dem User-Klick zugeordnet (Safari erlaubt Auto-Print nur dann).
 
-Geplant:
-- Browser/WebKit-Erkennung ergänzen
-- aus dem Blob eine sichere temporäre Blob-URL erzeugen
-- beim Klick synchron einen Druck-Tab/Preview öffnen, damit kein Popup-Blocker greift
-- dort das PDF nativ laden
-- danach normal aus Safaris PDF-Ansicht drucken
+### 2. Timing für „PDF ist wirklich da"
+Damit der Druckdialog nicht erscheint, bevor Safari die PDF-Seiten gerendert hat (sonst druckt Safari ein leeres Blatt), warte ich auf eine Kombination aus:
 
-Erwarteter Effekt:
-- Safari nutzt dann die echte PDF-Seitengröße statt ein HTML-Layout mit zusätzlicher Drucklogik
-- Phantom-Seiten durch HTML-/`iframe`-Umbruch entfallen
-- der obere Rand mit Logo wird nicht mehr durch den WebKit-Print-Container abgeschnitten
+- `load`-Event des PDF-Einbettungselements
+- kurze zusätzliche Sicherheitsverzögerung
+- Sichtbarkeitsprüfung des Tabs (Auto-Print nur im aktiven Tab)
 
-### 3. Den HTML-Print-Fallback für Nicht-Safari robuster machen
-Der bestehende `iframe`-Pfad bleibt für Chrome/andere Browser erhalten, wird aber bereinigt:
+Erst danach wird der Druck angestoßen.
 
-- Seitencontainer nur dort verwenden, wo der Browser stabil mit `@page` umgeht
-- letzten Seitenumbruch explizit neutralisieren
-- feste A4-Größe nur pro Seite, nicht als globales Dokument-Zwangslayout
-- weiterhin kein Inline-Whitespace und keine versehentlichen Zusatzhöhen
+### 3. Auto-Close nach Druck
+Sobald der Druckdialog geschlossen wird (egal ob „Drucken" oder „Abbrechen"), schließt sich der Tab. Mechanik:
 
-Damit bleibt der bisherige Vorteil erhalten: PDFs können dort weiter direkt im aktuellen Tab gedruckt werden.
+- bevorzugt `afterprint`-Event
+- Backup über Fokus-Wechsel-Erkennung (für Browser, die `afterprint` nicht zuverlässig feuern)
+- harter Sicherheits-Timeout, der den Tab nach längerer Inaktivität schließt
 
-### 4. `PrintButton` an den Safari-Pfad anbinden
-In `src/components/pdf/PrintButton.tsx` binde ich die neue Safari-Logik sauber an den bestehenden Klickfluss an:
+Wenn der Browser das Schließen verweigert (sehr selten), bleibt der Tab einfach offen — kein Crash, kein Fehler.
 
-- Tab/Fenster wird direkt im User-Klick geöffnet
-- danach wird der Blob in diesen Druckpfad übergeben
-- bestehende Fehlerbehandlung und Toasts bleiben erhalten
-- kein unnötiger Eingriff in Angebot/Rechnung/Protokoll-Routen
+### 4. iPhone / iPad
+Auf iOS funktioniert derselbe Mechanismus:
+- Tab öffnet sich
+- automatischer Druckaufruf → iOS zeigt den AirPrint-/Share-Dialog
+- nach Abschluss schließt sich der Tab
 
-### 5. Saubere Validierung nach der Umsetzung
-Ich prüfe danach gezielt diese Fälle:
+Da iOS-Safari beim automatischen Druck strenger ist, baue ich den Pfad robust: Klappt das Auto-Print nicht, bleibt das PDF im Tab sichtbar und der User kann manuell über das Teilen-Menü drucken — genau wie heute.
 
-1. **1-seitige Rechnung/Angebot/Protokoll** → im Druckdialog nur 1 Seite
-2. **mehrseitige Rechnung** → sauberer Seitenwechsel ohne Beschnitt oben
-3. **Logo/Briefkopf oben links** → vollständig sichtbar
-4. **keine Regression** bei Download/Viewer/normaler PDF-Anzeige
+### 5. Chrome/Firefox bleiben unberührt
+Diese drucken weiterhin im aktuellen Tab über das bestehende Iframe-Verfahren. Kein neuer Tab, keine Änderung.
+
+### 6. Saubere Fehler- und Abbruch-Pfade
+- Druck schlägt fehl → Tab bleibt offen mit sichtbarem PDF + Hinweis „Bitte manuell drucken"
+- User schließt den Tab selbst, bevor der Druckdialog kommt → keine Folgefehler
+- Popup-Blocker greift trotz User-Geste → Toast mit Erklärung, kein stiller Fail
 
 ## Technische Details
 
-**Dateien mit Änderungen:**
-- `src/lib/pdf/printBlob.ts`
-- `src/components/pdf/PrintButton.tsx`
+**Geänderte Dateien:**
+- `src/lib/pdf/printBlob.ts` — Safari-Pfad: HTML-Hülle mit eingebettetem PDF + Auto-`print()` + Auto-`close()` statt direkter Blob-URL
 
-**Bewusst nicht anfassen:**
-- PDF-Inhalte / Layoutdefinitionen in `belegPdf.ts`, `werkzeugePdf.ts`, `backend/src/pdf/layout.ts`
-- Routen für Rechnungen, Angebote, Protokolle
+**Nicht geändert:**
+- `src/components/pdf/PrintButton.tsx` (nutzt die Funktion unverändert, der Tab wird weiterhin synchron im Klick geöffnet)
+- Chromium/Firefox-Druckpfad (HTML-Iframe im aktuellen Tab)
+- PDF-Erzeugung, Routen, UI
 
-**Warum dieser Ansatz:**
-- Das Problem sitzt sehr wahrscheinlich nicht mehr im PDF selbst, sondern in der **Druckdarstellung von Safari/WebKit**
-- Der aktuelle Fix hat nur das HTML-/Bild-Layout verändert
-- Auf dem Mac ist für exakte Seitengrößen der **native PDF-Druck** der zuverlässigste Weg, besonders bei langen Dokumenten
+**Warum dieser Ansatz funktioniert:**
+- Das Fenster wird **synchron im User-Klick** geöffnet → Safari erlaubt darin `window.print()` ohne Geste
+- Die HTML-Hülle gehört uns → wir können auf das PDF-Ladeevent warten und das Timing kontrollieren
+- Das PDF bleibt das **original gerenderte PDF** → keine Beschnitt-/Phantomseiten-Probleme
+
+**Bekannte Grenzen (ehrlich):**
+- Der Tab ist beim Öffnen für ~0,5–1 Sekunde sichtbar — das lässt sich von Browsern aus nicht verstecken
+- In sehr seltenen Safari-Konstellationen wird Auto-`print()` verweigert → dann zeigt der Tab das PDF und der User druckt manuell
+- Auf iOS hängt das Verhalten leicht von der iOS-Version ab; der Fallback ist immer ein normaler PDF-Tab
