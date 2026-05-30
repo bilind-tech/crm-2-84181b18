@@ -452,15 +452,11 @@ export async function printPdfBlobUrl(url: string, winRef?: Window | null): Prom
   try {
     res = await fetch(url);
   } catch (err) {
-    if (winRef) {
-      try { winRef.close(); } catch { /* noop */ }
-    }
+    showPrintTabError(winRef ?? null, "PDF konnte nicht geladen werden.");
     throw wrapError("PDF-Quelle nicht erreichbar (Blob-URL evtl. abgelaufen)", err);
   }
   if (!res.ok) {
-    if (winRef) {
-      try { winRef.close(); } catch { /* noop */ }
-    }
+    showPrintTabError(winRef ?? null, "PDF konnte nicht geladen werden.");
     throw new Error(`PDF-Quelle antwortete HTTP ${res.status}`);
   }
   if (isWebKitSafari()) {
