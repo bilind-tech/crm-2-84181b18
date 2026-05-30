@@ -7,7 +7,7 @@
 
 set -euo pipefail
 
-REPO="https://github.com/bilind-tech/crm-2.git"
+REPO="https://github.com/bilind-tech/crm-2-5f8fb3a9.git"
 BRANCH="main"
 APP_DIR="/opt/mycleancenter/current"
 # WICHTIG: NICHT /tmp benutzen — auf dem Pi ist /tmp meist tmpfs (RAM-begrenzt).
