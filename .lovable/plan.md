@@ -1,74 +1,76 @@
-## Ziel
+# Plan: Druck-Tab vordergründig + Auto-Print zuverlässig
 
-Beim Klick auf „Drucken":
-- Neuer Tab öffnet sich (wie bisher, nötig für sauberen PDF-Druck in Safari)
-- Druckdialog erscheint **automatisch**, ohne dass der User Cmd+P drücken muss
-- Nach „Drucken" oder „Abbrechen" schließt sich der Tab **automatisch**
-- Funktioniert auf macOS-Safari **und** auf iPhone/iPad-Safari (dort AirPrint-Dialog)
-- Falls etwas schiefgeht: sauberer Fallback auf den jetzigen Zustand (User drückt Cmd+P selbst)
+## Beobachtetes Problem
 
-## Umsetzung
+Beim Klick auf „Drucken" passieren in Safari aktuell drei Dinge, die nicht zusammenpassen:
 
-### 1. Druck-Tab-Inhalt umbauen (`src/lib/pdf/printBlob.ts`)
-Statt im neuen Tab direkt die PDF-Blob-URL zu setzen, wird eine winzige selbst gebaute HTML-Hülle geladen. Diese Hülle:
+1. Der neue Tab öffnet sich **im Hintergrund** — die Hauptseite bleibt aktiv.
+2. Der Druckdialog erscheint nicht automatisch.
+3. Wenn man manuell zum Tab wechselt, sieht man nur die **dunkelgraue Fläche** (`#525659` aus der Wrapper-HTML) ohne PDF-Inhalt.
 
-- bettet das PDF bildschirmfüllend ein (eigener PDF-Viewer-Tab-Look bleibt)
-- wartet bis das PDF wirklich gerendert ist
-- ruft dann automatisch den nativen Druckdialog auf
-- horcht auf den Abschluss des Druckdialogs und schließt den Tab
+## Ursachenanalyse
 
-Die HTML-Hülle wird per `document.write` in das schon im User-Klick geöffnete Fenster geschrieben — so bleibt der Tab dem User-Klick zugeordnet (Safari erlaubt Auto-Print nur dann).
+Drei zusammenwirkende Ursachen, alle behebbar:
 
-### 2. Timing für „PDF ist wirklich da"
-Damit der Druckdialog nicht erscheint, bevor Safari die PDF-Seiten gerendert hat (sonst druckt Safari ein leeres Blatt), warte ich auf eine Kombination aus:
+**A) User-Gesture geht verloren.**
+`PrintButton` öffnet `window.open("", "_blank")` synchron — gut. Aber danach läuft asynchron `getBlob()` (PDF-Erzeugung, bei „Drucken" über `getBlob` mehrere hundert Millisekunden). Erst danach kommt `document.write(...)`. Safari erkennt das nicht mehr als direkte User-Aktion → blockiert `window.print()` im Tab UND foregrounded den Tab nicht.
 
-- `load`-Event des PDF-Einbettungselements
-- kurze zusätzliche Sicherheitsverzögerung
-- Sichtbarkeitsprüfung des Tabs (Auto-Print nur im aktiven Tab)
+**B) Iframe lädt die Blob-URL im neuen Tab nicht zuverlässig.**
+Blob-URLs sind origin-gebunden. Ein per `window.open("")` geöffneter Tab läuft auf `about:blank` und erbt das Parent-Origin, sollte also Zugriff haben — aber wenn der Tab beim `document.write` schon „eingefroren" im Hintergrund ist, rendert WebKit den Iframe-Inhalt erst beim Aktivieren neu, und das `load`-Event im Wrapper-Script feuert ggf. zu früh oder gar nicht → kein `window.print()`-Aufruf, nur graue Fläche.
 
-Erst danach wird der Druck angestoßen.
+**C) Kein `winRef.focus()`.**
+Selbst wenn der Tab vordergründig öffnen sollte, holt aktuell nichts den Fokus aktiv zurück.
 
-### 3. Auto-Close nach Druck
-Sobald der Druckdialog geschlossen wird (egal ob „Drucken" oder „Abbrechen"), schließt sich der Tab. Mechanik:
+## Lösung
 
-- bevorzugt `afterprint`-Event
-- Backup über Fokus-Wechsel-Erkennung (für Browser, die `afterprint` nicht zuverlässig feuern)
-- harter Sicherheits-Timeout, der den Tab nach längerer Inaktivität schließt
+Drei chirurgische Änderungen in **`src/lib/pdf/printBlob.ts`** und **`src/components/pdf/PrintButton.tsx`**. Keine anderen Dateien.
 
-Wenn der Browser das Schließen verweigert (sehr selten), bleibt der Tab einfach offen — kein Crash, kein Fehler.
+### 1. Wrapper-HTML SOFORT in den Tab schreiben (vor PDF-Erzeugung)
 
-### 4. iPhone / iPad
-Auf iOS funktioniert derselbe Mechanismus:
-- Tab öffnet sich
-- automatischer Druckaufruf → iOS zeigt den AirPrint-/Share-Dialog
-- nach Abschluss schließt sich der Tab
+`PrintButton.handleClick`: direkt nach `window.open("", "_blank")` (also noch im User-Gesture-Frame, bevor `getBlob()` läuft) wird in den Tab eine **Lade-Hülle** geschrieben:
 
-Da iOS-Safari beim automatischen Druck strenger ist, baue ich den Pfad robust: Klappt das Auto-Print nicht, bleibt das PDF im Tab sichtbar und der User kann manuell über das Teilen-Menü drucken — genau wie heute.
+- Gleicher dunkler Hintergrund + zentrierter „PDF wird vorbereitet…"-Spinner.
+- Leeres `<iframe id="pdf">` ohne `src`.
+- Das komplette Auto-Print-Script ist bereits vorhanden, wartet aber via Custom Event auf das spätere Setzen der PDF-URL.
 
-### 5. Chrome/Firefox bleiben unberührt
-Diese drucken weiterhin im aktuellen Tab über das bestehende Iframe-Verfahren. Kein neuer Tab, keine Änderung.
+Damit ist der Tab sofort initialisiert, der User sieht etwas Vernünftiges statt grauer Fläche, und der Tab bleibt als „aktiv beschrieben" markiert.
 
-### 6. Saubere Fehler- und Abbruch-Pfade
-- Druck schlägt fehl → Tab bleibt offen mit sichtbarem PDF + Hinweis „Bitte manuell drucken"
-- User schließt den Tab selbst, bevor der Druckdialog kommt → keine Folgefehler
-- Popup-Blocker greift trotz User-Geste → Toast mit Erklärung, kein stiller Fail
+### 2. Blob-URL nachträglich im Child-Window setzen
 
-## Technische Details
+Neue Hilfsfunktion `attachPdfToPrintTab(winRef, blob)` in `printBlob.ts`:
 
-**Geänderte Dateien:**
-- `src/lib/pdf/printBlob.ts` — Safari-Pfad: HTML-Hülle mit eingebettetem PDF + Auto-`print()` + Auto-`close()` statt direkter Blob-URL
+- Erzeugt `URL.createObjectURL(blob)`.
+- Setzt `winRef.document.getElementById('pdf').src = url` aus dem Parent.
+- Setzt zusätzlich `winRef.document.title` auf „Drucken".
+- Ruft `winRef.focus()` auf → bringt den Tab nach vorne.
+- Das im Tab laufende Script bekommt sein `load`-Event vom Iframe und feuert dann `window.print()`.
 
-**Nicht geändert:**
-- `src/components/pdf/PrintButton.tsx` (nutzt die Funktion unverändert, der Tab wird weiterhin synchron im Klick geöffnet)
-- Chromium/Firefox-Druckpfad (HTML-Iframe im aktuellen Tab)
-- PDF-Erzeugung, Routen, UI
+### 3. Auto-Print-Script robuster
 
-**Warum dieser Ansatz funktioniert:**
-- Das Fenster wird **synchron im User-Klick** geöffnet → Safari erlaubt darin `window.print()` ohne Geste
-- Die HTML-Hülle gehört uns → wir können auf das PDF-Ladeevent warten und das Timing kontrollieren
-- Das PDF bleibt das **original gerenderte PDF** → keine Beschnitt-/Phantomseiten-Probleme
+Im Wrapper-Script:
 
-**Bekannte Grenzen (ehrlich):**
-- Der Tab ist beim Öffnen für ~0,5–1 Sekunde sichtbar — das lässt sich von Browsern aus nicht verstecken
-- In sehr seltenen Safari-Konstellationen wird Auto-`print()` verweigert → dann zeigt der Tab das PDF und der User druckt manuell
-- Auf iOS hängt das Verhalten leicht von der iOS-Version ab; der Fallback ist immer ein normaler PDF-Tab
+- Statt nur auf `f.addEventListener('load', ready)` zu hören, zusätzlich auf ein eigenes `pdf-ready`-Event vom Parent.
+- `triggerPrint()` ruft zuerst `window.focus()`, dann nach 100 ms `window.print()` — Safari braucht den Fokus zwingend.
+- Wenn nach 4 s kein `load` kam, Hint einblenden („Bitte zum Drucken-Tab wechseln und Cmd+P drücken").
+- `afterprint`/`visibilitychange`/`focus`-Close-Heuristik bleibt wie heute.
+
+### 4. Fehlerpfade
+
+- `getBlob()` schlägt fehl → bestehender Tab bekommt eine kleine Fehlerseite („PDF konnte nicht erzeugt werden. Tab kann geschlossen werden.") + Toast im Haupttab. Tab wird **nicht** automatisch geschlossen, damit der User die Meldung lesen kann.
+- Popup-Blocker (`winRef === null`) → wie bisher: Toast im Haupttab.
+
+## Erwartetes Verhalten danach
+
+- Klick auf „Drucken" → Tab öffnet **vordergründig** mit Spinner → 1–2 s später erscheint das PDF + **Druckdialog automatisch**.
+- Auf iPhone/iPad: Tab öffnet, PDF lädt, AirPrint-/Teilen-Sheet erscheint automatisch (sofern iOS-Version das aus User-Gesture erlaubt — sonst Fallback-Hinweis).
+- Nach Druck/Abbruch: Tab schließt sich automatisch.
+
+## Risiken / Grenzen
+
+- Ob Safari den Tab **wirklich vordergründig** öffnet, hängt am Browser (Einstellung „Tabs anstatt Fenster öffnen" + „Neue Tabs im Hintergrund"). `winRef.focus()` hilft, aber Apple gibt keine Garantie. Falls der User „neue Tabs im Hintergrund" gesetzt hat, bleibt der Tab hinten — dann sieht er aber wenigstens den Spinner statt grauer Fläche und der Druckdialog poppt auf (auch ohne Tab-Wechsel).
+- Auf älteren iOS-Versionen kann `window.print()` aus dem Skript blockiert sein → Fallback-Hint greift.
+
+## Dateien
+
+- `src/components/pdf/PrintButton.tsx` — Wrapper sofort in `winRef` schreiben, dann erst `getBlob()`.
+- `src/lib/pdf/printBlob.ts` — `buildAutoPrintTabHtml` aufteilen in `buildPrintTabShellHtml` (Spinner + leeres Iframe + Script) und `attachPdfToPrintTab(winRef, blob)`; `printPdfNativeTab` ruft nur noch letzteres.
