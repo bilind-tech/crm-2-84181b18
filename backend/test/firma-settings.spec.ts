@@ -82,6 +82,7 @@ describe("Firmendaten-Roundtrip (UI-Felder bleiben nach Speichern erhalten)", ()
       ort: "Sankt Augustin",
       land: "Deutschland",
       telefon: "+49 2241 123456",
+      mobil: "+49 170 1234567",
       email: "info@acme.de",
       webseite: "https://acme.de",
       ustId: "DE123456789",
