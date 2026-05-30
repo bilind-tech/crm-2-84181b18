@@ -74,19 +74,37 @@ function buildPrintHtml(images: string[]): string {
 <title>Drucken</title>
 <style>
   @page { size: A4; margin: 0; }
-  html, body { margin: 0; padding: 0; background: #fff; }
+  html, body {
+    width: 210mm;
+    height: 297mm;
+    margin: 0;
+    padding: 0;
+    background: #fff;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
   .page {
     width: 210mm;
     height: 297mm;
-    page-break-after: always;
+    box-sizing: border-box;
     overflow: hidden;
+    page-break-after: always;
+    break-after: page;
+    /* entfernt unsichtbares Inline-Whitespace nach <img>,
+       das sonst die effektive Höhe vergrößert und eine Phantom-Seite auslöst */
+    line-height: 0;
+    font-size: 0;
   }
-  .page:last-child { page-break-after: auto; }
+  .page:last-child {
+    page-break-after: avoid;
+    break-after: avoid;
+  }
   .page img {
-    width: 210mm;
-    height: 297mm;
     display: block;
+    width: 100%;
+    height: 100%;
     object-fit: contain;
+    object-position: top center;
   }
 </style>
 </head>

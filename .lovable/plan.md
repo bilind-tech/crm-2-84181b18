@@ -1,52 +1,32 @@
-# Empfänger nicht fett + Druck passt auf A4
+## Problem (laut Screenshot)
 
-## 1. Empfänger-Adressblock: Firmenname nicht mehr fett
+Im macOS-Druckdialog wird ein 1-seitiges PDF als **2 Seiten** dargestellt und das Logo oben wird abgeschnitten. Ursache liegt in `src/lib/pdf/printBlob.ts` (`buildPrintHtml`):
 
-In allen PDF-Generatoren (Angebot, Rechnung, Übergabeprotokoll, Schlüsselübergabe) wird die erste Zeile des Empfänger-Blocks aktuell mit `bold: i === 0` fett gesetzt. Das wird in folgenden Dateien entfernt — die Adresszeilen erscheinen einheitlich in normaler Schriftstärke:
+1. `.page { height: 297mm }` füllt die A4-Höhe komplett aus. Safari erzwingt jedoch eine minimale, nicht abschaltbare Druckermargin und addiert (bei aktivierten "Kopf- und Fußzeilen") zusätzlich Header/Footer-Höhe. Dadurch überläuft die Seite um wenige Millimeter → der Browser bricht eine **zweite, fast leere Seite** auf.
+2. Das Bild ist mit `object-fit: contain` auf 210 × 297 mm vertikal zentriert. Sobald der Drucker oben/unten ~5 mm Margin erzwingt, wird das obere Drittel (Logo) **abgeschnitten**, weil der Inhalt nicht skaliert, sondern weggeschnitten wird.
+3. Safaris Kopf-/Fußzeilen-Option (im Screenshot aktiv) lässt sich aus dem Web nicht deaktivieren — wir müssen das Layout robust gegen diese Zusatzhöhe machen.
 
-- `src/lib/pdf/belegPdf.ts` (Zeile ~661, Frontend-Beleg-PDF)
-- `backend/src/pdf/layout.ts` (Zeile ~471, Backend-Beleg-PDF)
-- `src/lib/pdf/werkzeugePdf.ts` (Zeilen ~356 und ~538, Übergabe-/Schlüsselprotokoll)
+## Lösung (nur `src/lib/pdf/printBlob.ts`)
 
-Reihenfolge und Inhalt der Zeilen bleiben unverändert (Firmenname, Person, Straße, PLZ Ort).
+`buildPrintHtml` so umbauen, dass jede PDF-Seite garantiert auf **genau eine** physische Druckseite passt — auch wenn der Browser zusätzliche Randhöhe reserviert:
 
-## 2. Druckdialog: PDF passt sauber auf A4, mehrseitig
+- `@page { size: A4; margin: 0 }` beibehalten, zusätzlich `html, body { width: 210mm; height: 297mm; margin: 0; padding: 0 }`.
+- `.page`-Container: feste Breite **210mm**, Höhe **297mm**, `overflow: hidden`, `page-break-after: always`, letzter `.page` mit `page-break-after: avoid` (nicht nur `auto`) — verhindert das Phantom-Blatt.
+- Das Bild **passend skalieren** statt zuschneiden:
+  - `width: 100%`, `height: 100%`, `object-fit: contain`, `object-position: top center` (verankert oben, sodass Logo nie verschwindet, wenn der Drucker minimal stutzt).
+  - `display: block`.
+- Zusätzlich `body { -webkit-print-color-adjust: exact; print-color-adjust: exact }` für farbtreue Logos.
+- Sicherheitspuffer gegen Sub-Pixel-Overflow: `.page { box-sizing: border-box; line-height: 0; font-size: 0 }` — entfernt unsichtbaren Inline-Whitespace nach `<img>`, der bisher die effektive Höhe um ~4 px nach unten verschiebt und so die zweite Seite auslöst.
+- Keine Veränderung an Renderauflösung (`PRINT_DPI = 2`), `printViaHiddenIframe`-Logik oder dem öffentlichen API (`printPdfBlob`, `printPdfBlobUrl`).
 
-Aktuell rendert `src/lib/pdf/printBlob.ts` jede PDF-Seite als PNG in ein Iframe mit:
-```css
-@page { size: A4; margin: 0; }
-.page img { width: 100%; height: auto; }
-```
-Das führt im macOS-Druckdialog dazu, dass das Bild oben angeschnitten wird (Logo halb abgeschnitten), weil `height: auto` die Bildhöhe nicht an die A4-Seite bindet und Browser/Drucker eigene Skalierung anwenden.
+## Erwartetes Ergebnis
 
-Fix in `src/lib/pdf/printBlob.ts` (Funktion `buildPrintHtml`): Bild fest auf A4-Maße zwingen, jede Seite genau eine A4-Seite, mehrseitige PDFs sauber umbrechen:
-```css
-@page { size: A4; margin: 0; }
-html, body { margin: 0; padding: 0; background: #fff; }
-.page {
-  width: 210mm;
-  height: 297mm;
-  page-break-after: always;
-  overflow: hidden;
-}
-.page:last-child { page-break-after: auto; }
-.page img {
-  width: 210mm;
-  height: 297mm;
-  display: block;
-  object-fit: contain;
-}
-```
-
-Damit:
-- jede Seite belegt exakt eine A4-Seite (kein Anschnitt oben, Logo vollständig sichtbar),
-- `object-fit: contain` verhindert Verzerrung, falls der PDF-Renderer minimal abweichende Proportionen liefert,
-- mehrseitige Rechnungen brechen automatisch auf Seite 2, 3 … um (via `page-break-after: always`).
-
-Der eigentliche PDF-Inhalt (pdfmake-Layout, Seitenränder, Tabellen-Umbruch) bleibt unverändert — die Mehrseitigkeit funktioniert dort bereits über pdfmake und wird durch die CSS-Anpassung nur korrekt im Druckdialog wiedergegeben.
+- Im Druckdialog erscheint für ein 1-seitiges PDF nur **„Seite 1 von 1"**.
+- Logo und Adressblock oben sind vollständig sichtbar (Verankerung `top center` + `contain` verhindern Beschnitt).
+- Mehrseitige Rechnungen brechen weiterhin sauber Seite für Seite um (`page-break-after: always` zwischen Seiten).
 
 ## Out of Scope
 
-- Keine Änderungen an pdfmake-Seitenrändern, Header, Footer oder Tabellen.
-- Keine Backend-/Datenänderungen.
-- Keine UI-Änderungen außerhalb der PDF-Generierung.
+- Keine Änderung an pdfmake-Layouts (`backend/src/pdf/layout.ts`, `src/lib/pdf/belegPdf.ts`, `werkzeugePdf.ts`).
+- Keine UI-/Button-/Hook-Änderungen (`PrintButton.tsx`, `useBelegPdf.ts`).
+- Kein Eingriff in `pdfjsWorker`/Renderer.
