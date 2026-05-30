@@ -75,9 +75,19 @@ function buildPrintHtml(images: string[]): string {
 <style>
   @page { size: A4; margin: 0; }
   html, body { margin: 0; padding: 0; background: #fff; }
-  .page { page-break-after: always; }
+  .page {
+    width: 210mm;
+    height: 297mm;
+    page-break-after: always;
+    overflow: hidden;
+  }
   .page:last-child { page-break-after: auto; }
-  .page img { width: 100%; height: auto; display: block; }
+  .page img {
+    width: 210mm;
+    height: 297mm;
+    display: block;
+    object-fit: contain;
+  }
 </style>
 </head>
 <body>
