@@ -11,7 +11,13 @@ import { useState } from "react";
 import { Loader2, Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { printPdfBlob, printPdfBlobUrl, printRequiresOpenWindow } from "@/lib/pdf/printBlob";
+import {
+  initializePrintTab,
+  printPdfBlob,
+  printPdfBlobUrl,
+  printRequiresOpenWindow,
+  showPrintTabError,
+} from "@/lib/pdf/printBlob";
 import { cn } from "@/lib/utils";
 
 type Common = {
@@ -43,6 +49,7 @@ export function PrintButton(props: Props) {
     if (printRequiresOpenWindow() && (props.blob || props.url || props.getBlob)) {
       try {
         winRef = window.open("", "_blank");
+        initializePrintTab(winRef);
       } catch {
         winRef = null;
       }
@@ -72,10 +79,12 @@ export function PrintButton(props: Props) {
       toast.error("PDF ist noch nicht bereit.");
     } catch (err) {
       console.error(err);
-      if (winRef) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (winRef && printRequiresOpenWindow()) {
+        showPrintTabError(winRef, "PDF konnte nicht vorbereitet werden.");
+      } else if (winRef) {
         try { winRef.close(); } catch { /* noop */ }
       }
-      const msg = err instanceof Error ? err.message : String(err);
       toast.error(`Drucken fehlgeschlagen: ${msg}`);
     } finally {
       setBusy(false);
