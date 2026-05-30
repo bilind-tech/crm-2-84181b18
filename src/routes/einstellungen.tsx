@@ -411,9 +411,12 @@ function FirmendatenTab({
       </Section>
 
       <Section title="Kontakt">
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Telefon">
             <Input value={form.telefon ?? ""} onChange={(e) => set("telefon", e.target.value)} />
+          </Field>
+          <Field label="Mobil">
+            <Input value={form.mobil ?? ""} onChange={(e) => set("mobil", e.target.value)} />
           </Field>
           <Field label="E-Mail">
             <Input
