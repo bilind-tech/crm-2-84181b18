@@ -42,6 +42,8 @@ function wrapError(stage: string, err: unknown): Error {
 type PrintTabWindow = Window & {
   __attachPdfForPrint?: (url: string) => void;
   __markPrintTabLoading?: (message?: string) => void;
+  __pendingPrintPdfUrl?: string;
+  __pendingPrintError?: string;
   __showPrintTabError?: (message?: string) => void;
 };
 
@@ -73,6 +75,7 @@ function attachPdfToPrintTab(winRef: Window | null, blob: Blob): void {
   const url = URL.createObjectURL(blob);
   try {
     child.focus?.();
+    child.__pendingPrintPdfUrl = url;
     if (typeof child.__attachPdfForPrint === "function") {
       child.__attachPdfForPrint(url);
     } else {
@@ -216,6 +219,13 @@ function buildPrintTabShellHtml(): string {
   };
   bindFrame();
   showLoader('PDF wird vorbereitet…');
+  if(window.__pendingPrintError){
+    window.__showPrintTabError(window.__pendingPrintError);
+    window.__pendingPrintError = '';
+  } else if(window.__pendingPrintPdfUrl){
+    window.__attachPdfForPrint(window.__pendingPrintPdfUrl);
+    window.__pendingPrintPdfUrl = '';
+  }
 })();
 `.trim();
   return `<!doctype html>
@@ -266,6 +276,7 @@ export function showPrintTabError(winRef: Window | null, message: string): void 
   if (!winRef) return;
   try {
     const child = ensurePrintTabShell(winRef);
+    child.__pendingPrintError = message;
     child.__showPrintTabError?.(message);
     child.focus?.();
   } catch {
