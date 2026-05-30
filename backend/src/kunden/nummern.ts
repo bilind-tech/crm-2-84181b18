@@ -47,6 +47,26 @@ export function bumpBelegNummerMindestens(
     .run(kundeId, belegart, periodeMMYY, Math.max(1, mindestens));
 }
 
+/** Setzt den Zähler EXAKT auf den angegebenen Wert — auch nach unten.
+ *  Wird vom User-PATCH der Stammdaten verwendet, damit eine manuelle
+ *  Korrektur der nächsten Belegnummer wirklich persistiert wird. */
+export function setBelegNummerStart(
+  kundeId: string,
+  belegart: BelegArt,
+  periodeMMYY: string,
+  naechsterStart: number,
+): void {
+  const v = Math.max(1, Math.floor(naechsterStart));
+  getDatabase()
+    .prepare(
+      `INSERT INTO belegnummer_zaehler (kunde_id, belegart, periode, naechster_start)
+       VALUES (?, ?, ?, ?)
+       ON CONFLICT(kunde_id, belegart, periode)
+         DO UPDATE SET naechster_start = excluded.naechster_start`,
+    )
+    .run(kundeId, belegart, periodeMMYY, v);
+}
+
 /** Vorschau ohne Vergabe. */
 export function peekBelegNummer(
   kundeId: string,
