@@ -8,6 +8,7 @@ export interface FirmaForPdf {
   plz?: string | null;
   ort?: string | null;
   telefon?: string | null;
+  mobil?: string | null;
   email?: string | null;
   webseite?: string | null;
   ustId?: string | null;
