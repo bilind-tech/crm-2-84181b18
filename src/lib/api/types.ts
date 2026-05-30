@@ -498,6 +498,7 @@ export interface Firmendaten {
   land?: string;
   telefon?: string;
   email?: string;
+  mobil?: string;
   webseite?: string;
   ustId?: string;
   steuernummer?: string;
