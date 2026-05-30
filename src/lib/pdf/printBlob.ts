@@ -39,195 +39,97 @@ function wrapError(stage: string, err: unknown): Error {
   return wrapped;
 }
 
-type PrintTabWindow = Window & {
-  __attachPdfForPrint?: (url: string) => void;
-  __markPrintTabLoading?: (message?: string) => void;
-  __pendingPrintPdfUrl?: string;
-  __pendingPrintError?: string;
-  __showPrintTabError?: (message?: string) => void;
-};
+/**
+ * Safari-Druckpfad — bewusst minimal.
+ *
+ * Ablauf:
+ *  1. UI (PrintButton) hat den Tab synchron im Klick geöffnet (`winRef`).
+ *  2. Wir schreiben eine **statische** Lade-Shell hinein — kein Script,
+ *     keine Handshake-Logik im Child. Genau dieser Handshake ist in WebKit
+ *     unzuverlässig und hat den hängenden „PDF wird vorbereitet…"-Zustand
+ *     ausgelöst.
+ *  3. Sobald der Blob da ist, navigieren wir den Tab direkt auf die Blob-URL.
+ *     Safari öffnet dann seinen nativen PDF-Viewer — keine eigenen Skripte
+ *     mehr nötig.
+ *  4. Vom Haupttab aus rufen wir nach kurzem Delay `winRef.focus()` +
+ *     `winRef.print()`. Klappt das nicht (z. B. iOS, anderer Origin), bleibt
+ *     immerhin die PDF sichtbar und manuell druckbar.
+ */
+function writePrintTabShell(winRef: Window | null): void {
+  if (!winRef) return;
+  try {
+    const doc = winRef.document;
+    doc.open();
+    doc.write(buildPrintTabShellHtml());
+    doc.close();
+    try {
+      winRef.focus();
+    } catch {
+      /* noop */
+    }
+  } catch {
+    /* noop — wenn schon navigiert, ignorieren */
+  }
+}
 
-function ensurePrintTabShell(winRef: Window | null): PrintTabWindow {
+function showPrintTabErrorInternal(winRef: Window | null, message: string): void {
+  if (!winRef) return;
+  try {
+    const doc = winRef.document;
+    doc.open();
+    doc.write(buildPrintTabErrorHtml(message));
+    doc.close();
+  } catch {
+    /* noop — Tab evtl. schon auf Blob-URL navigiert (cross-doc) */
+  }
+}
+
+async function printPdfNativeTab(blob: Blob, winRef: Window | null): Promise<void> {
   if (!winRef) {
     throw new Error(
       "Druck-Tab konnte nicht geöffnet werden (Popup-Blocker?). Bitte Popups für diese Seite zulassen.",
     );
   }
-  const child = winRef as PrintTabWindow;
-  try {
-    const doc = child.document;
-    const hasShell = doc.getElementById("pdf") && doc.getElementById("loader");
-    if (!hasShell) {
-      doc.open();
-      doc.write(buildPrintTabShellHtml());
-      doc.close();
-    }
-    child.__markPrintTabLoading?.("PDF wird vorbereitet…");
-    child.focus?.();
-    return child;
-  } catch (err) {
-    throw wrapError("Druck-Tab konnte nicht initialisiert werden", err);
-  }
-}
-
-function attachPdfToPrintTab(winRef: Window | null, blob: Blob): void {
-  const child = ensurePrintTabShell(winRef);
   const url = URL.createObjectURL(blob);
   try {
-    child.focus?.();
-    child.__pendingPrintPdfUrl = url;
-    if (typeof child.__attachPdfForPrint === "function") {
-      child.__attachPdfForPrint(url);
-    } else {
-      const frame = child.document.getElementById("pdf") as HTMLIFrameElement | null;
-      if (!frame) throw new Error("PDF-Frame im Druck-Tab nicht gefunden");
-      frame.src = url;
+    // Direkt auf das PDF navigieren — Safari rendert es nativ.
+    // Das ist robuster als ein iframe + Script-Handshake.
+    try {
+      winRef.location.replace(url);
+    } catch (err) {
+      // Fallback: location.href
+      try {
+        winRef.location.href = url;
+      } catch (err2) {
+        URL.revokeObjectURL(url);
+        throw wrapError("Druck-Tab konnte nicht auf PDF umgeleitet werden", err2 ?? err);
+      }
     }
-  } catch (err) {
-    URL.revokeObjectURL(url);
-    throw wrapError("PDF konnte nicht an den Druck-Tab übergeben werden", err);
+    // Auto-Print best effort. Kurzer Delay, damit der PDF-Viewer geladen ist.
+    // Klappt das nicht (iOS, Origin-Bruch nach Navigation): PDF bleibt
+    // sichtbar und ist manuell druckbar.
+    const tryPrint = () => {
+      try {
+        winRef.focus();
+        winRef.print();
+      } catch {
+        /* noop — manueller Druck via Cmd+P / Teilen funktioniert weiterhin */
+      }
+    };
+    // Zwei Versuche: nach 800ms und nach 1800ms. Falls der erste zu früh
+    // kam, sitzt der zweite sicher.
+    setTimeout(tryPrint, 800);
+    setTimeout(tryPrint, 1800);
+  } finally {
+    // Großzügig revoken — die Blob-URL hängt am Tab.
+    setTimeout(() => URL.revokeObjectURL(url), 10 * 60_000);
   }
-  setTimeout(() => URL.revokeObjectURL(url), 10 * 60_000);
-}
-
-/**
- * Safari-Druckpfad: Druck-Tab zuerst mit eigener HTML-Hülle initialisieren,
- * danach PDF-Blob an das Child-Window übergeben. So bleibt die User-Geste
- * erhalten und Safari erlaubt eher Fokus + `window.print()`.
- */
-async function printPdfNativeTab(blob: Blob, winRef: Window | null): Promise<void> {
-  attachPdfToPrintTab(winRef, blob);
 }
 
 function buildPrintTabShellHtml(): string {
-  const script = `
-(function(){
-  var didPrint = false;
-  var didClose = false;
-  var closeHooksBound = false;
-  var hint = document.getElementById('hint');
-  var frame = document.getElementById('pdf');
-  var loader = document.getElementById('loader');
-  var status = document.getElementById('status');
-  var hintTimer = 0;
-  function setStatus(text){ if(status){ status.textContent = text || ''; } }
-  function showHint(text){
-    if(text && hint){ hint.textContent = text; }
-    if(hint){ hint.style.display='block'; }
-  }
-  function hideHint(){ if(hint){ hint.style.display='none'; } }
-  function showLoader(text){
-    if(loader){ loader.style.display='flex'; }
-    if(frame){ frame.style.display='none'; }
-    setStatus(text || 'PDF wird vorbereitet…');
-  }
-  function showFrame(){
-    if(loader){ loader.style.display='none'; }
-    if(frame){ frame.style.display='block'; }
-  }
-  function closeSoon(delay){
-    if(didClose) return;
-    didClose = true;
-    setTimeout(function(){
-      try { window.close(); } catch(e){}
-    }, delay || 200);
-  }
-  function bindCloseHooks(){
-    if(closeHooksBound) return;
-    closeHooksBound = true;
-    window.addEventListener('afterprint', function(){ closeSoon(150); });
-    var seenHidden = false;
-    document.addEventListener('visibilitychange', function(){
-      if(document.hidden){ seenHidden = true; }
-      else if(seenHidden){ closeSoon(150); }
-    });
-    window.addEventListener('focus', function(){
-      setTimeout(function(){ closeSoon(50); }, 800);
-    });
-    setTimeout(function(){ closeSoon(0); }, 5 * 60 * 1000);
-  }
-  function triggerPrint(){
-    if(didPrint) return;
-    didPrint = true;
-    bindCloseHooks();
-    showFrame();
-    hideHint();
-    setStatus('Druckdialog wird geöffnet…');
-    try {
-      window.focus();
-    } catch(e){
-      didPrint = false;
-      showFrame();
-      showHint('Falls der Druckdialog nicht erscheint: bitte zu diesem Tab wechseln und manuell drucken.');
-      setStatus('Automatisches Drucken wurde blockiert.');
-      return;
-    }
-    setTimeout(function(){
-      try {
-        window.print();
-      } catch(e){
-        didPrint = false;
-        showFrame();
-        showHint('Falls der Druckdialog nicht erscheint: bitte zu diesem Tab wechseln und manuell drucken.');
-        setStatus('Automatisches Drucken wurde blockiert.');
-      }
-    }, 100);
-  }
-  function ready(){
-    if(hintTimer){ window.clearTimeout(hintTimer); hintTimer = 0; }
-    setTimeout(triggerPrint, 450);
-  }
-  function bindFrame(){
-    if(!frame || frame.__printBound) return;
-    frame.__printBound = true;
-    frame.addEventListener('load', ready);
-    frame.addEventListener('error', function(){
-      showLoader('PDF konnte nicht geladen werden.');
-      showHint('Bitte diesen Tab schließen und es erneut versuchen.');
-    });
-  }
-  window.__markPrintTabLoading = function(message){
-    didPrint = false;
-    hideHint();
-    showLoader(message || 'PDF wird vorbereitet…');
-    try { window.focus(); } catch(e){}
-  };
-  window.__attachPdfForPrint = function(url){
-    bindFrame();
-    didPrint = false;
-    hideHint();
-    showLoader('PDF wird geladen…');
-    try { window.focus(); } catch(e){}
-    if(!frame){
-      showHint('Druckansicht konnte nicht vorbereitet werden.');
-      setStatus('Druckansicht fehlt.');
-      return;
-    }
-    if(hintTimer){ window.clearTimeout(hintTimer); }
-    hintTimer = window.setTimeout(function(){
-      showFrame();
-      showHint('Falls kein Druckdialog erscheint: bitte zu diesem Tab wechseln und Cmd+P bzw. Teilen > Drucken nutzen.');
-      setStatus('PDF ist bereit.');
-    }, 4000);
-    frame.src = url;
-  };
-  window.__showPrintTabError = function(message){
-    if(hintTimer){ window.clearTimeout(hintTimer); hintTimer = 0; }
-    didPrint = true;
-    showLoader(message || 'PDF konnte nicht vorbereitet werden.');
-    showHint('Dieser Tab kann geschlossen werden.');
-  };
-  bindFrame();
-  showLoader('PDF wird vorbereitet…');
-  if(window.__pendingPrintError){
-    window.__showPrintTabError(window.__pendingPrintError);
-    window.__pendingPrintError = '';
-  } else if(window.__pendingPrintPdfUrl){
-    window.__attachPdfForPrint(window.__pendingPrintPdfUrl);
-    window.__pendingPrintPdfUrl = '';
-  }
-})();
-`.trim();
+  // Bewusst KEIN Script: rein statische Lade-Shell.
+  // Sobald wir die Blob-URL haben, navigieren wir das ganze Tab dorthin —
+  // dann ist diese Shell ohnehin weg.
   return `<!doctype html>
 <html lang="de">
 <head>
@@ -236,52 +138,65 @@ function buildPrintTabShellHtml(): string {
 <title>Drucken</title>
 <style>
   html, body { margin:0; padding:0; height:100%; background:#525659; }
-  body { font:14px -apple-system,BlinkMacSystemFont,system-ui,sans-serif; }
-  #pdf { position:fixed; inset:0; width:100%; height:100%; border:0; display:none; background:#525659; }
+  body { font:14px -apple-system,BlinkMacSystemFont,system-ui,sans-serif; color:#fff; }
   #loader {
     position:fixed; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;
-    gap:14px; color:#fff; text-align:center; padding:24px;
+    gap:14px; text-align:center; padding:24px;
   }
   #spinner {
     width:32px; height:32px; border-radius:999px; border:3px solid rgba(255,255,255,.28);
     border-top-color:#fff; animation:spin .8s linear infinite;
   }
   #status { max-width:360px; line-height:1.45; opacity:.95; }
-  #hint {
-    display:none; position:fixed; left:50%; bottom:24px; transform:translateX(-50%);
-    background:#111; color:#fff; padding:10px 16px; border-radius:8px;
-    font:14px -apple-system,system-ui,sans-serif; box-shadow:0 6px 24px rgba(0,0,0,.35);
-    z-index:10; max-width:min(calc(100vw - 32px), 560px); text-align:center;
-  }
   @keyframes spin { to { transform:rotate(360deg); } }
 </style>
 </head>
 <body>
-<iframe id="pdf" title="PDF"></iframe>
 <div id="loader">
   <div id="spinner" aria-hidden="true"></div>
   <div id="status">PDF wird vorbereitet…</div>
 </div>
-<div id="hint">Falls der Druckdialog nicht erscheint: bitte zu diesem Tab wechseln und manuell drucken.</div>
-<script>${script}</script>
+</body>
+</html>`;
+}
+
+function buildPrintTabErrorHtml(message: string): string {
+  const safe = String(message || "PDF konnte nicht vorbereitet werden.")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+  return `<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Drucken</title>
+<style>
+  html, body { margin:0; padding:0; height:100%; background:#525659; }
+  body { font:14px -apple-system,BlinkMacSystemFont,system-ui,sans-serif; color:#fff; }
+  .wrap {
+    position:fixed; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:10px; text-align:center; padding:24px;
+  }
+  .msg { max-width:420px; line-height:1.5; }
+  .sub { opacity:.7; font-size:13px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="msg">${safe}</div>
+  <div class="sub">Dieser Tab kann geschlossen werden.</div>
+</div>
 </body>
 </html>`;
 }
 
 export function initializePrintTab(winRef: Window | null): void {
-  ensurePrintTabShell(winRef);
+  writePrintTabShell(winRef);
 }
 
 export function showPrintTabError(winRef: Window | null, message: string): void {
-  if (!winRef) return;
-  try {
-    const child = ensurePrintTabShell(winRef);
-    child.__pendingPrintError = message;
-    child.__showPrintTabError?.(message);
-    child.focus?.();
-  } catch {
-    /* noop */
-  }
+  showPrintTabErrorInternal(winRef, message);
 }
 
 async function renderPdfToImages(data: ArrayBuffer): Promise<string[]> {
