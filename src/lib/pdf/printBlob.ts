@@ -1,15 +1,18 @@
 // Druckt ein PDF direkt aus dem aktuellen Tab — ohne neues Fenster / Pop-up.
 //
-// Strategie:
-//  1. PDF mit PDF.js öffnen
-//  2. Jede Seite druckscharf in einen Canvas rendern (PNG-DataURL)
-//  3. Bilder in ein verstecktes Inline-<iframe> einbetten (srcdoc + @page A4)
-//  4. iframe.contentWindow.print() → nativer Browser-Druckdialog im aktuellen Tab
-//  5. Nach onafterprint Iframe entfernen
+// Strategie (zwei Pfade):
 //
-// Damit gibt es keinen window.open()-Aufruf mehr im Erfolgs-Pfad. Da der
-// Iframe-Inhalt gerenderte PNGs sind (kein eingebettetes PDF), greift das
-// alte Problem des nativen PDF-Plugins ("leeres Blatt") nicht.
+// A) Safari / WebKit (macOS, iOS):
+//    Nativer PDF-Druck im neuen Tab. Das umgeht die HTML/iframe-Print-Engine
+//    von WebKit, die bei rasterisierten Bildern reproduzierbar das obere
+//    Drittel abschneidet und 1-seitige PDFs als 2 Seiten ausgibt.
+//    Es wird ein leerer Tab synchron im User-Klick geöffnet (Popup-Blocker)
+//    und sofort mit einer Blob-URL des Original-PDFs befüllt. Safari zeigt
+//    den PDF-Viewer; Cmd+P → echte A4-Seitengröße ohne Beschnitt.
+//
+// B) Andere Browser (Chromium, Firefox):
+//    PDF mit PDF.js zu PNG-Seiten rastern und in ein verstecktes Inline-Iframe
+//    einbetten (srcdoc + @page A4) → iframe.contentWindow.print().
 
 import { configurePdfWorker } from "./pdfjsWorker";
 import { pdfjs } from "react-pdf";
@@ -18,12 +21,48 @@ configurePdfWorker();
 
 const PRINT_DPI = 2; // ~144 dpi — gutes Verhältnis Schärfe ↔ Größe
 
+/** Erkennt Safari/WebKit auf macOS und iOS (Chrome/Edge/Firefox auf Mac NICHT). */
+function isWebKitSafari(): boolean {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent;
+  // iPad/iPhone/iPod immer (alle Browser dort sind WebKit)
+  if (/iPad|iPhone|iPod/.test(ua)) return true;
+  // Desktop-Safari: enthält "Safari", aber NICHT "Chrome", "Chromium", "Edg", "OPR", "Firefox"
+  return /Safari/.test(ua) && !/Chrome|Chromium|Edg\/|OPR\/|Firefox/.test(ua);
+}
+
 function wrapError(stage: string, err: unknown): Error {
   const original = err instanceof Error ? err : new Error(String(err));
   const msg = original.message || String(err) || "unbekannt";
   const wrapped = new Error(`${stage} (${msg})`);
   (wrapped as Error & { cause?: unknown }).cause = original;
   return wrapped;
+}
+
+/**
+ * Safari-Druckpfad: PDF nativ in neuem Tab anzeigen → User druckt aus Safaris
+ * eingebautem PDF-Viewer. `winRef` MUSS synchron im User-Klick geöffnet sein.
+ */
+async function printPdfNativeTab(blob: Blob, winRef: Window | null): Promise<void> {
+  if (!winRef) {
+    throw new Error(
+      "Druck-Tab konnte nicht geöffnet werden (Popup-Blocker?). Bitte Popups für diese Seite zulassen.",
+    );
+  }
+  const url = URL.createObjectURL(blob);
+  try {
+    winRef.location.href = url;
+  } catch (err) {
+    try {
+      winRef.close();
+    } catch {
+      /* noop */
+    }
+    URL.revokeObjectURL(url);
+    throw wrapError("Druck-Tab konnte nicht geladen werden", err);
+  }
+  // URL erst nach genug Zeit freigeben, damit Safari sie laden + anzeigen + drucken kann.
+  setTimeout(() => URL.revokeObjectURL(url), 5 * 60_000);
 }
 
 async function renderPdfToImages(data: ArrayBuffer): Promise<string[]> {
@@ -76,7 +115,6 @@ function buildPrintHtml(images: string[]): string {
   @page { size: A4; margin: 0; }
   html, body {
     width: 210mm;
-    height: 297mm;
     margin: 0;
     padding: 0;
     background: #fff;
@@ -96,13 +134,15 @@ function buildPrintHtml(images: string[]): string {
     font-size: 0;
   }
   .page:last-child {
-    page-break-after: avoid;
-    break-after: avoid;
+    page-break-after: auto;
+    break-after: auto;
+    height: auto;
   }
   .page img {
     display: block;
     width: 100%;
-    height: 100%;
+    height: auto;
+    max-height: 297mm;
     object-fit: contain;
     object-position: top center;
   }
@@ -196,16 +236,29 @@ async function printPdfFromArrayBuffer(data: ArrayBuffer): Promise<void> {
   await printViaHiddenIframe(images);
 }
 
-/** Druckt eine vorhandene Blob-URL. URL wird NICHT freigegeben (gehört dem Caller). */
-export async function printPdfBlobUrl(url: string): Promise<void> {
+/** Druckt eine vorhandene Blob-URL. URL wird NICHT freigegeben (gehört dem Caller).
+ *  `winRef` (Safari): vorab im User-Klick geöffnetes Fenster für den nativen PDF-Tab.
+ */
+export async function printPdfBlobUrl(url: string, winRef?: Window | null): Promise<void> {
   let res: Response;
   try {
     res = await fetch(url);
   } catch (err) {
+    if (winRef) {
+      try { winRef.close(); } catch { /* noop */ }
+    }
     throw wrapError("PDF-Quelle nicht erreichbar (Blob-URL evtl. abgelaufen)", err);
   }
   if (!res.ok) {
+    if (winRef) {
+      try { winRef.close(); } catch { /* noop */ }
+    }
     throw new Error(`PDF-Quelle antwortete HTTP ${res.status}`);
+  }
+  if (isWebKitSafari()) {
+    const blob = await res.blob();
+    await printPdfNativeTab(blob, winRef ?? null);
+    return;
   }
   let buf: ArrayBuffer;
   try {
@@ -216,8 +269,14 @@ export async function printPdfBlobUrl(url: string): Promise<void> {
   await printPdfFromArrayBuffer(buf);
 }
 
-/** Druckt einen frischen Blob. */
-export async function printPdfBlob(blob: Blob): Promise<void> {
+/** Druckt einen frischen Blob.
+ *  `winRef` (Safari): vorab im User-Klick geöffnetes Fenster für den nativen PDF-Tab.
+ */
+export async function printPdfBlob(blob: Blob, winRef?: Window | null): Promise<void> {
+  if (isWebKitSafari()) {
+    await printPdfNativeTab(blob, winRef ?? null);
+    return;
+  }
   let buf: ArrayBuffer;
   try {
     buf = await blob.arrayBuffer();
@@ -225,4 +284,10 @@ export async function printPdfBlob(blob: Blob): Promise<void> {
     throw wrapError("PDF-Blob konnte nicht gelesen werden", err);
   }
   await printPdfFromArrayBuffer(buf);
+}
+
+/** True, wenn Druck den Safari-PDF-Tab-Pfad nimmt. UI kann damit synchron
+ *  im Klickhandler ein leeres `window.open()` aufrufen, um Popup-Blocker zu vermeiden. */
+export function printRequiresOpenWindow(): boolean {
+  return isWebKitSafari();
 }

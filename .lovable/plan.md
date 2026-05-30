@@ -1,32 +1,71 @@
-## Problem (laut Screenshot)
+## Ziel
+Der Druck soll auf dem Mac sauber funktionieren:
+- 1-seitige PDFs erscheinen im Druckdialog als genau 1 Seite
+- Logo und oberer Bereich werden nicht abgeschnitten
+- lange Rechnungen/Angebote/Protokolle laufen sauber über 2, 3 oder mehr Seiten
 
-Im macOS-Druckdialog wird ein 1-seitiges PDF als **2 Seiten** dargestellt und das Logo oben wird abgeschnitten. Ursache liegt in `src/lib/pdf/printBlob.ts` (`buildPrintHtml`):
+## Plan
 
-1. `.page { height: 297mm }` füllt die A4-Höhe komplett aus. Safari erzwingt jedoch eine minimale, nicht abschaltbare Druckermargin und addiert (bei aktivierten "Kopf- und Fußzeilen") zusätzlich Header/Footer-Höhe. Dadurch überläuft die Seite um wenige Millimeter → der Browser bricht eine **zweite, fast leere Seite** auf.
-2. Das Bild ist mit `object-fit: contain` auf 210 × 297 mm vertikal zentriert. Sobald der Drucker oben/unten ~5 mm Margin erzwingt, wird das obere Drittel (Logo) **abgeschnitten**, weil der Inhalt nicht skaliert, sondern weggeschnitten wird.
-3. Safaris Kopf-/Fußzeilen-Option (im Screenshot aktiv) lässt sich aus dem Web nicht deaktivieren — wir müssen das Layout robust gegen diese Zusatzhöhe machen.
+### 1. Die Druckstrategie in `src/lib/pdf/printBlob.ts` aufteilen
+Ich stelle den Druck auf zwei klare Wege um:
 
-## Lösung (nur `src/lib/pdf/printBlob.ts`)
+- **Safari/WebKit auf macOS/iOS:** nicht mehr über das aktuelle versteckte Rasterbild-`iframe` drucken
+- **andere Browser:** bestehende Inline-Print-Strategie behalten und nur gezielt härten
 
-`buildPrintHtml` so umbauen, dass jede PDF-Seite garantiert auf **genau eine** physische Druckseite passt — auch wenn der Browser zusätzliche Randhöhe reserviert:
+Hintergrund: Im aktuellen Code ist bereits kommentiert, dass Safari/iOS automatisch über einen neuen Tab laufen soll, aber diese Sonderbehandlung ist faktisch noch nicht implementiert. Genau dort liegt sehr wahrscheinlich die Lücke.
 
-- `@page { size: A4; margin: 0 }` beibehalten, zusätzlich `html, body { width: 210mm; height: 297mm; margin: 0; padding: 0 }`.
-- `.page`-Container: feste Breite **210mm**, Höhe **297mm**, `overflow: hidden`, `page-break-after: always`, letzter `.page` mit `page-break-after: avoid` (nicht nur `auto`) — verhindert das Phantom-Blatt.
-- Das Bild **passend skalieren** statt zuschneiden:
-  - `width: 100%`, `height: 100%`, `object-fit: contain`, `object-position: top center` (verankert oben, sodass Logo nie verschwindet, wenn der Drucker minimal stutzt).
-  - `display: block`.
-- Zusätzlich `body { -webkit-print-color-adjust: exact; print-color-adjust: exact }` für farbtreue Logos.
-- Sicherheitspuffer gegen Sub-Pixel-Overflow: `.page { box-sizing: border-box; line-height: 0; font-size: 0 }` — entfernt unsichtbaren Inline-Whitespace nach `<img>`, der bisher die effektive Höhe um ~4 px nach unten verschiebt und so die zweite Seite auslöst.
-- Keine Veränderung an Renderauflösung (`PRINT_DPI = 2`), `printViaHiddenIframe`-Logik oder dem öffentlichen API (`printPdfBlob`, `printPdfBlobUrl`).
+### 2. Für Safari den nativen PDF-Druck verwenden
+Für Safari/WebKit wird der Druck aus dem **Original-PDF** ausgelöst statt aus gerenderten PNG-Seiten.
 
-## Erwartetes Ergebnis
+Geplant:
+- Browser/WebKit-Erkennung ergänzen
+- aus dem Blob eine sichere temporäre Blob-URL erzeugen
+- beim Klick synchron einen Druck-Tab/Preview öffnen, damit kein Popup-Blocker greift
+- dort das PDF nativ laden
+- danach normal aus Safaris PDF-Ansicht drucken
 
-- Im Druckdialog erscheint für ein 1-seitiges PDF nur **„Seite 1 von 1"**.
-- Logo und Adressblock oben sind vollständig sichtbar (Verankerung `top center` + `contain` verhindern Beschnitt).
-- Mehrseitige Rechnungen brechen weiterhin sauber Seite für Seite um (`page-break-after: always` zwischen Seiten).
+Erwarteter Effekt:
+- Safari nutzt dann die echte PDF-Seitengröße statt ein HTML-Layout mit zusätzlicher Drucklogik
+- Phantom-Seiten durch HTML-/`iframe`-Umbruch entfallen
+- der obere Rand mit Logo wird nicht mehr durch den WebKit-Print-Container abgeschnitten
 
-## Out of Scope
+### 3. Den HTML-Print-Fallback für Nicht-Safari robuster machen
+Der bestehende `iframe`-Pfad bleibt für Chrome/andere Browser erhalten, wird aber bereinigt:
 
-- Keine Änderung an pdfmake-Layouts (`backend/src/pdf/layout.ts`, `src/lib/pdf/belegPdf.ts`, `werkzeugePdf.ts`).
-- Keine UI-/Button-/Hook-Änderungen (`PrintButton.tsx`, `useBelegPdf.ts`).
-- Kein Eingriff in `pdfjsWorker`/Renderer.
+- Seitencontainer nur dort verwenden, wo der Browser stabil mit `@page` umgeht
+- letzten Seitenumbruch explizit neutralisieren
+- feste A4-Größe nur pro Seite, nicht als globales Dokument-Zwangslayout
+- weiterhin kein Inline-Whitespace und keine versehentlichen Zusatzhöhen
+
+Damit bleibt der bisherige Vorteil erhalten: PDFs können dort weiter direkt im aktuellen Tab gedruckt werden.
+
+### 4. `PrintButton` an den Safari-Pfad anbinden
+In `src/components/pdf/PrintButton.tsx` binde ich die neue Safari-Logik sauber an den bestehenden Klickfluss an:
+
+- Tab/Fenster wird direkt im User-Klick geöffnet
+- danach wird der Blob in diesen Druckpfad übergeben
+- bestehende Fehlerbehandlung und Toasts bleiben erhalten
+- kein unnötiger Eingriff in Angebot/Rechnung/Protokoll-Routen
+
+### 5. Saubere Validierung nach der Umsetzung
+Ich prüfe danach gezielt diese Fälle:
+
+1. **1-seitige Rechnung/Angebot/Protokoll** → im Druckdialog nur 1 Seite
+2. **mehrseitige Rechnung** → sauberer Seitenwechsel ohne Beschnitt oben
+3. **Logo/Briefkopf oben links** → vollständig sichtbar
+4. **keine Regression** bei Download/Viewer/normaler PDF-Anzeige
+
+## Technische Details
+
+**Dateien mit Änderungen:**
+- `src/lib/pdf/printBlob.ts`
+- `src/components/pdf/PrintButton.tsx`
+
+**Bewusst nicht anfassen:**
+- PDF-Inhalte / Layoutdefinitionen in `belegPdf.ts`, `werkzeugePdf.ts`, `backend/src/pdf/layout.ts`
+- Routen für Rechnungen, Angebote, Protokolle
+
+**Warum dieser Ansatz:**
+- Das Problem sitzt sehr wahrscheinlich nicht mehr im PDF selbst, sondern in der **Druckdarstellung von Safari/WebKit**
+- Der aktuelle Fix hat nur das HTML-/Bild-Layout verändert
+- Auf dem Mac ist für exakte Seitengrößen der **native PDF-Druck** der zuverlässigste Weg, besonders bei langen Dokumenten
