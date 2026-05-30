@@ -353,7 +353,7 @@ export async function generateUebergabeprotokollPdf(
           {
             id: "kunde",
             width: "*",
-            stack: adresse.map((l, i) => ({ text: l, fontSize: 10, bold: i === 0 })),
+            stack: adresse.map((l) => ({ text: l, fontSize: 10 })),
           },
           metaBox(meta),
         ],
@@ -535,7 +535,7 @@ export async function generateSchluesseluebergabePdf(
           {
             id: "kunde",
             width: "*",
-            stack: adresse.map((l, i) => ({ text: l, fontSize: 10, bold: i === 0 })),
+            stack: adresse.map((l) => ({ text: l, fontSize: 10 })),
           },
           metaBox(meta),
         ],
