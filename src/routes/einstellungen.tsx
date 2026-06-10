@@ -20,6 +20,7 @@ import {
   Calculator,
   Clock,
   FileSpreadsheet,
+  Upload,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -51,6 +52,7 @@ import { SteuerTab } from "@/components/einstellungen/SteuerTab";
 import { StundenzettelTab } from "@/components/einstellungen/StundenzettelTab";
 import { BackendVerbindungTab } from "@/components/einstellungen/BackendVerbindungTab";
 import { ExportTab } from "@/components/einstellungen/ExportTab";
+import { ImportTab } from "@/components/einstellungen/ImportTab";
 import type { Firmendaten } from "@/lib/api/types";
 import { cn } from "@/lib/utils";
 
@@ -58,6 +60,7 @@ export const Route = createFileRoute("/einstellungen")({ component: Page });
 
 type TabId =
   | "firmendaten"
+  | "import"
   | "email-vorlagen"
   | "email-signaturen"
   | "smtp"
@@ -78,6 +81,7 @@ const tabs: { id: TabId; label: string; icon: typeof Building2; gruppe: string }
   { id: "firmendaten", label: "Firmendaten", icon: Building2, gruppe: "Stammdaten" },
   { id: "nummernkreise", label: "Nummernkreise", icon: Hash, gruppe: "Stammdaten" },
   { id: "vorlagen", label: "Vorlagen", icon: FileText, gruppe: "Stammdaten" },
+  { id: "import", label: "Import", icon: Upload, gruppe: "Stammdaten" },
 
   { id: "email-vorlagen", label: "E-Mail-Vorlagen", icon: Mail, gruppe: "E-Mail" },
   { id: "email-signaturen", label: "E-Mail-Signaturen", icon: PenLine, gruppe: "E-Mail" },
@@ -260,6 +264,7 @@ function Page() {
           {tab === "steuern" && <SteuerTab />}
           {tab === "stundenzettel" && <StundenzettelTab />}
           {tab === "export" && <ExportTab />}
+          {tab === "import" && <ImportTab />}
           {tab === "drive" && <GoogleDriveTab />}
           {tab === "backend" && <BackendVerbindungTab />}
           {tab === "backup" && <BackupTab />}
