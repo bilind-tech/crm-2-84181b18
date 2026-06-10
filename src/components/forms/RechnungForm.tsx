@@ -10,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { KundePicker } from "./KundePicker";
 import {
   useKunden,
   useObjekte,
@@ -162,24 +163,14 @@ export function RechnungForm({ onClose, defaultKundeId, defaultObjektId }: Props
     <div className="space-y-6">
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Kunde *">
-          <Select
+          <KundePicker
+            kunden={kunden}
             value={kundeId || undefined}
-            onValueChange={(v) => {
+            onChange={(v) => {
               setKundeId(v);
               setObjektId("");
             }}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Kunde wählen…" />
-            </SelectTrigger>
-            <SelectContent>
-              {kunden.map((k) => (
-                <SelectItem key={k.id} value={k.id}>
-                  {k.firmenname || `${k.vorname ?? ""} ${k.nachname ?? ""}`.trim()} · {k.nummer}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          />
         </Field>
         <Field label="Objekt (optional)">
           <Select
