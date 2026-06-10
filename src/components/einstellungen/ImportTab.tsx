@@ -60,7 +60,7 @@ function parseInput(text: string): { rows: ImportRow[]; error?: string } {
   try {
     const data = JSON.parse(text);
     const list = Array.isArray(data?.kunden) ? data.kunden : Array.isArray(data) ? data : null;
-    if (!list) return { rows: [], error: "JSON muss ein Feld „kunden" mit einer Liste enthalten." };
+    if (!list) return { rows: [], error: 'JSON muss ein Feld "kunden" mit einer Liste enthalten.' };
     const rows: ImportRow[] = list.map((r: Record<string, unknown>) => ({
       firmenname: toStr(r.firmenname),
       adresse: toStr(r.adresse),
