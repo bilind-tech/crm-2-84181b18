@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/select";
 import { useKunden, useObjekte } from "@/hooks/useApi";
 import type { Kunde, Objekt } from "@/lib/api/types";
+import { KundePicker } from "@/components/forms/KundePicker";
 
 interface Props {
   kundeId: string | undefined;
@@ -52,27 +53,12 @@ export function KundenObjektPicker({
     <div className={showObjekt ? "grid gap-3 sm:grid-cols-2" : "grid gap-3 sm:max-w-md"}>
       <div className="space-y-1.5">
         <Label>Kunde *</Label>
-        <Select
-          value={kundeId ?? ""}
-          onValueChange={(v) => onKundeChange(kunden.find((k) => k.id === v))}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Kunde auswählen …" />
-          </SelectTrigger>
-          <SelectContent>
-            {kunden.map((k) => (
-              <SelectItem key={k.id} value={k.id}>
-                {kundenAnzeige(k)}
-                {k.kuerzel ? ` · ${k.kuerzel}` : ""}
-              </SelectItem>
-            ))}
-            {kunden.length === 0 && (
-              <div className="px-2 py-1.5 text-sm text-muted-foreground">
-                Keine Kunden vorhanden.
-              </div>
-            )}
-          </SelectContent>
-        </Select>
+        <KundePicker
+          kunden={kunden}
+          value={kundeId || undefined}
+          onChange={(v) => onKundeChange(kunden.find((k) => k.id === v))}
+          placeholder="Kunde auswählen …"
+        />
       </div>
 
       {showObjekt && (
