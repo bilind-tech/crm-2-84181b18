@@ -1,25 +1,43 @@
-Der neue Fehler ist kein Build-Fehler im Code mehr: Frontend und native ARM64-Bindings laufen jetzt durch. Das Backend scheitert beim Paket-Download, weil der persistente npm-Cache unter `/var/tmp/mcc-npm-cache` beschädigte/halb geschriebene Cache-Dateien enthält (`_cacache ... ENOENT`, viele „tarball data seems to be corrupted“).
+## Ziel
 
-Do I know what the issue is? Ja: Das Update-Skript verwendet einen wiederverwendeten npm-Cache. Wenn der einmal kaputt ist oder ein Download abbricht, kann jedes spätere `mcc-update` an zufälligen Paketen scheitern.
+Wenn beim Erstellen/Bearbeiten eines Angebots oder einer Rechnung ein Objekt des Kunden ausgewählt ist, soll dessen Name im Empfänger-Block links oben **direkt unter dem Kunden-/Firmennamen** und **über der Adresse** als eigene Zeile erscheinen.
 
-Plan:
+Beispielansicht:
 
-1. `backend/deploy/update.sh` anpassen
-   - Den persistenten Cache `/var/tmp/mcc-npm-cache` nicht mehr als Standard verwenden.
-   - Stattdessen pro Update einen frischen Cache unter dem Build-Ordner verwenden, z. B. `/var/tmp/mcc-build-<pid>/.npm-cache`.
-   - Der Cache liegt weiterhin auf der SSD, nicht im RAM-`/tmp`, und wird mit dem Build-Verzeichnis automatisch gelöscht.
+```text
+Muster GmbH                ← Firmenname / Kundenname
+Max Mustermann             ← Ansprechpartner (falls vorhanden)
+Objekt Bahnhofsplatz 12    ← NEU: Objektname (nur wenn Objekt ausgewählt)
+Bahnhofsplatz 12
+53757 Sankt Augustin
+```
 
-2. npm-Install robuster machen
-   - Für Frontend- und Backend-Install dieselben sicheren npm-Optionen verwenden.
-   - Retry-/Timeout-Werte setzen, damit kurze Netzwerkprobleme auf dem Pi weniger schnell abbrechen.
-   - Optional `--prefer-online` nutzen, damit npm nicht versucht, kaputte lokale Cache-Einträge wiederzuverwenden.
+## Was geändert wird
 
-3. Alte redundante LightningCSS-Speziallogik im Update-Skript entfernen
-   - Die ARM64-Native-Bindings werden jetzt bereits sauber über `scripts/ensure-lightningcss-native.mjs` installiert.
-   - Dadurch vermeiden wir doppelte/alte Logik.
+1. **Frontend-PDF** (`src/lib/pdf/belegPdf.ts`)
+   - Funktion `kundeAdresse(k, ap, o)` liefert die Empfänger-Zeilen. Die Zeile `if (o?.name) lines.push(o.name);` wird geprüft und – falls nötig – so eingesetzt, dass sie **genau zwischen Person/Firmenname und Straße** steht. Reihenfolge final: Firmenname → Ansprechpartner/Kundenperson → **Objektname** → Straße → PLZ Ort → Land.
 
-4. Daten-Sicherheitsregel bleibt unverändert
-   - Es wird nur das Update-Skript geändert.
-   - `/var/lib/mycleancenter/` wird nicht angefasst.
+2. **Backend-PDF** (`backend/src/pdf/layout.ts`)
+   - Gleiche Funktion `kundeAdresse(k, ap, o)` – identische Reihenfolge sicherstellen, damit die vom Pi gerenderten PDFs (die auch nach Google Drive hochgeladen werden) exakt dasselbe Layout haben wie die Browser-Vorschau.
 
-Nach dem Fix sollte der nächste `mcc-update` mit frischem npm-Cache laufen. Falls auf dem Pi bereits ein kaputter Cache liegt, kann er danach zusätzlich einmalig entfernt werden, aber das Skript soll künftig nicht mehr davon abhängig sein.
+3. **Editor-Vorschau** (`src/components/pdf-editor/panels/StammdatenPanel.tsx`)
+   - Der Empfänger-Kasten im rechten Editor-Panel zeigt derzeit nur Kundenname + Adresse. Wenn im Beleg ein `objektId` gesetzt ist, wird der Objektname als kleine Zusatzzeile zwischen Name und Adresse eingeblendet (nur Anzeige, kein neues Eingabefeld). Der Text „Zum Ändern: Kundenstammdaten bearbeiten." bleibt.
+
+4. **Keine anderen Änderungen**
+   - Keine neuen Abhängigkeiten (kein `bun add`, kein `npm install`).
+   - Keine Änderungen an `package.json`, `package-lock.json`, `bun.lock` oder an `scripts/ensure-lightningcss-native.mjs` bzw. `backend/deploy/update.sh`.
+   - Keine Datenbank-Migration, keine API-Änderung – `objektId` ist bereits Teil von Angebot/Rechnung, `getObjekt` liefert bereits `name`.
+   - Keine Änderung an Empfänger-Adressen-Logik (Objekt-Adresse überschreibt weiterhin die Kundenadresse, wenn gepflegt) – nur die zusätzliche Namenszeile.
+
+## Warum das für `mcc-update` sicher ist
+
+- Es werden ausschließlich TypeScript-Dateien im Quellcode berührt. Der Build-Prozess (`npm ci` + Vite-Build + Backend-Build) läuft unverändert.
+- Keine neuen Pakete, kein Lockfile-Diff, keine nativen Bindings – der zuletzt reparierte Update-Pfad (frischer npm-Cache pro Build, `--prefer-online`, `ensure-lightningcss-native.mjs`) bleibt unangetastet.
+- Keine Schema-Migration, keine neuen Env-Variablen – `/var/lib/mycleancenter/` bleibt unberührt.
+
+## Verifikation vor Abgabe
+
+- `bun run build` (Frontend) und Backend-Build laufen fehlerfrei.
+- Angebots-PDF (Vorschau) mit ausgewähltem Objekt zeigt den Objektnamen in der neuen Zeile; ohne Objekt bleibt der Block unverändert.
+- Rechnungs-PDF verhält sich identisch.
+- Editor-Panel „Empfänger" zeigt den Objektnamen live, wenn ein Objekt ausgewählt ist.
