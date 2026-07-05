@@ -1,43 +1,39 @@
 ## Ziel
 
-Wenn beim Erstellen/Bearbeiten eines Angebots oder einer Rechnung ein Objekt des Kunden ausgewählt ist, soll dessen Name im Empfänger-Block links oben **direkt unter dem Kunden-/Firmennamen** und **über der Adresse** als eigene Zeile erscheinen.
+Zwei kleine, gezielte Layout-Anpassungen an den PDFs für Angebote und Rechnungen — sonst nichts. Kein Anfassen von Build-Skripten, `package.json`, `bun.lock`, `update.sh` oder `ensure-lightningcss-native.mjs`, damit `mcc-update` weiterhin sauber durchläuft wie beim letzten Mal.
 
-Beispielansicht:
+## Änderung 1 — Empfänger etwas weiter nach oben
 
-```text
-Muster GmbH                ← Firmenname / Kundenname
-Max Mustermann             ← Ansprechpartner (falls vorhanden)
-Objekt Bahnhofsplatz 12    ← NEU: Objektname (nur wenn Objekt ausgewählt)
-Bahnhofsplatz 12
-53757 Sankt Augustin
-```
+Aktuell startet der Empfänger-Block (Firmenname, Ansprechpartner, Objekt, Adresse) bei `pageMargins.top = 155`. Wir reduzieren den oberen Seitenrand auf `130`, sodass der komplette Adressblock ~25 pt (≈9 mm) nach oben rutscht. Der Header (Absender-Zeile + Logo) bleibt an seiner festen Position (`margin: [55, 30, 55, 0]`), es entsteht also nur mehr Luft zwischen Header und Kunde, nicht weniger — der Adressblock rückt näher an die typische Sichtfensterhöhe.
 
-## Was geändert wird
+Dateien:
+- `src/lib/pdf/belegPdf.ts` — Zeile 676: `pageMargins: [55, 130, 55, 100]`
+- `backend/src/pdf/layout.ts` — Zeile 460: dieselbe Änderung, damit Pi-PDF (und der Drive-Upload) identisch aussehen
 
-1. **Frontend-PDF** (`src/lib/pdf/belegPdf.ts`)
-   - Funktion `kundeAdresse(k, ap, o)` liefert die Empfänger-Zeilen. Die Zeile `if (o?.name) lines.push(o.name);` wird geprüft und – falls nötig – so eingesetzt, dass sie **genau zwischen Person/Firmenname und Straße** steht. Reihenfolge final: Firmenname → Ansprechpartner/Kundenperson → **Objektname** → Straße → PLZ Ort → Land.
+## Änderung 2 — Tabellen-Header vertikal mittig
 
-2. **Backend-PDF** (`backend/src/pdf/layout.ts`)
-   - Gleiche Funktion `kundeAdresse(k, ap, o)` – identische Reihenfolge sicherstellen, damit die vom Pi gerenderten PDFs (die auch nach Google Drive hochgeladen werden) exakt dasselbe Layout haben wie die Browser-Vorschau.
+Die Kopfzellen „Leistung / Stunden / Abrechnungsart / Preis (netto)" sitzen aktuell mit `margin: [0, 4, 0, 4]` bei `paddingTop/Bottom: 8` in ihrer Zelle. Weil pdfmake keinen echten `vAlign` kennt, sieht die Kopfzeile bei nur einer Textzeile trotzdem oben angeklebt aus, sobald die Daten­zeilen darunter mehrzeilig werden.
 
-3. **Editor-Vorschau** (`src/components/pdf-editor/panels/StammdatenPanel.tsx`)
-   - Der Empfänger-Kasten im rechten Editor-Panel zeigt derzeit nur Kundenname + Adresse. Wenn im Beleg ein `objektId` gesetzt ist, wird der Objektname als kleine Zusatzzeile zwischen Name und Adresse eingeblendet (nur Anzeige, kein neues Eingabefeld). Der Text „Zum Ändern: Kundenstammdaten bearbeiten." bleibt.
+Fix:
+- Feste Kopfzeilenhöhe setzen: `table.heights = (row) => (row === 0 ? 22 : undefined)`
+- Kopfzellen-Margin symmetrisch anheben auf `margin: [0, 6, 0, 6]`, sodass der Text bei fixer 22-pt-Höhe und `paddingTop = paddingBottom = 8` exakt in der Mitte sitzt (oben 8 + 6 = 14, unten 8 + 6 = 14).
 
-4. **Keine anderen Änderungen**
-   - Keine neuen Abhängigkeiten (kein `bun add`, kein `npm install`).
-   - Keine Änderungen an `package.json`, `package-lock.json`, `bun.lock` oder an `scripts/ensure-lightningcss-native.mjs` bzw. `backend/deploy/update.sh`.
-   - Keine Datenbank-Migration, keine API-Änderung – `objektId` ist bereits Teil von Angebot/Rechnung, `getObjekt` liefert bereits `name`.
-   - Keine Änderung an Empfänger-Adressen-Logik (Objekt-Adresse überschreibt weiterhin die Kundenadresse, wenn gepflegt) – nur die zusätzliche Namenszeile.
+Betrifft nur die Kopfzeile (`positionsTabelle`), nicht die Summenzeilen.
 
-## Warum das für `mcc-update` sicher ist
+Dateien:
+- `src/lib/pdf/belegPdf.ts` — `leistungstabelle()`, Header-Margins + `heights` in `positionsTabelle.table`
+- `backend/src/pdf/layout.ts` — dieselbe Änderung an der Server-Kopie
 
-- Es werden ausschließlich TypeScript-Dateien im Quellcode berührt. Der Build-Prozess (`npm ci` + Vite-Build + Backend-Build) läuft unverändert.
-- Keine neuen Pakete, kein Lockfile-Diff, keine nativen Bindings – der zuletzt reparierte Update-Pfad (frischer npm-Cache pro Build, `--prefer-online`, `ensure-lightningcss-native.mjs`) bleibt unangetastet.
-- Keine Schema-Migration, keine neuen Env-Variablen – `/var/lib/mycleancenter/` bleibt unberührt.
+## Was NICHT angefasst wird
 
-## Verifikation vor Abgabe
+- Keine neuen Pakete, keine Lockfile-Änderungen
+- Keine Änderung an `backend/deploy/update.sh` oder `scripts/ensure-lightningcss-native.mjs`
+- Keine Änderung am Editor, an Hotspots, an der Positionsdarstellung oder an Fußzeile/Logo
+- Keine anderen Ränder, Schriftgrößen oder Farben
 
-- `bun run build` (Frontend) und Backend-Build laufen fehlerfrei.
-- Angebots-PDF (Vorschau) mit ausgewähltem Objekt zeigt den Objektnamen in der neuen Zeile; ohne Objekt bleibt der Block unverändert.
-- Rechnungs-PDF verhält sich identisch.
-- Editor-Panel „Empfänger" zeigt den Objektnamen live, wenn ein Objekt ausgewählt ist.
+## Prüfen nach Umsetzung
+
+1. `tsgo` läuft grün (TypeScript unverändert kompatibel).
+2. Beleg-PDF-Tests (`backend/test/pdf.spec.ts`) laufen grün — sie prüfen Bytes/Cache, nicht Pixel, sollten also unauffällig durchlaufen.
+3. Manuell: Angebot + Rechnung öffnen, PDF-Vorschau prüfen — Adresse sitzt höher, Kopfzeile zentriert.
+4. `mcc-update` auf dem Pi: keine neuen Cache-/Native-Binding-Probleme zu erwarten, da nur zwei TS-Dateien geändert werden.

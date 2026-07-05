@@ -331,7 +331,7 @@ function leistungstabelle(
   const colCount = showStunden ? 4 : 3;
 
   const headerRow: unknown[] = [
-    { text: "Leistung", bold: true, fontSize: 10, color: COLOR_TEXT, margin: [0, 4, 0, 4] },
+    { text: "Leistung", bold: true, fontSize: 10, color: COLOR_TEXT, margin: [0, 6, 0, 6] },
   ];
   if (showStunden) {
     headerRow.push({
@@ -340,7 +340,7 @@ function leistungstabelle(
       fontSize: 10,
       color: COLOR_TEXT,
       alignment: "center",
-      margin: [0, 4, 0, 4],
+      margin: [0, 6, 0, 6],
     });
   }
   headerRow.push(
@@ -350,7 +350,7 @@ function leistungstabelle(
       fontSize: 10,
       color: COLOR_TEXT,
       alignment: "center",
-      margin: [0, 4, 0, 4],
+      margin: [0, 6, 0, 6],
     },
     {
       text: "Preis (netto)",
@@ -358,7 +358,7 @@ function leistungstabelle(
       fontSize: 10,
       color: COLOR_TEXT,
       alignment: "right",
-      margin: [0, 4, 0, 4],
+      margin: [0, 6, 0, 6],
     },
   );
 
@@ -435,6 +435,7 @@ function leistungstabelle(
       headerRows: 1,
       widths,
       body: positionsBody,
+      heights: (row: number) => (row === 0 ? 22 : undefined),
     },
     layout: tableLayout,
   };
@@ -673,7 +674,7 @@ async function buildDoc(
   };
   return {
     pageSize: "A4" as const,
-    pageMargins: [55, 155, 55, 100] as [number, number, number, number],
+    pageMargins: [55, 130, 55, 100] as [number, number, number, number],
     defaultStyle: { font: "Roboto", fontSize: 10, color: COLOR_TEXT, lineHeight: 1.25 },
     header: header(ctx.firma, logo),
     footer: footer(ctx.firma),
