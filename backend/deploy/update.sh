@@ -16,7 +16,7 @@ APP_DIR="/opt/mycleancenter/current"
 # /var/tmp liegt auf der SSD und hat den vollen Plattenplatz.
 BUILD_ROOT="${MCC_BUILD_ROOT:-/var/tmp}"
 BUILD_DIR="$BUILD_ROOT/mcc-build-$$"
-NPM_CACHE_DIR="$BUILD_ROOT/mcc-npm-cache"
+NPM_CACHE_DIR="$BUILD_DIR/.npm-cache"
 SERVICE="mycleancenter"
 
 cleanup() {
@@ -43,7 +43,7 @@ require_build_space() {
   if [[ -n "$avail_kb" && "$avail_kb" -lt "$min_kb" ]]; then
     echo "FEHLER: Zu wenig freier Speicher in $BUILD_ROOT."
     echo "Frei: $((avail_kb / 1024)) MB, benötigt: mindestens $((min_kb / 1024)) MB."
-    echo "Tipp: sudo rm -rf /tmp/mcc-build-* $BUILD_ROOT/mcc-build-* && sudo npm cache clean --force && sudo apt clean"
+    echo "Tipp: sudo rm -rf /tmp/mcc-build-* $BUILD_ROOT/mcc-build-* $BUILD_ROOT/mcc-npm-cache && sudo apt clean"
     exit 1
   fi
 }
@@ -51,31 +51,26 @@ require_build_space() {
 cleanup_stale_build_dirs
 require_build_space
 
-# Persistente npm-Cache auf SSD — beschleunigt Re-Installs und entlastet RAM/tmpfs.
-mkdir -p "$NPM_CACHE_DIR"
-export npm_config_cache="$NPM_CACHE_DIR"
-# workerd ist eine Build-/SSR-Dev-Dependency, die wir für `build:spa` nicht brauchen.
-# Sein Postinstall lädt eine plattform­spezifische Binary (~100 MB) und schlägt
-# auf ARM oft fehl. Wir lassen npm den Postinstall überspringen.
-export npm_config_ignore_scripts=false
-
 echo "==> 1/6  Klone $REPO ($BRANCH) nach $BUILD_DIR"
 rm -rf "$BUILD_DIR"
 git clone --depth 1 --branch "$BRANCH" "$REPO" "$BUILD_DIR"
 
 echo "==> 2/6  Frontend bauen (SPA)"
 cd "$BUILD_DIR"
+mkdir -p "$NPM_CACHE_DIR"
+# Frischer npm-Cache pro Update: liegt auf der SSD unter /var/tmp, wird aber
+# zusammen mit dem Build-Verzeichnis gelöscht. So kann ein beschädigter Cache
+# keinen späteren Update-Lauf mehr blockieren.
+export npm_config_cache="$NPM_CACHE_DIR"
+export npm_config_prefer_online=true
+export npm_config_fetch_retries=5
+export npm_config_fetch_retry_mintimeout=20000
+export npm_config_fetch_retry_maxtimeout=120000
+export npm_config_ignore_scripts=false
 # workerd-Postinstall überspringen (Binary nicht nötig für SPA-Build, frisst Platz/Zeit).
-WORKERD_SKIP_INSTALL=1 npm ci --no-audit --no-fund --ignore-scripts
+WORKERD_SKIP_INSTALL=1 npm ci --prefer-online --no-audit --no-fund --ignore-scripts
 # Native Module für die Tools, die wir wirklich brauchen, nachträglich bauen (esbuild).
 npm rebuild esbuild --no-audit --no-fund || true
-# npm lockt optionale native Pakete manchmal nur für die Architektur, auf der
-# package-lock.json erzeugt wurde. Auf dem Pi fehlt dann z. B. das
-# lightningcss-ARM64-Binary, obwohl lightningcss selbst installiert ist.
-if [[ "$(uname -s)" == "Linux" && "$(uname -m)" == "aarch64" ]]; then
-  LIGHTNINGCSS_VERSION="$(node -p "require('./node_modules/lightningcss/package.json').version")"
-  npm install --no-save --no-audit --no-fund "lightningcss-linux-arm64-gnu@$LIGHTNINGCSS_VERSION"
-fi
 npm run build:spa
 
 echo "==> 2b/6  Frontend-node_modules entfernen (verhindert esbuild-Versions-Kollision beim Backend-Postinstall)"
@@ -83,7 +78,7 @@ rm -rf "$BUILD_DIR/node_modules"
 
 echo "==> 3/6  Backend bauen"
 cd "$BUILD_DIR/backend"
-npm ci --no-audit --no-fund
+npm ci --prefer-online --no-audit --no-fund
 npm run build
 
 echo "==> 4/6  Service stoppen"
