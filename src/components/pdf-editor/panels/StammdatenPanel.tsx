@@ -8,7 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useVertraege } from "@/hooks/useApi";
+import { useVertraege, useObjekt } from "@/hooks/useApi";
 import type { Angebot, Rechnung, Kunde } from "@/lib/api/types";
 
 interface Props {
@@ -21,6 +21,7 @@ interface Props {
 
 export function StammdatenPanel({ kind, draft, kunde, set }: Props) {
   const { data: vertraege = [] } = useVertraege(kind === "rechnung" ? kunde.id : "");
+  const { data: objekt } = useObjekt(draft.objektId ?? "");
   return (
     <div className="space-y-5">
       <Section label="Empfänger" feldId="kunde">
@@ -28,6 +29,9 @@ export function StammdatenPanel({ kind, draft, kunde, set }: Props) {
           <p className="font-medium">
             {kunde.firmenname || `${kunde.vorname ?? ""} ${kunde.nachname ?? ""}`.trim() || "—"}
           </p>
+          {objekt?.name && (
+            <p className="mt-0.5 text-xs text-muted-foreground">{objekt.name}</p>
+          )}
           <p className="mt-0.5 text-xs text-muted-foreground">
             {[kunde.strasse, [kunde.plz, kunde.ort].filter(Boolean).join(" ")]
               .filter(Boolean)
