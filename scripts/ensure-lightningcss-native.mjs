@@ -12,55 +12,67 @@ if (!isLinuxArm64) {
   process.exit(0);
 }
 
-const nativePackageName = "lightningcss-linux-arm64-gnu";
+// Liste der ARM64-Native-Bindings, die auf dem Pi häufig fehlen,
+// weil `npm ci --ignore-scripts` Postinstall-Downloads überspringt.
+const nativePackages = [
+  { parent: "lightningcss", native: "lightningcss-linux-arm64-gnu" },
+  { parent: "@tailwindcss/oxide", native: "@tailwindcss/oxide-linux-arm64-gnu" },
+];
 
-try {
-  require.resolve(nativePackageName);
-  process.exit(0);
-} catch {
-  // Continue below and install the missing native package.
-}
-
-let lightningCssVersion;
-
-try {
-  const entry = require.resolve("lightningcss");
-  // Suche das nächstgelegene package.json oberhalb des Entrypoints.
-  let dir = path.dirname(entry);
-  // eslint-disable-next-line no-constant-condition
-  while (true) {
-    const candidate = path.join(dir, "package.json");
-    try {
-      const pkg = JSON.parse(readFileSync(candidate, "utf8"));
-      if (pkg && pkg.name === "lightningcss") {
-        lightningCssVersion = pkg.version;
-        break;
+function readParentVersion(parentName) {
+  try {
+    const entry = require.resolve(parentName);
+    let dir = path.dirname(entry);
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      const candidate = path.join(dir, "package.json");
+      try {
+        const pkg = JSON.parse(readFileSync(candidate, "utf8"));
+        if (pkg && pkg.name === parentName) {
+          return pkg.version;
+        }
+      } catch {
+        // weiter nach oben
       }
-    } catch {
-      // package.json hier nicht vorhanden – weiter nach oben.
+      const parent = path.dirname(dir);
+      if (parent === dir) return null;
+      dir = parent;
     }
-    const parent = path.dirname(dir);
-    if (parent === dir) break;
-    dir = parent;
+  } catch {
+    return null;
   }
-} catch {
-  // ignorieren – Fallback ohne Version-Pin unten
 }
 
-const installSpec = lightningCssVersion
-  ? `${nativePackageName}@${lightningCssVersion}`
-  : nativePackageName;
+const toInstall = [];
 
-if (!lightningCssVersion) {
-  console.warn(
-    "Konnte lightningcss-Version nicht ermitteln – installiere ARM64-Binary ohne Version-Pin.",
-  );
+for (const { parent, native } of nativePackages) {
+  try {
+    require.resolve(native);
+    continue;
+  } catch {
+    // fehlt – nachinstallieren
+  }
+
+  const version = readParentVersion(parent);
+  const spec = version ? `${native}@${version}` : native;
+
+  if (!version) {
+    console.warn(
+      `Konnte ${parent}-Version nicht ermitteln – installiere ${native} ohne Version-Pin.`,
+    );
+  }
+
+  toInstall.push(spec);
 }
 
-console.log(`Installiere fehlendes LightningCSS ARM64-Binary: ${installSpec}`);
+if (toInstall.length === 0) {
+  process.exit(0);
+}
+
+console.log(`Installiere fehlende ARM64-Native-Bindings: ${toInstall.join(", ")}`);
 
 execFileSync(
   "npm",
-  ["install", "--no-save", "--no-audit", "--no-fund", installSpec],
+  ["install", "--no-save", "--no-audit", "--no-fund", ...toInstall],
   { stdio: "inherit" },
 );

@@ -1,17 +1,18 @@
 ## Problem
 
-Der Build bricht in Schritt 2/6 ab. Ursache: `scripts/ensure-lightningcss-native.mjs` liest die lightningcss-Version mit `require("lightningcss/package.json")`. Neuere `lightningcss`-Versionen erlauben diesen Subpath nicht mehr über das `exports`-Feld → Node wirft `ERR_PACKAGE_PATH_NOT_EXPORTED`. Dadurch wird das ARM64-Native-Binary auf dem Pi nie nachinstalliert und der Frontend-Build schlägt fehl.
+Nach dem lightningcss-Fix bricht der Build jetzt an derselben Stelle für `@tailwindcss/oxide` ab: `Cannot find native binding`. Ursache identisch — `npm ci --ignore-scripts` in `update.sh` überspringt Postinstall-Skripte, wodurch das ARM64-Native-Binary `@tailwindcss/oxide-linux-arm64-gnu` fehlt. Für `lightningcss` haben wir das über das prebuild-Script gelöst; für Tailwind Oxide fehlt der gleiche Mechanismus.
 
 ## Fix
 
-`scripts/ensure-lightningcss-native.mjs` so anpassen, dass die Version ohne `exports`-Restriktion gelesen wird:
+`scripts/ensure-lightningcss-native.mjs` zu einem generischen Script umbauen, das mehrere ARM64-Natives sicherstellt:
 
-- statt `require("lightningcss/package.json")` den Pfad via `require.resolve("lightningcss")` auflösen, das nächstgelegene `package.json` mit `node:fs` lesen und `version` daraus parsen.
-- Fallback: wenn die Version nicht ermittelbar ist, `lightningcss-linux-arm64-gnu` ohne Version-Pin (`@latest` bzw. ohne Suffix) installieren, damit der Build trotzdem durchläuft.
-- Rest des Scripts (ARM64-Check, `require.resolve` des Native-Pakets, `npm install --no-save`) bleibt unverändert.
+- Liste der Pakete im Script: `lightningcss` → `lightningcss-linux-arm64-gnu`, `@tailwindcss/oxide` → `@tailwindcss/oxide-linux-arm64-gnu`.
+- Für jedes Paar: prüfen ob Native-Binding bereits auflösbar (`require.resolve`), sonst Version aus dem Parent-Paket via `fs`+`package.json`-Walk auslesen (wie beim lightningcss-Fix) und mit `npm install --no-save` nachziehen. Ohne Version-Pin als Fallback.
+- Nicht-ARM64 Plattformen: sofort exit 0.
+- Datei bleibt unter demselben Pfad, `prebuild:spa` in `package.json` bleibt unverändert.
+
+Optional Aufräumen (kein Muss, aber saubere Sache): den redundanten lightningcss-Block in `backend/deploy/update.sh` entfernen, weil das prebuild-Script das jetzt vollständig übernimmt.
 
 ## Nach dem Merge auf dem Pi
 
-Der User führt einfach nochmal `mcc-update` aus — der neue Clone enthält das gefixte Script, und Schritt 2/6 läuft durch.
-
-Keine weiteren Änderungen an Deploy-Scripts, Repo-URL oder Daten notwendig.
+`mcc-update` erneut ausführen — Schritt 2/6 installiert dann sowohl das lightningcss- als auch das @tailwindcss/oxide-ARM64-Binary automatisch und der Vite-Build läuft durch.
