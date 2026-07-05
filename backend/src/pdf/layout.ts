@@ -62,6 +62,7 @@ function kundeAdresse(k: ApiKunde, ap?: ApiAnsprechpartner, o?: ApiObjekt | null
   const apPerson = ap ? [ap.vorname, ap.nachname].filter(Boolean).join(" ").trim() : "";
   const person = apPerson || [k.vorname, k.nachname].filter(Boolean).join(" ");
   if (person) lines.push(person);
+  if (o?.name) lines.push(o.name);
   // Wenn ein Objekt ausgewählt ist, ist dessen Einsatzadresse maßgeblich.
   // Falls dort nichts gepflegt ist, fällt die PDF auf die Kundenadresse zurück.
   const strasse = o?.strasse || k.strasse || "";
@@ -380,28 +381,28 @@ function defaultOutroAngebot(a: ApiAngebot, outro?: string): string {
 }
 function defaultIntroRechnung(_r: ApiRechnung, intro?: string): string {
   if (intro) return intro;
+  const monat = rechnungsMonat(_r);
   const vertrag = _r.vertrag;
   if (vertrag && vertrag.startDatum) {
-    const datum = dt(vertrag.startDatum);
     const bez = vertrag.bezeichnung?.trim();
     const kern = bez
-      ? `gemäß unserem Vertrag »${bez}« vom ${datum}`
-      : `gemäß unserem Vertrag vom ${datum}`;
-    if (_r.leistungsmonat) {
-      const monat = formatLeistungsmonat(_r.leistungsmonat);
-      if (monat) return `${kern} berechnen wir Ihnen für ${monat} folgende Leistungen:`;
-    }
+      ? `gemäß unserem Vertrag »${bez}«`
+      : `gemäß unserem Vertrag`;
+    if (monat) return `${kern} berechnen wir Ihnen für ${monat} folgende Leistungen:`;
     return `${kern} berechnen wir Ihnen folgende Leistungen:`;
   }
-  const einsatz = formatEinsatz(_r.einsatzVon, _r.einsatzBis);
-  if (einsatz) {
-    return `hiermit übersenden wir Ihnen die Rechnung für die Reinigung ${einsatz} für folgende Leistungen:`;
-  }
-  if (_r.leistungsmonat) {
-    const monat = formatLeistungsmonat(_r.leistungsmonat);
-    if (monat) return `hiermit übersenden wir Ihnen die Rechnung v. ${monat} für folgende Leistungen:`;
-  }
+  if (monat) return `hiermit übersenden wir Ihnen die Rechnung v. ${monat} für folgende Leistungen:`;
   return `hiermit übersenden wir Ihnen die Rechnung für folgende Leistungen:`;
+}
+
+function rechnungsMonat(r: ApiRechnung): string {
+  const fromLm = formatLeistungsmonat(r.leistungsmonat);
+  if (fromLm) return fromLm;
+  const d = r.rechnungsdatum
+    ? new Date(r.rechnungsdatum.includes("T") ? r.rechnungsdatum : r.rechnungsdatum + "T00:00:00Z")
+    : null;
+  if (!d || isNaN(d.getTime())) return "";
+  return d.toLocaleDateString("de-DE", { month: "long", year: "numeric", timeZone: "UTC" });
 }
 
 function formatLeistungsmonat(s?: string | null): string {

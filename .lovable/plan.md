@@ -1,35 +1,52 @@
-# Suchbare Kunden-Auswahl
+## Änderung 1 — Objektname als eigene Zeile in der Empfängeradresse
 
-Aktuell ist die Kunden-Auswahl in den Formularen ein einfaches Select mit langer, nicht filterbarer Liste. Ich baue daraus ein **suchbares Dropdown**, das beim Öffnen direkt im Suchfeld steht.
+In der PDF-Adressbox (oben links, Empfänger) wird direkt nach Firma/Person eine zusätzliche Zeile mit dem Objektnamen eingefügt — aber nur, wenn ein Objekt gewählt wurde und `objekt.name` gepflegt ist. Beispiel:
 
-## Verhalten
+```text
+Musterfirma GmbH
+Julia Weber
+Objekt Nordpark            ← NEU
+Schlossstraße 27
+70173 Stuttgart
+```
 
-- Klick auf das Dropdown öffnet die Liste **und** setzt den Cursor sofort in ein Suchfeld ganz oben.
-- Tippen filtert die Kundenliste live (Treffer in Firmenname, Kürzel, Kundennummer; Groß/Kleinschreibung egal, Umlaute toleriert).
-- Pfeiltasten ↑/↓ wählen, Enter übernimmt, Esc schließt.
-- Klick auf einen Eintrag wählt den Kunden — exakt wie bisher.
-- Leerer Zustand: „Keine Kunden gefunden".
-- Ausgewählter Kunde wird im Trigger wie bisher angezeigt (Firmenname · Kürzel).
-- Komplette Liste bleibt erhalten (kein künstliches Limit), nur eben filterbar.
+Betroffen: Rechnung **und** Angebot (gleiche `kundeAdresse()`-Funktion wird von beiden benutzt).
 
-## Wo wird es eingesetzt
+Dateien:
+- `backend/src/pdf/layout.ts` → `kundeAdresse()`: nach der Personen-Zeile `if (o?.name) lines.push(o.name);` einfügen.
+- `src/lib/pdf/belegPdf.ts` → gleiche Ergänzung in der dortigen `kundeAdresse()` (Frontend-Preview-Renderer).
 
-Überall, wo heute das Kunden-Select steht:
+Kein Datenmodell-, kein Backend-Route-, kein Formular-Change.
 
-1. **Neue Rechnung / Rechnung bearbeiten** — `RechnungForm.tsx`
-2. **Neues Angebot / Angebot bearbeiten** — `AngebotForm.tsx`
-3. **Protokolle (Übergabe & Schlüssel)** — `KundenObjektPicker.tsx` (wird von beiden Protokoll-Formularen genutzt)
+## Änderung 2 — Rechnungs-Einleitungstext auf „Monat Jahr" umstellen
 
-Das Objekt-Dropdown im Protokoll-Picker bleibt unverändert (kurze Listen pro Kunde, keine Suche nötig).
+Aktuell steht im Intro entweder das exakte Vertragsdatum (`gemäß unserem Vertrag vom 12.04.2025 …`) oder ein exakter Einsatzzeitraum. Gewünscht ist eine kompakte Monats-/Jahresangabe wie „v. Juni 2026".
 
-## Technische Umsetzung
+Neue Reihenfolge in `defaultIntroRechnung()` (in `backend/src/pdf/layout.ts` **und** `src/lib/pdf/belegPdf.ts` gespiegelt):
 
-- Neue, wiederverwendbare Komponente `src/components/forms/KundePicker.tsx`, gebaut aus den vorhandenen shadcn-Bausteinen `Popover` + `Command` (gleiches Pattern wie `AnsprechpartnerPicker`).
-- Props: `kunden`, `value`, `onChange`, optional `placeholder` / `disabled`.
-- Beim Öffnen autofokussiert `CommandInput`.
-- Kein neuer Datenfluss, keine Backend-Änderung, keine Änderungen am gespeicherten Datenmodell — nur UI-Austausch.
+1. Wenn der Nutzer einen eigenen Intro-Text gesetzt hat → weiterhin dieser Text.
+2. Sonst wird der Monat bestimmt in dieser Reihenfolge:
+   - `rechnung.leistungsmonat` (Format `YYYY-MM`, falls gepflegt)
+   - sonst der Monat aus `rechnung.rechnungsdatum`
+   - sonst leer.
+3. Ausgabe:
+   - Mit Vertrag + Monat: `gemäß unserem Vertrag »<Bezeichnung>« berechnen wir Ihnen für Juni 2026 folgende Leistungen:` (Vertragsdatum entfällt vollständig).
+   - Ohne Vertrag, mit Monat: `hiermit übersenden wir Ihnen die Rechnung v. Juni 2026 für folgende Leistungen:`.
+   - Ohne Vertrag, ohne Monat (Fallback): `hiermit übersenden wir Ihnen die Rechnung für folgende Leistungen:`.
 
-## Nicht im Umfang
+Der bisherige „vom TT.MM.JJJJ bis TT.MM.JJJJ"-Einsatzsatz entfällt aus dem Default-Intro — er wurde nur zusätzlich zum Datum genutzt und passt nicht zu „nur Monat".
 
-- Keine Änderung an Objekt-/Ansprechpartner-/Vertrag-Dropdowns.
-- Kein neues serverseitiges Suchen — Filter läuft clientseitig über die bereits geladene Kundenliste.
+Deutsche Monatsformatierung wie bisher via `toLocaleDateString("de-DE", { month: "long", year: "numeric", timeZone: "UTC" })`, damit Zeitzonen-Off-by-one ausgeschlossen ist.
+
+## Verifikation
+
+- `bunx tsgo` (Typecheck).
+- Vitest `backend/test/pdf.spec.ts` läuft weiter grün (falls Snapshots betroffen sind, aktualisieren).
+- Manuelle Sichtprüfung: Rechnung mit Objekt → Objektname erscheint als eigene Zeile; Intro zeigt „v. Juni 2026" statt Tages-Datum.
+
+## Nicht Teil der Änderung
+
+- Kein neues Feld in Formularen.
+- Kein Backend-API-Change, keine Migration.
+- Angebots-Intro bleibt unverändert (User hat nur Rechnungs-Intro angesprochen).
+- Der Editor-Text (eigener Intro/Outro) bleibt unangetastet.

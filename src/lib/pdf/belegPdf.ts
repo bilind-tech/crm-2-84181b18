@@ -167,6 +167,7 @@ function kundeAdresse(k: Kunde, ap?: Ansprechpartner, o?: Objekt | null) {
   const apPerson = ap ? [ap.vorname, ap.nachname].filter(Boolean).join(" ").trim() : "";
   const person = apPerson || [k.vorname, k.nachname].filter(Boolean).join(" ");
   if (person) lines.push(person);
+  if (o?.name) lines.push(o.name);
   // Wenn ein Objekt ausgewählt ist, ist dessen Einsatzadresse maßgeblich.
   // Falls dort nichts gepflegt ist, fällt die PDF auf die Kundenadresse zurück.
   const strasse = o?.strasse || k.strasse || "";
@@ -571,21 +572,30 @@ export function defaultOutroAngebot(a: Angebot, opts: BuildOptions = {}) {
 }
 export function defaultIntroRechnung(_r: Rechnung, opts: BuildOptions = {}) {
   if (opts.intro) return opts.intro;
-  const einsatz = formatEinsatzClient(_r.einsatzVon, _r.einsatzBis);
-  if (einsatz) {
-    return `hiermit übersenden wir Ihnen die Rechnung für die Reinigung ${einsatz} für folgende Leistungen:`;
+  const monat = monatFromRechnung(_r);
+  if (monat) {
+    return `hiermit übersenden wir Ihnen die Rechnung v. ${monat} für folgende Leistungen:`;
   }
-  if (_r.leistungsmonat) {
-    const m = /^(\d{4})-(\d{2})$/.exec(_r.leistungsmonat);
+  return `hiermit übersenden wir Ihnen die Rechnung für folgende Leistungen:`;
+}
+
+function monatFromRechnung(r: Rechnung): string {
+  if (r.leistungsmonat) {
+    const m = /^(\d{4})-(\d{2})$/.exec(r.leistungsmonat);
     if (m) {
       const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, 1));
       if (!isNaN(d.getTime())) {
-        const monat = d.toLocaleDateString("de-DE", { month: "long", year: "numeric", timeZone: "UTC" });
-        return `hiermit übersenden wir Ihnen die Rechnung v. ${monat} für folgende Leistungen:`;
+        return d.toLocaleDateString("de-DE", { month: "long", year: "numeric", timeZone: "UTC" });
       }
     }
   }
-  return `hiermit übersenden wir Ihnen die Rechnung für folgende Leistungen:`;
+  if (r.rechnungsdatum) {
+    const d = new Date(r.rechnungsdatum.includes("T") ? r.rechnungsdatum : r.rechnungsdatum + "T00:00:00Z");
+    if (!isNaN(d.getTime())) {
+      return d.toLocaleDateString("de-DE", { month: "long", year: "numeric", timeZone: "UTC" });
+    }
+  }
+  return "";
 }
 
 function formatEinsatzClient(von?: string, bis?: string): string {
