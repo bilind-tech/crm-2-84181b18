@@ -1,27 +1,57 @@
+## Do I know what the issue is?
+
+Ja.
+
+## Was das Problem wirklich ist
+
+Der Raspberry Pi läuft beim Befehl `mcc-update` sehr wahrscheinlich noch mit dem lokal installierten alten Update-Script. Deshalb wurde mein letzter Fix in `backend/deploy/update.sh` nicht ausgeführt.
+
+Das sieht man am Log: Nach `rebuilt dependencies successfully` müsste bei meinem Fix noch ein `npm install ... lightningcss-linux-arm64-gnu` passieren. Das passiert nicht, danach startet direkt `vite build`.
+
+Zusätzlich ist der ursprüngliche Fehler ein bekanntes npm/optional-dependency-Problem: `lightningcss` braucht auf ARM64 ein natives Paket (`lightningcss-linux-arm64-gnu`). Wenn der Lockfile auf einer anderen Architektur erzeugt wurde oder npm optionale native Pakete nicht korrekt nachzieht, fehlt genau diese `.node`-Datei.
+
 ## Plan
 
-Der Fehler kommt daher, dass `lightningcss` auf dem Raspberry Pi ein natives ARM64-Paket braucht (`lightningcss-linux-arm64-gnu`), dieses aber im aktuellen `package-lock.json` nicht als installierbarer Eintrag vorhanden ist. Dadurch installiert `npm ci` auf dem Pi zwar die normalen Pakete, aber beim Build fehlt die native `.node`-Datei.
+1. Nicht mehr nur das externe Pi-Update-Script fixen, weil das alte `mcc-update` dieses Script vor dem Build gar nicht aktualisiert.
+2. Stattdessen einen `prebuild:spa`-Hook in `package.json` ergänzen.
+   - `npm run build:spa` führt automatisch vorher `prebuild:spa` aus.
+   - Damit greift der Fix auch dann, wenn auf dem Pi noch der alte `mcc-update`-Wrapper läuft.
+3. Ein kleines Node-Script hinzufügen, das vor dem SPA-Build prüft:
+   - Läuft das System auf Linux ARM64?
+   - Ist `lightningcss-linux-arm64-gnu` vorhanden?
+   - Falls nein: installiere exakt die passende Version zu `lightningcss` per `npm install --no-save --no-audit --no-fund`.
+4. Das bestehende `backend/deploy/update.sh` zusätzlich robuster lassen/erweitern, damit künftige frisch installierte Updater ebenfalls korrekt sind.
+5. Prüfen, dass `package.json` den Hook enthält und das Script syntax-valid ist.
 
-## Umsetzung
+## Warum das funktionieren soll
 
-1. `package-lock.json` so aktualisieren, dass die optionalen LightningCSS-Nativpakete für Linux ARM64 enthalten sind.
-2. Sicherstellen, dass `package.json` unverändert bleibt, weil dort die Abhängigkeit bereits indirekt korrekt über Tailwind/Vite kommt.
-3. Danach prüfen, dass der Lockfile-Eintrag für `lightningcss-linux-arm64-gnu` vorhanden ist.
-
-## Danach auf dem Raspberry Pi ausführen
+Der Build-Befehl auf dem Pi ist bereits:
 
 ```bash
-rm -rf /var/tmp/mcc-npm-cache
-mcc-update
+npm run build:spa
 ```
 
-Falls der Pi weiterhin alte Installationsreste nutzt:
+Npm führt davor automatisch aus:
+
+```bash
+npm run prebuild:spa
+```
+
+Dieser Hook liegt im neu geklonten Repo und wird daher auch vom alten `mcc-update` geladen.
+
+## Danach auf dem Pi
+
+Nach dem nächsten GitHub-Sync genügt wieder:
 
 ```bash
 rm -rf /var/tmp/mcc-npm-cache /var/tmp/mcc-build-*
 mcc-update
 ```
 
-## Erwartetes Ergebnis
+<presentation-actions>
+  <presentation-open-history>View History</presentation-open-history>
+</presentation-actions>
 
-`npm ci` installiert dann auf dem Pi automatisch das passende ARM64-Paket, und `vite build --config vite.spa.config.ts` kann `lightningcss` laden.
+<presentation-actions>
+<presentation-link url="https://docs.lovable.dev/tips-tricks/troubleshooting">Troubleshooting docs</presentation-link>
+</presentation-actions>
