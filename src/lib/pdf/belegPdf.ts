@@ -674,7 +674,7 @@ async function buildDoc(
   };
   return {
     pageSize: "A4" as const,
-    pageMargins: [55, 155, 55, 100] as [number, number, number, number],
+    pageMargins: [55, 130, 55, 100] as [number, number, number, number],
     defaultStyle: { font: "Roboto", fontSize: 10, color: COLOR_TEXT, lineHeight: 1.25 },
     header: header(ctx.firma, logo),
     footer: footer(ctx.firma),
