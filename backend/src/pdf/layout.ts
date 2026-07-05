@@ -190,14 +190,14 @@ function leistungstabelle(positionen: ApiPosition[], totalsT: { netto: number; s
   const colCount = showStunden ? 4 : 3;
 
   const headerRow: unknown[] = [
-    { text: "Leistung", bold: true, fontSize: 10, color: COLOR_TEXT, margin: [0, 4, 0, 4] },
+    { text: "Leistung", bold: true, fontSize: 10, color: COLOR_TEXT, margin: [0, 6, 0, 6] },
   ];
   if (showStunden) {
-    headerRow.push({ text: "Stunden", bold: true, fontSize: 10, color: COLOR_TEXT, alignment: "center", margin: [0, 4, 0, 4] });
+    headerRow.push({ text: "Stunden", bold: true, fontSize: 10, color: COLOR_TEXT, alignment: "center", margin: [0, 6, 0, 6] });
   }
   headerRow.push(
-    { text: "Abrechnungsart", bold: true, fontSize: 10, color: COLOR_TEXT, alignment: "center", margin: [0, 4, 0, 4] },
-    { text: "Preis (netto)", bold: true, fontSize: 10, color: COLOR_TEXT, alignment: "right", margin: [0, 4, 0, 4] },
+    { text: "Abrechnungsart", bold: true, fontSize: 10, color: COLOR_TEXT, alignment: "center", margin: [0, 6, 0, 6] },
+    { text: "Preis (netto)", bold: true, fontSize: 10, color: COLOR_TEXT, alignment: "right", margin: [0, 6, 0, 6] },
   );
 
   const body: unknown[][] = [headerRow];
@@ -242,6 +242,7 @@ function leistungstabelle(positionen: ApiPosition[], totalsT: { netto: number; s
       headerRows: 1,
       widths,
       body,
+      heights: (row: number) => (row === 0 ? 22 : undefined),
     },
     layout: {
       hLineWidth: () => 0.6,
